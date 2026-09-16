@@ -93,56 +93,68 @@ export default function NoteDialog({
       archived: latest.current.archived,
       labelIds: [...latest.current.labelIds],
     };
-    docRef.current = { ...docRef.current, ...adopted };
+    // Keep a locally cleared title in the input until close; the persist baseline still tracks the saved title.
+    const editorTitle = docRef.current.title;
+    docRef.current = {
+      ...docRef.current,
+      ...adopted,
+      ...(editorTitle.trim() ? {} : { title: editorTitle }),
+    };
     lastEditorDocument.current = { ...lastEditorDocument.current, ...structuredClone(adopted) };
     setDocument(docRef.current);
   }, [latest, saving, persistedRevision]);
   const readOnly =
     !writable || document.meta.trashedAt !== null || !!latest?.duplicate || !!latest?.remoteUnavailable;
-  const persist = useCallback(async () => {
-    clearTimeout(localTimer.current);
-    const run = async () => {
-      if (version.current === savedVersion.current) return;
-      const currentVersion = version.current;
-      const draft = structuredClone(docRef.current);
-      if (!idRef.current && !draft.title.trim() && !draft.markdown.trim()) {
-        savedVersion.current = currentVersion;
-        setSaving(false);
-        return;
-      }
-      if (!draft.title.trim()) {
-        draft.title = t('home.untitled');
-        docRef.current = { ...docRef.current, title: draft.title };
-        setDocument((d) => ({ ...d, title: draft.title }));
-      }
-      try {
-        const note = idRef.current
-          ? await saveEditedNote(scope, idRef.current, lastEditorDocument.current, draft)
-          : await createNote(scope, draft);
-        lastEditorDocument.current = structuredClone(draft);
-        setPersistedRevision(note.localRevision);
-        if (!idRef.current) {
-          idRef.current = note.localId;
-          setLocalId(note.localId);
-          engine?.setEditing(note.localId, true);
+  const persist = useCallback(
+    async (options?: { finalizeEmptyTitle?: boolean }) => {
+      clearTimeout(localTimer.current);
+      const run = async () => {
+        const emptyTitle = !docRef.current.title.trim();
+        // Title-only clearing is kept local; still persist the untitled fallback on close.
+        if (version.current === savedVersion.current && !(options?.finalizeEmptyTitle && emptyTitle)) return;
+        const currentVersion = version.current;
+        const draft = structuredClone(docRef.current);
+        if (!idRef.current && emptyTitle && !draft.markdown.trim()) {
+          savedVersion.current = currentVersion;
+          setSaving(false);
+          return;
         }
-        savedVersion.current = currentVersion;
-        setSaveError('');
-        if (currentVersion === version.current) setSaving(false);
-      } catch (error) {
-        setSaving(false);
-        setSaveError(
-          error instanceof Error && /VALIDATION|LIMIT|title|markdown|body/i.test(error.message)
-            ? 'VALIDATION_FAILED'
-            : 'storage',
-        );
-        throw error;
-      }
-    };
-    const result = persistence.current.catch(() => {}).then(run);
-    persistence.current = result;
-    return result;
-  }, [scope, t, engine]);
+        if (emptyTitle) {
+          draft.title =
+            options?.finalizeEmptyTitle || !idRef.current
+              ? t('home.untitled')
+              : lastEditorDocument.current.title;
+        }
+        try {
+          const note = idRef.current
+            ? await saveEditedNote(scope, idRef.current, lastEditorDocument.current, draft)
+            : await createNote(scope, draft);
+          lastEditorDocument.current = structuredClone(draft);
+          setPersistedRevision(note.localRevision);
+          if (!idRef.current) {
+            idRef.current = note.localId;
+            setLocalId(note.localId);
+            engine?.setEditing(note.localId, true);
+          }
+          savedVersion.current = currentVersion;
+          setSaveError('');
+          if (currentVersion === version.current) setSaving(false);
+        } catch (error) {
+          setSaving(false);
+          setSaveError(
+            error instanceof Error && /VALIDATION|LIMIT|title|markdown|body/i.test(error.message)
+              ? 'VALIDATION_FAILED'
+              : 'storage',
+          );
+          throw error;
+        }
+      };
+      const result = persistence.current.catch(() => {}).then(run);
+      persistence.current = result;
+      return result;
+    },
+    [scope, t, engine],
+  );
   const flush = useCallback(async () => {
     await editorFlush.current();
     await persist();
@@ -182,7 +194,8 @@ export default function NoteDialog({
   }
   async function close(direction?: -1 | 1) {
     try {
-      await flush();
+      await editorFlush.current();
+      await persist({ finalizeEmptyTitle: true });
       if (idRef.current) engine?.setEditing(idRef.current, false);
       if (direction) onNavigate(direction);
       else onClose();
