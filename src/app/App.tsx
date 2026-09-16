@@ -6,7 +6,6 @@ import * as Dialog from '@radix-ui/react-dialog';
 import {
   Archive,
   ArrowUpRight,
-  CheckSquare,
   CircleAlert,
   CloudOff,
   FileText,
@@ -454,23 +453,9 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
             <Settings onConnect={() => setConnectOpen(true)} offlineReady={offlineReady} />
           ) : (
             <>
-              <div className="page-heading">
-                <div>
-                  <div className="eyebrow">{t('home.scrollHint')}</div>
-                  <h1>{t(route === 'notes' ? 'home.title' : `nav.${route}`)}</h1>
-                  <p>
-                    {t(
-                      route === 'archive'
-                        ? 'home.archiveDescription'
-                        : route === 'trash'
-                          ? 'home.trashDescription'
-                          : route === 'issues'
-                            ? 'home.issuesDescription'
-                            : 'home.subtitle',
-                    )}
-                  </p>
-                </div>
-                {route !== 'issues' && route !== 'trash' && (
+              <h1 className="sr-only">{t(`nav.${route}`)}</h1>
+              {route !== 'issues' && route !== 'trash' && (
+                <div className="page-actions">
                   <button
                     className="button primary new-note-button"
                     disabled={!session.writable}
@@ -479,25 +464,6 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                     <Plus size={18} />
                     {t('action.new')}
                   </button>
-                )}
-              </div>
-              {route === 'notes' && (
-                <div className="quick-note">
-                  <button
-                    disabled={!session.writable}
-                    onClick={() => setSelection({ kind: 'markdown', ids: [] })}
-                  >
-                    <NotebookPen size={19} />
-                    <span>{t('home.quick')}</span>
-                    <kbd>+</kbd>
-                  </button>
-                  <IconButton
-                    label={t('action.checklist')}
-                    disabled={!session.writable}
-                    onClick={() => setSelection({ kind: 'checklist', ids: [] })}
-                  >
-                    <CheckSquare size={21} />
-                  </IconButton>
                 </div>
               )}
               {sync?.loading || (!sync?.initialLoadComplete && session.connected) ? (

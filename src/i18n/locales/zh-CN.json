@@ -17,7 +17,6 @@
     "disconnect": "断开 GitHub 连接",
     "openOffline": "打开本地笔记",
     "new": "新建笔记",
-    "checklist": "新建清单",
     "save": "立即同步",
     "close": "关闭",
     "cancel": "取消",
@@ -78,9 +77,6 @@
     "privateOnly": "请使用你自己拥有的 GitHub 私人仓库。"
   },
   "home": {
-    "title": "放下一个想法",
-    "subtitle": "记下小事，也留下值得回看的念头。",
-    "quick": "记点什么…",
     "search": "搜索笔记",
     "pinned": "置顶",
     "other": "其他笔记",
@@ -89,8 +85,6 @@
     "emptyDescription": "记下想法，收藏链接，或列一张小清单。",
     "noResults": "这里暂时没有笔记",
     "noResultsDescription": "试试其他关键词，或调整筛选条件。",
-    "trashDescription": "笔记会一直保留，直到你恢复。不会自动清空。",
-    "archiveDescription": "先收起来，需要时再翻开。",
     "issuesDescription": "已有 Issue 会保持原样，直到你选择把它转为笔记。",
     "loading": "正在加载 Issues，筛选结果可能不完整。",
     "offline": "当前离线。修改会保存在此设备，连接恢复后再同步。",
@@ -102,8 +96,7 @@
     "newTitle": "新建笔记",
     "readIssue": "阅读 Issue",
     "invalid": "无法读取这条 Issue 的笔记元数据，原始内容已保留。",
-    "unsupported": "这条笔记使用了更新的数据格式，请更新 Tebikae 后再编辑。",
-    "scrollHint": "你的笔记，一目了然"
+    "unsupported": "这条笔记使用了更新的数据格式，请更新 Tebikae 后再编辑。"
   },
   "note": {
     "remoteUpdated": "GitHub 上有更新的笔记版本，当前编辑器中的正文已保留。",

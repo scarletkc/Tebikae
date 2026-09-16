@@ -17,7 +17,6 @@
     "disconnect": "Disconnect GitHub",
     "openOffline": "Open cached notes",
     "new": "New note",
-    "checklist": "New checklist",
     "save": "Sync now",
     "close": "Close",
     "cancel": "Cancel",
@@ -78,9 +77,6 @@
     "privateOnly": "Use a private repository owned by your GitHub account."
   },
   "home": {
-    "title": "A place for your thoughts",
-    "subtitle": "Keep the small things. Come back to the good ones.",
-    "quick": "Take a note…",
     "search": "Search your notes",
     "pinned": "Pinned",
     "other": "Everything else",
@@ -89,8 +85,6 @@
     "emptyDescription": "Capture a thought, save a link, or make a little list.",
     "noResults": "Nothing here just yet",
     "noResultsDescription": "Try another search or adjust your filters.",
-    "trashDescription": "Notes stay here until you restore them. Nothing is automatically deleted.",
-    "archiveDescription": "Out of the way, here when you need them.",
     "issuesDescription": "Your existing Issues stay unchanged until you choose to turn one into a note.",
     "loading": "Loading Issues — these results may be incomplete.",
     "offline": "You’re offline. Changes stay on this device until you reconnect.",
@@ -102,8 +96,7 @@
     "newTitle": "New note",
     "readIssue": "Read Issue",
     "invalid": "This Issue’s note metadata cannot be read. Its original content is preserved.",
-    "unsupported": "This note uses a newer format. Update Tebikae before editing it.",
-    "scrollHint": "Your notes, at a glance"
+    "unsupported": "This note uses a newer format. Update Tebikae before editing it."
   },
   "note": {
     "remoteUpdated": "GitHub has a newer version of this note. Your current editor text is preserved.",
