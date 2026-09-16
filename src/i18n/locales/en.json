@@ -196,6 +196,21 @@
     "connectedRequired": "Connect to GitHub to create labels.",
     "choose": "Choose labels"
   },
+  "markdownExport": {
+    "title": "Export Markdown ZIP",
+    "help": "Download your current notes as Markdown files, organized into notes, archive, and trash folders. Duplicate titles get separate filenames. A manifest preserves labels, note properties, and sync status.",
+    "coverage": "This preview captures notes and unsynced drafts stored on this device. It does not fetch from GitHub. Comments, attachment files, ordinary Issues, and recovery copies are excluded; use JSON export for recovery copies.",
+    "includeTrash": "Include notes in trash",
+    "notes": "Notes",
+    "archive": "Archived",
+    "trash": "Trash",
+    "unsynced": "With unsynced changes",
+    "total": "Total files",
+    "empty": "No notes to export with these options.",
+    "preparing": "Preparing export…",
+    "download": "Download ZIP",
+    "failed": "Could not prepare the Markdown export. Your notes are unchanged. Please try again."
+  },
   "settings": {
     "title": "Make it yours",
     "appearance": "Appearance",

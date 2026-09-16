@@ -1280,6 +1280,27 @@ hr {
 .dialog-header .icon-button {
   padding: 6px;
 }
+.markdown-export-body {
+  padding: 0 24px 24px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.markdown-export-counts {
+  margin: 20px 0;
+}
+.markdown-export-counts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+}
+.markdown-export-counts dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.markdown-export-counts > div:last-child {
+  font-weight: 600;
+}
 .note-dialog {
   width: min(94vw, 890px);
 }

@@ -4,6 +4,8 @@ import { connect, mockGitHub } from '../e2e/fixtures';
 import en from '../../src/i18n/locales/en.json' with { type: 'json' };
 import zh from '../../src/i18n/locales/zh-CN.json' with { type: 'json' };
 import { blockGitHubAfterReload, disconnectNetwork } from './network';
+import { readFile } from 'node:fs/promises';
+import { strFromU8, unzipSync } from 'fflate';
 
 for (const language of ['en', 'zh-CN'] as const) {
   test(`production shell and first editor use work after a fully offline reload (${language})`, async ({
@@ -60,6 +62,18 @@ for (const language of ['en', 'zh-CN'] as const) {
     await page.locator('.note-card').filter({ hasText: 'Weekend ideas' }).locator('.note-open').click();
     await expect(page.locator('.ProseMirror')).toContainText('首次离线编辑');
     await expect(page.getByRole('button', { name: copy.action.save, exact: true })).toBeDisabled();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: copy.action.close, exact: true })
+      .last()
+      .click();
+    await page.locator('a[href$="#/settings"]').click();
+    await page.getByRole('button', { name: copy.markdownExport.title, exact: true }).click();
+    const downloaded = page.waitForEvent('download');
+    await page.getByRole('button', { name: copy.markdownExport.download, exact: true }).click();
+    const download = await downloaded;
+    const files = unzipSync(await readFile((await download.path())!));
+    expect(strFromU8(files['notes/Weekend ideas.md']!)).toContain('首次离线编辑');
     expect(remote.writes).toHaveLength(0);
   });
 }

@@ -8,7 +8,8 @@ import {
   type ReactNode,
 } from 'react';
 import type { Connection } from '../domain/types';
-import { ApiError, GitHubClient, GITHUB_API_VERSION } from '../adapters/github/client';
+import { ApiError, GitHubClient } from '../adapters/github/client';
+import { createHttpCache } from '../storage/http-cache';
 import { CredentialProvider } from '../security/credentials';
 import { savedSessionStore, type SavedSession } from '../security/saved-session';
 import { db } from '../storage/db';
@@ -97,11 +98,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   ) {
     runtime.current.credentials.set(token);
     const adapter = new GitHubClient(runtime.current.credentials, {
-      cache: {
-        get: (scopeId, url) =>
-          db.httpCache.get([scopeId, url, 'application/vnd.github+json', GITHUB_API_VERSION]),
-        put: (entry) => db.httpCache.put(entry),
-      },
+      cache: createHttpCache(),
     });
     try {
       const next = await adapter.connect(repository);

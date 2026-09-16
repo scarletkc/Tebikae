@@ -22,7 +22,7 @@ Select **Remember this connection in this browser** to save your connection with
 - Visual Markdown editing with a source mode, checklists, links, code, and GFM tables.
 - GitHub labels, search and combined filters, colors, pinning, archive, and recoverable trash.
 - Simplified Chinese and English; light, dark, and system themes.
-- Local drafts, a persistent sync queue, conflict resolution, recovery copies, and JSON / Markdown exports.
+- Local drafts, a persistent sync queue, conflict resolution, recovery copies, and JSON / Markdown exports, including a bulk Markdown ZIP with a preview and optional trash inclusion.
 - An installable PWA with an offline app shell and editor.
 
 ## Development

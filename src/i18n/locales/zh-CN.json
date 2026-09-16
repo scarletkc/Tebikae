@@ -196,6 +196,21 @@
     "connectedRequired": "连接 GitHub 后可以创建标签。",
     "choose": "选择标签"
   },
+  "markdownExport": {
+    "title": "导出 Markdown ZIP",
+    "help": "将当前笔记下载为 Markdown 文件，按笔记、归档和回收站分目录保存。同名笔记使用不同文件名，清单文件保留标签、笔记属性和同步状态。",
+    "coverage": "此预览包含本设备上已保存的笔记和未同步草稿，不会从 GitHub 拉取数据。不包含评论、附件文件、普通 Issue 和恢复副本；需要恢复副本时请使用 JSON 导出。",
+    "includeTrash": "包含回收站中的笔记",
+    "notes": "笔记",
+    "archive": "已归档",
+    "trash": "回收站",
+    "unsynced": "含未同步修改",
+    "total": "笔记文件总数",
+    "empty": "当前选项下没有可导出的笔记。",
+    "preparing": "正在准备导出…",
+    "download": "下载 ZIP",
+    "failed": "无法准备 Markdown 导出，笔记未被修改。请重试。"
+  },
   "settings": {
     "title": "用你喜欢的方式",
     "appearance": "外观",

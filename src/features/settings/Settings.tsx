@@ -8,6 +8,8 @@ import { download, LanguageControl } from '../../app/ui';
 import { exportScope, clearScope } from '../../application/commands';
 import { db } from '../../storage/db';
 import packageJson from '../../../package.json';
+import { prepareMarkdownExport, type MarkdownExportSnapshot } from '../../application/markdown-export';
+import MarkdownExportDialog from './MarkdownExportDialog';
 
 export default function Settings({ onConnect, offlineReady }: { onConnect(): void; offlineReady: boolean }) {
   const { t } = useTranslation();
@@ -16,6 +18,8 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
   const connection = session.connection!;
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [preparingExport, setPreparingExport] = useState(false);
+  const [markdownExport, setMarkdownExport] = useState<MarkdownExportSnapshot>();
   const state = useLiveQuery(() => db.syncState.get(connection.scopeId), [connection.scopeId]);
   async function exportData() {
     await flushAllDrafts();
@@ -43,6 +47,18 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
       setNotice(t('error.storage'));
     } finally {
       setBusy(false);
+    }
+  }
+  async function previewMarkdownExport() {
+    setPreparingExport(true);
+    setNotice('');
+    try {
+      await flushAllDrafts();
+      setMarkdownExport(await prepareMarkdownExport(connection.scopeId));
+    } catch {
+      setNotice(t('markdownExport.failed'));
+    } finally {
+      setPreparingExport(false);
     }
   }
   return (
@@ -117,6 +133,14 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
           </button>
           <button
             className="button secondary"
+            disabled={preparingExport || busy}
+            onClick={() => void previewMarkdownExport()}
+          >
+            <Download size={16} />
+            {t(preparingExport ? 'markdownExport.preparing' : 'markdownExport.title')}
+          </button>
+          <button
+            className="button secondary"
             onClick={() =>
               void navigator.storage
                 ?.persist?.()
@@ -158,6 +182,9 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
         <p role="status" className="banner">
           {notice}
         </p>
+      )}
+      {markdownExport && (
+        <MarkdownExportDialog snapshot={markdownExport} onClose={() => setMarkdownExport(undefined)} />
       )}
     </section>
   );

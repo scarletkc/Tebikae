@@ -165,8 +165,10 @@ export function Modal({
     </Dialog.Root>
   );
 }
-export function download(name: string, value: string, type = 'text/plain') {
-  const url = URL.createObjectURL(new Blob([value], { type: `${type};charset=utf-8` }));
+export function download(name: string, value: string | Blob, type = 'text/plain') {
+  const url = URL.createObjectURL(
+    value instanceof Blob ? value : new Blob([value], { type: `${type};charset=utf-8` }),
+  );
   const link = document.createElement('a');
   link.href = url;
   link.download = [...name].map((c) => (c.charCodeAt(0) < 32 || /[<>:"/\\|?*]/.test(c) ? '_' : c)).join('');
