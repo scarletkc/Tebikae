@@ -6,8 +6,6 @@ import * as Dialog from '@radix-ui/react-dialog';
 import {
   Archive,
   ArrowUpRight,
-  CircleAlert,
-  CloudOff,
   FileText,
   GitBranch,
   Grid2X2,
@@ -20,7 +18,6 @@ import {
   Search,
   Settings as SettingsIcon,
   SlidersHorizontal,
-  Tag,
   Trash2,
   X,
 } from 'lucide-react';
@@ -31,13 +28,15 @@ import { PwaUpdateContext } from './pwa';
 import { Brand, IconButton, Modal, PreferencesControls, download } from './ui';
 import { db } from '../storage/db';
 import { defaultFilters, filterNotes, labelCounts } from '../domain/filters';
-import { toggleChecklistItem } from '../domain/markdown';
+import WorkspaceStatus, { type WorkspaceNotice } from './WorkspaceStatus';
 import type { LocalNote, NoteFilters, NoteKind, UnmanagedIssue } from '../domain/types';
 import { convertIssue, saveEditedNote } from '../application/commands';
 import { ApiError } from '../adapters/github/client';
 import { safeHref } from '../security/urls';
 import ConnectPage, { ConnectForm } from '../features/connect/Connect';
 import NoteCard from '../features/notes/NoteCard';
+import { LabelDot } from '../features/labels';
+import NotesGrid from '../features/notes/NotesGrid';
 import NoteDialog from '../features/notes/NoteDialog';
 import { FilterChips, FiltersDialog, filterCount } from '../features/filters/Filters';
 import Settings from '../features/settings/Settings';
@@ -202,14 +201,13 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       setBusy(false);
     }
   }
-  async function change(note: LocalNote, action: 'pin' | 'archive' | 'trash' | 'restore' | number) {
+  async function change(note: LocalNote, action: 'pin' | 'archive' | 'trash' | 'restore') {
     if (!session.writable) return;
     try {
       const fresh = await db.notes.get([scope, note.localId]);
       if (!fresh) return;
       const current = structuredClone(fresh.current);
-      if (typeof action === 'number') current.markdown = toggleChecklistItem(current.markdown, action);
-      else if (action === 'pin') current.meta.pinned = !current.meta.pinned;
+      if (action === 'pin') current.meta.pinned = !current.meta.pinned;
       else if (action === 'archive') current.archived = !current.archived;
       else current.meta.trashedAt = action === 'trash' ? new Date().toISOString() : null;
       await saveEditedNote(scope, note.localId, fresh.current, current);
@@ -245,6 +243,89 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       setBusy(false);
     }
   }
+  const statusNotices: WorkspaceNotice[] = [];
+  const reconnect = { label: t('action.connect'), run: () => setConnectOpen(true) };
+  if (notice)
+    statusNotices.push({
+      id: 'notice',
+      severity: 'error',
+      message: notice,
+      action: { label: t('action.close'), run: () => setNotice('') },
+    });
+  if (session.notice)
+    statusNotices.push({
+      id: 'session',
+      severity: 'error',
+      message: t(`error.${session.notice}`),
+      action: reconnect,
+    });
+  if (!online) statusNotices.push({ id: 'offline', severity: 'warning', message: t('home.offline') });
+  else if (!session.connected)
+    statusNotices.push({
+      id: 'disconnected',
+      severity: 'warning',
+      message: t('home.disconnected'),
+      action: reconnect,
+    });
+  if (!session.writable)
+    statusNotices.push({
+      id: 'readonly',
+      severity: 'warning',
+      message: t(session.lockState === 'unsupported' ? 'home.unsupportedLock' : 'home.readonly'),
+      action:
+        session.lockState === 'busy'
+          ? { label: t('action.takeLock'), run: () => void session.takeLock().catch(report) }
+          : undefined,
+    });
+  if (sync?.error)
+    statusNotices.push({
+      id: 'sync',
+      severity: 'error',
+      message: `${t(`error.${sync.error.code}`)}${sync.error.retryAt ? ` ${t('error.retryAt', { time: new Date(sync.error.retryAt).toLocaleString() })}` : ''}`,
+      action: sync.error.code === 'AUTH_REQUIRED' ? reconnect : undefined,
+    });
+  if (sync?.loading || (!sync?.initialLoadComplete && session.connected))
+    statusNotices.push({
+      id: 'loading',
+      severity: 'progress',
+      message: `${t('home.loading')} ${sync?.loadedCount || 0}`,
+    });
+  else if (busy)
+    statusNotices.push({ id: 'busy', severity: 'progress', message: t('workspaceStatus.working') });
+  if (result.error)
+    statusNotices.push({ id: 'filter', severity: 'error', message: t('error.VALIDATION_FAILED') });
+  for (const status of ['conflict', 'error', 'uncertain', 'syncing', 'pending', 'local'] as const) {
+    const count = notes.filter((note) => note.syncStatus === status).length;
+    if (count)
+      statusNotices.push({
+        id: `notes-${status}`,
+        severity:
+          status === 'conflict' || status === 'error'
+            ? 'error'
+            : status === 'uncertain'
+              ? 'warning'
+              : status === 'syncing'
+                ? 'progress'
+                : 'info',
+        message: t('workspaceStatus.notes', { count, status: t(`status.${status}`) }),
+      });
+  }
+  const statusControl = (
+    <WorkspaceStatus
+      notices={statusNotices}
+      count={
+        route === 'settings'
+          ? undefined
+          : route === 'issues'
+            ? issues.filter((row) =>
+                `${row.snapshot.title}\n${row.snapshot.body}\n${row.snapshot.labels.map((label) => label.name).join(' ')}`
+                  .toLowerCase()
+                  .includes(filters.query.toLowerCase()),
+              ).length
+            : result.notes.length
+      }
+    />
+  );
   const navItems = [
     ['notes', NotebookPen],
     ['all', Layers],
@@ -306,7 +387,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                 setDrawer(false);
               }}
             >
-              <Tag size={16} />
+              <LabelDot color={label.color} />
               <span>{label.name}</span>
               <span className="nav-count">{counts[label.id] || 0}</span>
             </button>
@@ -316,14 +397,25 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
         )}
       </div>
       <div className="sidebar-bottom">
-        <NavLink
-          to="/settings"
-          onClick={() => setDrawer(false)}
-          className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-        >
-          <SettingsIcon size={19} />
-          {t('nav.settings')}
-        </NavLink>
+        <div className="workspace-preferences">
+          <IconButton
+            label={t('action.refresh')}
+            disabled={!session.engine || busy}
+            onClick={() => void refresh()}
+          >
+            <RefreshCw size={18} className={busy ? 'spin' : ''} />
+          </IconButton>
+          <PreferencesControls compact />
+          <NavLink
+            to="/settings"
+            onClick={() => setDrawer(false)}
+            title={t('nav.settings')}
+            aria-label={t('nav.settings')}
+            className={({ isActive }) => `icon-button ${isActive ? 'selected' : ''}`}
+          >
+            <SettingsIcon size={18} />
+          </NavLink>
+        </div>
         <button className="repository-pill" onClick={() => setConnectOpen(true)}>
           <span className={`connection-dot ${session.connected ? 'connected' : ''}`} />
           <span>
@@ -340,7 +432,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   const pinned = view === 'notes' ? resultNotes.filter((n) => n.current.meta.pinned) : [];
   const others = view === 'notes' ? resultNotes.filter((n) => !n.current.meta.pinned) : resultNotes;
   const renderCards = (items: LocalNote[]) => (
-    <div className={`notes-grid ${prefs.layout === 'list' ? 'notes-list' : ''}`}>
+    <NotesGrid list={prefs.layout === 'list'}>
       {items.map((note) => (
         <NoteCard
           key={note.localId}
@@ -351,7 +443,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           onChange={(action) => void change(note, action)}
         />
       ))}
-    </div>
+    </NotesGrid>
   );
   return (
     <div className="workspace">
@@ -387,90 +479,64 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
               </IconButton>
             )}
           </div>
-          <div className="topbar-actions">
-            <IconButton
-              label={t('action.refresh')}
-              disabled={!session.engine || busy}
-              onClick={() => void refresh()}
-            >
-              <RefreshCw size={18} className={busy ? 'spin' : ''} />
-            </IconButton>
-            <PreferencesControls />
-          </div>
+          {route !== 'settings' && route !== 'issues' && (
+            <div className="topbar-note-actions">
+              <button
+                className={`button filter-button ${filterCount(filters) ? 'is-active' : ''}`}
+                onClick={() => setFiltersOpen(true)}
+              >
+                <SlidersHorizontal size={16} />
+                {t('action.filter')}
+                {filterCount(filters) > 0 && <span className="count-badge">{filterCount(filters)}</span>}
+              </button>
+              <select
+                aria-label={t('filter.sort')}
+                value={filters.sort}
+                onChange={(e) => setFilters({ ...filters, sort: e.target.value as NoteFilters['sort'] })}
+              >
+                {(['updated-desc', 'updated-asc', 'created-desc', 'title'] as const).map((sort) => (
+                  <option key={sort} value={sort}>
+                    {t(`filter.${sort}`)}
+                  </option>
+                ))}
+              </select>
+              <span className="view-toggle">
+                <IconButton
+                  className={prefs.layout === 'grid' ? 'selected' : ''}
+                  label={t('action.grid')}
+                  onClick={() => prefs.setLayout('grid')}
+                >
+                  <Grid2X2 size={17} />
+                </IconButton>
+                <IconButton
+                  className={prefs.layout === 'list' ? 'selected' : ''}
+                  label={t('action.list')}
+                  onClick={() => prefs.setLayout('list')}
+                >
+                  <List size={18} />
+                </IconButton>
+              </span>
+              {statusControl}
+              {route !== 'trash' && (
+                <button
+                  className="button primary new-note-button"
+                  disabled={!session.writable}
+                  onClick={() => setSelection({ kind: 'markdown', ids: [] })}
+                >
+                  <Plus size={18} />
+                  {t('action.new')}
+                </button>
+              )}
+            </div>
+          )}
+          {(route === 'settings' || route === 'issues') && statusControl}
         </header>
         <main className="main-content">
-          {(notice || session.notice) && (
-            <div role="alert" className="banner error-banner">
-              <CircleAlert size={17} />
-              <span>{notice || t(`error.${session.notice}`)}</span>
-              {notice && (
-                <IconButton label={t('action.close')} onClick={() => setNotice('')}>
-                  <X size={16} />
-                </IconButton>
-              )}
-            </div>
-          )}
-          {!online ? (
-            <div className="banner">
-              <CloudOff size={17} />
-              {t('home.offline')}
-            </div>
-          ) : !session.connected ? (
-            <div className="banner">
-              <CloudOff size={17} />
-              <span>{t('home.disconnected')}</span>
-              <button className="text-button" onClick={() => setConnectOpen(true)}>
-                {t('action.connect')}
-              </button>
-            </div>
-          ) : null}
-          {!session.writable && (
-            <div className="banner warning">
-              <span>{t(session.lockState === 'unsupported' ? 'home.unsupportedLock' : 'home.readonly')}</span>
-              {session.lockState === 'busy' && (
-                <button className="text-button" onClick={() => void session.takeLock().catch(report)}>
-                  {t('action.takeLock')}
-                </button>
-              )}
-            </div>
-          )}
-          {sync?.error && (
-            <div className="banner error-banner">
-              <CircleAlert size={17} />
-              <span>
-                {t(`error.${sync.error.code}`)}
-                {sync.error.retryAt &&
-                  ` ${t('error.retryAt', { time: new Date(sync.error.retryAt).toLocaleString() })}`}
-              </span>
-              {sync.error.code === 'AUTH_REQUIRED' && (
-                <button className="text-button" onClick={() => setConnectOpen(true)}>
-                  {t('action.connect')}
-                </button>
-              )}
-            </div>
-          )}
           {route === 'settings' ? (
             <Settings onConnect={() => setConnectOpen(true)} offlineReady={offlineReady} />
           ) : (
             <>
               <h1 className="sr-only">{t(`nav.${route}`)}</h1>
-              {route !== 'issues' && route !== 'trash' && (
-                <div className="page-actions">
-                  <button
-                    className="button primary new-note-button"
-                    disabled={!session.writable}
-                    onClick={() => setSelection({ kind: 'markdown', ids: [] })}
-                  >
-                    <Plus size={18} />
-                    {t('action.new')}
-                  </button>
-                </div>
-              )}
-              {sync?.loading || (!sync?.initialLoadComplete && session.connected) ? (
-                <p className="loading-notice" role="status">
-                  {t('home.loading')} {sync?.loadedCount || 0}
-                </p>
-              ) : null}
               {route === 'issues' ? (
                 <div className={`notes-grid ${prefs.layout === 'list' ? 'notes-list' : ''}`}>
                   {issues
@@ -500,56 +566,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                 </div>
               ) : (
                 <>
-                  <div className="results-toolbar">
-                    <span>{t('home.count', { count: result.notes.length })}</span>
-                    <div>
-                      <button
-                        className={`button filter-button ${filterCount(filters) ? 'is-active' : ''}`}
-                        onClick={() => setFiltersOpen(true)}
-                      >
-                        <SlidersHorizontal size={16} />
-                        {t('action.filter')}
-                        {filterCount(filters) > 0 && (
-                          <span className="count-badge">{filterCount(filters)}</span>
-                        )}
-                      </button>
-                      <select
-                        aria-label={t('filter.sort')}
-                        value={filters.sort}
-                        onChange={(e) =>
-                          setFilters({ ...filters, sort: e.target.value as NoteFilters['sort'] })
-                        }
-                      >
-                        {(['updated-desc', 'updated-asc', 'created-desc', 'title'] as const).map((sort) => (
-                          <option key={sort} value={sort}>
-                            {t(`filter.${sort}`)}
-                          </option>
-                        ))}
-                      </select>
-                      <span className="view-toggle">
-                        <IconButton
-                          className={prefs.layout === 'grid' ? 'selected' : ''}
-                          label={t('action.grid')}
-                          onClick={() => prefs.setLayout('grid')}
-                        >
-                          <Grid2X2 size={17} />
-                        </IconButton>
-                        <IconButton
-                          className={prefs.layout === 'list' ? 'selected' : ''}
-                          label={t('action.list')}
-                          onClick={() => prefs.setLayout('list')}
-                        >
-                          <List size={18} />
-                        </IconButton>
-                      </span>
-                    </div>
-                  </div>
                   <FilterChips filters={activeFilters} setFilters={setFilters} labels={labels} />
-                  {result.error && (
-                    <p role="alert" className="error-box">
-                      {t('error.VALIDATION_FAILED')}
-                    </p>
-                  )}
                   {empty ? (
                     <div className="empty-state">
                       <div className="empty-illustration">

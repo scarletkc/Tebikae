@@ -34,9 +34,11 @@ test('language and theme updates keep the visual editor and undo history alive',
   await editor.pressSequentially(' plus 中文');
   await expect(editor).toContainText('Original plus 中文');
   const preferencesPage = await context.newPage();
-  await preferencesPage.goto('/');
+  await preferencesPage.goto('/#/settings');
+  await preferencesPage.locator('#language-setting').click();
+  await preferencesPage.getByRole('menuitemradio', { name: '简体中文', exact: true }).click();
+  await expect(preferencesPage.locator('#language-setting')).toHaveText('简体中文');
   await preferencesPage.evaluate(() => {
-    localStorage.setItem('tebikae.language', 'zh-CN');
     localStorage.setItem('tebikae.theme', 'dark');
   });
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
@@ -115,7 +117,7 @@ test('HTML stays in source and images never fetch external URLs', async ({ page,
   await closeDialog(page);
   expect(state.writes).toEqual([]);
   await page.getByRole('button', { name: 'Edit note: Private images', exact: true }).click();
-  await expect(page.locator('.editor-image-placeholder')).toContainText('Private image');
+  await expect(page.getByRole('dialog').locator('.editor-image-placeholder')).toContainText('Private image');
   await expect(page.locator('.ProseMirror img[src]')).toHaveCount(0);
   await expect(page.locator('.ProseMirror pre')).toContainText('<script>literal</script>');
   expect(await page.evaluate(() => Object.hasOwn(window, 'executed'))).toBe(false);

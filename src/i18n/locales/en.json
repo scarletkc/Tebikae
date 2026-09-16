@@ -1,5 +1,12 @@
 {
   "tagline": "Simple notes, powered by GitHub Issues.",
+  "workspaceStatus": {
+    "title": "Workspace status",
+    "notifications": "{{count}} notifications",
+    "ready": "Everything is up to date",
+    "working": "Refreshing and syncing…",
+    "notes": "{{count}} notes: {{status}}"
+  },
   "nav": {
     "notes": "Notes",
     "all": "All notes",

@@ -35,6 +35,7 @@ import { Modal, IconButton, download } from '../../app/ui';
 import { db } from '../../storage/db';
 import { safeHref } from '../../security/urls';
 import { usePwaUpdate } from '../../app/pwa';
+import { LabelBadge } from '../labels';
 const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'));
 
 export default function NoteDialog({
@@ -453,7 +454,7 @@ export default function NoteDialog({
                         }))
                       }
                     />
-                    {label.name}
+                    <LabelBadge label={label} />
                   </label>
                 ))
               ) : (

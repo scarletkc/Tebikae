@@ -1,5 +1,12 @@
 {
   "tagline": "Simple notes, powered by GitHub Issues.",
+  "workspaceStatus": {
+    "title": "工作区状态",
+    "notifications": "{{count}} 条提示",
+    "ready": "当前无待处理提示",
+    "working": "正在刷新并同步…",
+    "notes": "{{count}} 条笔记：{{status}}"
+  },
   "nav": {
     "notes": "笔记",
     "all": "全部笔记",

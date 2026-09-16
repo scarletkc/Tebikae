@@ -1,0 +1,54 @@
+# =============================================================================
+# Git 行尾策略 — Tebikae
+# =============================================================================
+# 统一为 CRLF：工作区在任何平台上都以 CRLF 检出。
+# 索引（也就是仓库里实际存的字节）始终是 LF。
+#
+# 为什么：本项目在 Windows 上开发。用 `eol=crlf` 把工作区钉死，谁 clone 下来
+# 都是同样的字节，Prettier / ESLint / 编辑器的 diff 不会再为行尾吵架。
+#
+# 注意：这条规则与 .prettierrc.json 里的 `"endOfLine": "crlf"` 是配套的。
+# 改一个就必须改另一个，否则 `pnpm format:check` 会挂。
+
+# --- 默认：所有文本文件索引存 LF，检出为 CRLF -------------------------------
+* text=auto eol=crlf
+
+# --- Shell 脚本必须保持 LF，即使在 Windows 上 ---------------------------------
+# CRLF 的 shebang（`#!/bin/sh\r`）在 Linux / WSL / Docker / CI 上会直接报错。
+*.sh    text eol=lf
+*.bash  text eol=lf
+*.zsh   text eol=lf
+*.fish  text eol=lf
+
+# --- Windows 脚本反过来：必须 CRLF -------------------------------------------
+*.bat   text eol=crlf
+*.cmd   text eol=crlf
+*.ps1   text eol=crlf
+
+# --- 二进制文件：git 一律不要做任何转换 ---------------------------------------
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.avif  binary
+*.ico   binary
+*.icns  binary
+*.bmp   binary
+
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary
+*.eot   binary
+
+*.pdf   binary
+*.zip   binary
+*.gz    binary
+*.tar   binary
+*.7z    binary
+
+*.mp3   binary
+*.mp4   binary
+*.webm  binary
+*.mov   binary

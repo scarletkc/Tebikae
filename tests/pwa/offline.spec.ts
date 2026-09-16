@@ -16,7 +16,10 @@ for (const language of ['en', 'zh-CN'] as const) {
     await page.locator('a[href$="#/settings"]').click();
     await expect(page.getByText('Ready for offline use', { exact: true })).toBeVisible({ timeout: 30_000 });
     await page.locator('#theme-setting').selectOption('dark');
-    await page.locator('#language-setting').selectOption(language);
+    await page.locator('#language-setting').click();
+    await page
+      .getByRole('menuitemradio', { name: language === 'en' ? 'English' : '简体中文', exact: true })
+      .click();
     const copy = language === 'en' ? en : zh;
     await page.locator('a[href$="#/notes"]').click();
     const cached = await page.evaluate(async () => {

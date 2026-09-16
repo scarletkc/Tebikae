@@ -4,7 +4,7 @@ import { Download, ExternalLink, HardDrive, LogOut, Trash2, WifiOff } from 'luci
 import { useLiveQuery } from 'dexie-react-hooks';
 import { usePreferences, type Theme } from '../../app/preferences';
 import { useSession, flushAllDrafts } from '../../app/session';
-import { download } from '../../app/ui';
+import { download, LanguageControl } from '../../app/ui';
 import { exportScope, clearScope } from '../../application/commands';
 import { db } from '../../storage/db';
 import packageJson from '../../../package.json';
@@ -55,14 +55,12 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
         <h2>{t('settings.appearance')}</h2>
         <div className="settings-row">
           <label htmlFor="language-setting">{t('settings.language')}</label>
-          <select
+          <LanguageControl
             id="language-setting"
             value={prefs.language}
-            onChange={(e) => prefs.setLanguage(e.target.value)}
-          >
-            <option value="en">English</option>
-            <option value="zh-CN">简体中文</option>
-          </select>
+            onChange={(language) => prefs.setLanguage(language)}
+            label={t('settings.language')}
+          />
         </div>
         <div className="settings-row">
           <label htmlFor="theme-setting">{t('settings.theme')}</label>

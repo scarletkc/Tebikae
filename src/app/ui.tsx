@@ -1,5 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { X, Sun, Moon, Monitor } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { X, Sun, Moon, Monitor, Languages, Check, ChevronDown } from 'lucide-react';
+import './menus.css';
 import { useTranslation } from 'react-i18next';
 import { type ReactNode } from 'react';
 import { usePreferences } from './preferences';
@@ -39,19 +41,75 @@ export function IconButton({
     </button>
   );
 }
-export function PreferencesControls() {
+const LANGUAGES = [
+  { value: 'en', label: 'English' },
+  { value: 'zh-CN', label: '简体中文' },
+] as const;
+export type LanguageValue = (typeof LANGUAGES)[number]['value'];
+
+export function LanguageControl({
+  value,
+  onChange,
+  label,
+  id,
+  mode = 'text',
+}: {
+  value: string;
+  onChange(value: LanguageValue): void;
+  label: string;
+  id?: string;
+  mode?: 'text' | 'icon';
+}) {
+  const current = LANGUAGES.find((language) => language.value === value) ?? LANGUAGES[0];
+  const trigger = (
+    <DropdownMenu.Trigger
+      id={id}
+      className={mode === 'icon' ? 'icon-button language-menu-trigger-icon' : 'language-menu-trigger'}
+      title={label}
+      aria-label={label}
+    >
+      {mode === 'icon' ? <Languages size={18} aria-hidden="true" /> : <span>{current.label}</span>}
+      {mode === 'icon' ? null : <ChevronDown size={16} aria-hidden="true" />}
+    </DropdownMenu.Trigger>
+  );
+  return (
+    <DropdownMenu.Root>
+      {trigger}
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content className="language-menu-content" align="start" sideOffset={6} loop>
+          <DropdownMenu.RadioGroup value={value} onValueChange={(next) => onChange(next as LanguageValue)}>
+            {LANGUAGES.map((language) => (
+              <DropdownMenu.RadioItem
+                key={language.value}
+                value={language.value}
+                className="language-menu-item"
+              >
+                <span className="language-menu-check">
+                  <DropdownMenu.ItemIndicator>
+                    <Check size={15} aria-hidden="true" />
+                  </DropdownMenu.ItemIndicator>
+                </span>
+                {language.label}
+              </DropdownMenu.RadioItem>
+            ))}
+          </DropdownMenu.RadioGroup>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
+  );
+}
+
+export function PreferencesControls({ compact = false }: { compact?: boolean }) {
   const prefs = usePreferences();
   const { t } = useTranslation();
   return (
     <div className="preferences-controls">
-      <select
-        aria-label={t('settings.language')}
+      <LanguageControl
         value={prefs.language}
-        onChange={(e) => prefs.setLanguage(e.target.value)}
-      >
-        <option value="en">English</option>
-        <option value="zh-CN">简体中文</option>
-      </select>
+        onChange={prefs.setLanguage}
+        label={t('settings.language')}
+        mode={compact ? 'icon' : 'text'}
+      />
       <IconButton
         label={t(`settings.${prefs.theme}`)}
         onClick={() =>

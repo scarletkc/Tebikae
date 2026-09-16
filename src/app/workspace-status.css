@@ -1,0 +1,88 @@
+.workspace-status {
+  flex-shrink: 0;
+  gap: 6px;
+  min-width: 52px;
+  font-variant-numeric: tabular-nums;
+}
+.workspace-status.status-normal {
+  color: var(--accent);
+}
+.workspace-status.status-error {
+  background: var(--card-red);
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.workspace-status.status-warning {
+  background: var(--card-yellow);
+  color: var(--text);
+  border-color: color-mix(in srgb, #c58a25 70%, var(--border));
+}
+.workspace-status.status-progress,
+.workspace-status.status-info {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.workspace-status-menu {
+  z-index: 65;
+  width: min(350px, calc(100vw - 24px));
+  max-height: min(70vh, var(--radix-dropdown-menu-content-available-height));
+  overflow-y: auto;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 12px 32px #0003;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.workspace-status-heading {
+  font-size: 14px;
+  font-weight: 600;
+}
+.workspace-status-count {
+  color: var(--muted);
+  margin: 3px 0 12px;
+}
+.workspace-status-ready {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+}
+.workspace-status-entry {
+  padding: 10px;
+  margin-top: 8px;
+  border-radius: 7px;
+  background: var(--bg);
+}
+.workspace-status-entry p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.workspace-status-entry.status-error {
+  color: var(--danger);
+  background: var(--card-red);
+}
+.workspace-status-entry.status-warning {
+  background: var(--card-yellow);
+}
+.workspace-status-action {
+  cursor: pointer;
+  width: fit-content;
+  margin-top: 6px;
+  padding: 3px 8px;
+  border: 1px solid currentColor;
+  border-radius: 5px;
+}
+.workspace-status-action[data-highlighted] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.topbar-note-actions {
+  flex-wrap: wrap;
+}
+.main-content:has(.note-group),
+.main-content:has(.filter-chips) {
+  padding-top: 20px;
+}

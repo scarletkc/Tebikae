@@ -7,9 +7,10 @@ import './editor.css';
 export interface MarkdownPreviewProps {
   value: string;
   className?: string;
+  compact?: boolean;
 }
 
-export function MarkdownPreview({ value, className = '' }: MarkdownPreviewProps) {
+export function MarkdownPreview({ value, className = '', compact = false }: MarkdownPreviewProps) {
   const { t } = useTranslation();
   return (
     <div className={`markdown-preview ${className}`}>
@@ -19,7 +20,7 @@ export function MarkdownPreview({ value, className = '' }: MarkdownPreviewProps)
         urlTransform={(url) => safeHref(url) ?? ''}
         components={{
           a: ({ href, children }) =>
-            href ? (
+            href && !compact ? (
               <a href={href} target="_blank" rel="noopener noreferrer">
                 {children}
               </a>
@@ -31,9 +32,14 @@ export function MarkdownPreview({ value, className = '' }: MarkdownPreviewProps)
               ▧ {alt || t('editor.image')}
             </span>
           ),
-          input: ({ checked }) => (
-            <input type="checkbox" checked={checked} disabled aria-label={t('editor.toggleTask')} />
-          ),
+          input: ({ checked }) =>
+            compact ? (
+              <span className={`preview-checkbox ${checked ? 'is-checked' : ''}`} aria-hidden="true">
+                {checked ? '✓' : ''}
+              </span>
+            ) : (
+              <input type="checkbox" checked={checked} disabled aria-label={t('editor.toggleTask')} />
+            ),
         }}
       >
         {value}

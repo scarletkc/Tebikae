@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { NOTE_COLORS, type Label, type NoteFilters } from '../../domain/types';
 import { defaultFilters } from '../../domain/filters';
 import { Modal } from '../../app/ui';
+import { LabelBadge, LabelDot, labelStyle } from '../labels';
 
 export function filterCount(f: NoteFilters) {
   return (
@@ -28,9 +29,10 @@ export function FilterChips({
   labels: Label[];
 }) {
   const { t } = useTranslation();
-  const chips: { name: string; clear(): void }[] = [
+  const chips: { name: string; color?: string; clear(): void }[] = [
     ...f.labelIds.map((id) => ({
       name: labels.find((l) => l.id === id)?.name || `#${id}`,
+      color: labels.find((l) => l.id === id)?.color,
       clear: () => setFilters({ ...f, labelIds: f.labelIds.filter((x) => x !== id) }),
     })),
     ...f.colors.map((color) => ({
@@ -59,17 +61,22 @@ export function FilterChips({
       });
   return chips.length ? (
     <div className="filter-chips">
-      {chips.map((chip, i) => (
-        <button
-          key={i}
-          className="chip"
-          onClick={chip.clear}
-          aria-label={t('filter.remove', { name: chip.name })}
-        >
-          {chip.name}
-          <X size={12} />
-        </button>
-      ))}
+      {chips.map((chip, i) => {
+        const label = chip.color === undefined ? undefined : { name: chip.name, color: chip.color };
+        return (
+          <button
+            key={i}
+            className={label ? 'chip chip-label' : 'chip'}
+            style={labelStyle(chip.color)}
+            onClick={chip.clear}
+            aria-label={t('filter.remove', { name: chip.name })}
+          >
+            {label && <LabelDot color={chip.color} />}
+            {chip.name}
+            <X size={12} />
+          </button>
+        );
+      })}
       <button
         className="text-button"
         onClick={() => setFilters({ ...defaultFilters, view: f.view, query: f.query })}
@@ -120,7 +127,7 @@ export function FiltersDialog({
                     })
                   }
                 />
-                {label.name}
+                <LabelBadge label={label} />
               </label>
             ))}
           </div>
