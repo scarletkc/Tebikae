@@ -5,7 +5,8 @@
     "notifications": "{{count}} notifications",
     "ready": "Everything is up to date",
     "working": "Refreshing and syncing…",
-    "notes": "{{count}} notes: {{status}}"
+    "notes": "{{count}} notes: {{status}}",
+    "reviewNotes": "Review notes"
   },
   "nav": {
     "notes": "Notes",

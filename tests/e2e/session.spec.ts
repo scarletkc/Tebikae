@@ -101,10 +101,15 @@ test('expired credentials are forgotten while the notebook stays available', asy
     route.fulfill({ status: 401, contentType: 'application/json', body: '{"message":"Bad credentials"}' }),
   );
   await page.reload();
-  await expect(page.getByRole('alert')).toContainText('Your token has expired or is invalid.');
+  await expect(page.locator('.workspace-status')).toHaveClass(/status-error/);
+  await page.locator('.workspace-status').click();
+  await expect(page.locator('.workspace-status-menu')).toContainText('Your token has expired or is invalid.');
   await expect.poll(() => savedRecords(page)).toBe(0);
   await expect(page.locator('.note-card')).toHaveCount(2);
-  await page.getByRole('button', { name: 'Connect repository', exact: true }).first().click();
+  await page
+    .locator('.workspace-status-entry.status-error')
+    .getByRole('menuitem', { name: 'Connect repository', exact: true })
+    .click();
   await expect(page.getByLabel('GitHub repository', { exact: true })).toHaveValue('scarletkc/Tebikae-dev');
   await expect(page.getByLabel('Personal access token', { exact: true })).toHaveValue('');
   expect(remote.writes).toHaveLength(0);
@@ -118,13 +123,13 @@ test('a temporary network failure preserves the saved connection for automatic r
   await connect(page);
   await context.route('https://api.github.com/user', (route) => route.abort('internetdisconnected'));
   await page.reload();
-  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.locator('.workspace-status')).toHaveClass(/status-error/);
   await expect(page.locator('.note-card')).toHaveCount(2);
   expect(await savedRecords(page)).toBe(1);
   await context.unroute('https://api.github.com/user');
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
-  await expect(page.getByRole('alert')).toHaveCount(0);
+  await expect(page.locator('.workspace-status')).toHaveClass(/status-normal/);
   expect(remote.writes).toHaveLength(0);
 });
 
@@ -164,7 +169,8 @@ test('encryption failure keeps the connection usable and explains that it was no
   });
   await mockGitHub(context);
   await connect(page);
-  await expect(page.getByRole('alert')).toContainText('couldn’t save the connection securely');
+  await page.locator('.workspace-status').click();
+  await expect(page.locator('.workspace-status-menu')).toContainText('couldn’t save the connection securely');
   expect(await savedRecords(page)).toBe(0);
   await page.reload();
   await expect(page.getByLabel('Personal access token', { exact: true })).toHaveValue('');

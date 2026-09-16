@@ -30,6 +30,7 @@ import { db } from '../storage/db';
 import { defaultFilters, filterNotes, labelCounts } from '../domain/filters';
 import WorkspaceStatus, { type WorkspaceNotice } from './WorkspaceStatus';
 import type { LocalNote, NoteFilters, NoteKind, UnmanagedIssue } from '../domain/types';
+import { summarizeNoteStatuses } from './note-status';
 import { convertIssue, saveEditedNote } from '../application/commands';
 import { ApiError } from '../adapters/github/client';
 import { safeHref } from '../security/urls';
@@ -294,21 +295,29 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     statusNotices.push({ id: 'busy', severity: 'progress', message: t('workspaceStatus.working') });
   if (result.error)
     statusNotices.push({ id: 'filter', severity: 'error', message: t('error.VALIDATION_FAILED') });
-  for (const status of ['conflict', 'error', 'uncertain', 'syncing', 'pending', 'local'] as const) {
-    const count = notes.filter((note) => note.syncStatus === status).length;
-    if (count)
-      statusNotices.push({
-        id: `notes-${status}`,
-        severity:
-          status === 'conflict' || status === 'error'
-            ? 'error'
-            : status === 'uncertain'
-              ? 'warning'
-              : status === 'syncing'
-                ? 'progress'
-                : 'info',
-        message: t('workspaceStatus.notes', { count, status: t(`status.${status}`) }),
-      });
+  for (const group of summarizeNoteStatuses(notes)) {
+    statusNotices.push({
+      id: `notes-${group.status}`,
+      severity: group.severity,
+      message: `${t('workspaceStatus.notes', { count: group.count, status: t(`status.${group.status}`) })}${group.retryAt ? ` ${t('error.retryAt', { time: new Date(group.retryAt).toLocaleString() })}` : ''}`,
+      action:
+        group.recovery === 'connect'
+          ? reconnect
+          : group.recovery === 'review'
+            ? {
+                label: t('workspaceStatus.reviewNotes'),
+                run: () => {
+                  const note = group.notes[0]!;
+                  session.engine?.setEditing(note.localId, true);
+                  setSelection({
+                    id: note.localId,
+                    ids: group.notes.map((item) => item.localId),
+                    initial: note,
+                  });
+                },
+              }
+            : undefined,
+    });
   }
   const statusControl = (
     <WorkspaceStatus

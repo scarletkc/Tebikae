@@ -5,7 +5,8 @@
     "notifications": "{{count}} 条提示",
     "ready": "当前无待处理提示",
     "working": "正在刷新并同步…",
-    "notes": "{{count}} 条笔记：{{status}}"
+    "notes": "{{count}} 条笔记：{{status}}",
+    "reviewNotes": "查看待处理笔记"
   },
   "nav": {
     "notes": "笔记",
