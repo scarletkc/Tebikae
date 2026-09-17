@@ -5,7 +5,12 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { browserPlan, planForEvent, successCacheKey } from '../../scripts/ci-browser-plan.mjs';
+import {
+  browserPlan,
+  documentationOnlyForEvent,
+  planForEvent,
+  successCacheKey,
+} from '../../scripts/ci-browser-plan.mjs';
 
 const full = () => browserPlan([], true);
 const project = (paths, browser) => browserPlan(paths).include.find((entry) => entry.browser === browser);
@@ -114,6 +119,42 @@ test('missing history and first pushes fall back to full coverage', () => {
   );
 });
 
+test('only ordinary prose changes can skip required code validation', () => {
+  const event = { pull_request: { base: { sha: 'base' }, head: { sha: 'head' } } };
+  const diff = (path, oldMode = '100644', newMode = '100644', status = 'M') =>
+    `:${oldMode} ${newMode} abc123 def456 ${status}\0${path}\0`;
+  const prose = diff('README.md') + diff('docs/guide.md', '000000', '100644', 'A');
+  const classify = (raw) => documentationOnlyForEvent('pull_request', event, () => raw);
+  assert.equal(classify(prose), true);
+  assert.equal(classify(diff('LICENSE', '100644', '000000', 'D')), true);
+  for (const path of ['src/app.ts', 'src/content.md', 'docs/example.js', '.github/workflows/check.yml'])
+    assert.equal(classify(prose + diff(path)), false, path);
+  for (const mode of ['100755', '120000']) {
+    assert.equal(classify(diff('README.md', '100644', mode)), false);
+    assert.equal(classify(diff('README.md', mode, '000000', 'D')), false);
+  }
+  for (const raw of ['', 'malformed\0README.md\0', ':100644 100644 abc def R100\0old\0new\0'])
+    assert.equal(classify(raw), false);
+  assert.equal(
+    documentationOnlyForEvent('pull_request', event, () => prose, true),
+    false,
+  );
+  assert.equal(
+    documentationOnlyForEvent('workflow_dispatch', event, () => prose),
+    false,
+  );
+  assert.equal(
+    documentationOnlyForEvent('pull_request', {}, () => prose),
+    false,
+  );
+  assert.equal(
+    documentationOnlyForEvent('pull_request', event, () => {
+      throw new Error('missing history');
+    }),
+    false,
+  );
+});
+
 test('CLI handles renames, Actions outputs, documentation reuse and deployment overrides', () => {
   const root = mkdtempSync(join(tmpdir(), 'tebikae-ci-plan-'));
   const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
@@ -177,10 +218,11 @@ test('CLI handles renames, Actions outputs, documentation reuse and deployment o
     );
     assert.deepEqual(JSON.parse(deployment), full());
     const prOutput = join(root, 'pr-output');
+    let prBase = before;
     const runPR = (overrides = {}) => {
       writeFileSync(
         eventPath,
-        JSON.stringify({ pull_request: { base: { sha: before }, head: { sha: git('rev-parse', 'HEAD') } } }),
+        JSON.stringify({ pull_request: { base: { sha: prBase }, head: { sha: git('rev-parse', 'HEAD') } } }),
       );
       writeFileSync(prOutput, '');
       execFileSync(
@@ -215,6 +257,7 @@ test('CLI handles renames, Actions outputs, documentation reuse and deployment o
     };
     const initial = runPR();
     assert.equal(initial.reuse_allowed, 'true');
+    assert.equal(initial.documentation_only, 'false');
     writeFileSync(join(root, 'README.md'), 'Documentation update\n');
     git('add', 'README.md');
     git('commit', '-m', 'docs');
@@ -225,6 +268,16 @@ test('CLI handles renames, Actions outputs, documentation reuse and deployment o
     assert.notEqual(runPR().cache_key, initial.cache_key);
     assert.equal(runPR({ FULL_BROWSER_SUITE: 'true' }).reuse_allowed, 'false');
     assert.equal(runPR({ ImageVersion: '' }).reuse_allowed, 'false');
+    prBase = git('rev-parse', 'HEAD');
+    writeFileSync(join(root, 'README.md'), 'Only documentation changes\n');
+    git('add', 'README.md');
+    git('commit', '-m', 'prose only');
+    assert.equal(runPR().documentation_only, 'true');
+    assert.equal(runPR().reuse_allowed, 'false');
+    assert.equal(runPR({ FULL_BROWSER_SUITE: 'true' }).documentation_only, 'false');
+    git('update-index', '--chmod=+x', 'README.md');
+    git('commit', '-m', 'executable markdown');
+    assert.equal(runPR().documentation_only, 'false');
   } finally {
     assert.equal(dirname(resolve(root)), resolve(tmpdir()));
     assert.ok(basename(root).startsWith('tebikae-ci-plan-'));

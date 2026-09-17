@@ -7,10 +7,6 @@ on:
       - 'docs/**/*.md'
       - 'LICENSE'
   pull_request:
-    paths-ignore:
-      - '*.md'
-      - 'docs/**/*.md'
-      - 'LICENSE'
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -32,7 +28,8 @@ jobs:
       cache_key: ${{ steps.browsers.outputs.cache_key }}
       reuse_allowed: ${{ steps.browsers.outputs.reuse_allowed }}
       reused: ${{ steps.previous.outputs.cache-hit == 'true' }}
-      run_checks: ${{ steps.previous.outputs.cache-hit != 'true' }}
+      documentation_only: ${{ steps.browsers.outputs.documentation_only }}
+      run_checks: ${{ steps.browsers.outputs.documentation_only != 'true' && steps.previous.outputs.cache-hit != 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,6 +54,7 @@ jobs:
           cat .ci-check/passed >> "$GITHUB_STEP_SUMMARY"
   validate:
     needs: plan
+    if: needs.plan.outputs.documentation_only != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -162,8 +160,15 @@ jobs:
           VALIDATE: ${{ needs.validate.result }}
           BROWSERS: ${{ needs.browsers.result }}
           REUSED: ${{ needs.plan.outputs.reused }}
+          DOCUMENTATION_ONLY: ${{ needs.plan.outputs.documentation_only }}
         run: |
           test "$PLAN" = success
+          if [ "$DOCUMENTATION_ONLY" = true ]; then
+            test "$VALIDATE" = skipped
+            test "$BROWSERS" = skipped
+            echo 'Documentation-only PR: code validation is not required.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           test "$VALIDATE" = success
           if [ "$REUSED" = true ]; then
             test "$BROWSERS" = skipped

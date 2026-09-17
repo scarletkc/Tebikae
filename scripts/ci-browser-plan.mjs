@@ -99,6 +99,29 @@ export function planForEvent(eventName, event, changedPaths, forceFull = false) 
   }
 }
 
+export function documentationOnlyForEvent(eventName, event, rawDiff, forceFull = false) {
+  if (forceFull || eventName !== 'pull_request') return false;
+  const base = event.pull_request?.base.sha;
+  const head = event.pull_request?.head.sha;
+  if (!base || !head) return false;
+  try {
+    const records = rawDiff(base, head).split('\0');
+    if (records.pop() !== '' || records.length === 0 || records.length % 2 !== 0) return false;
+    for (let index = 0; index < records.length; index += 2) {
+      const header = records[index].match(/^:(\d{6}) (\d{6}) [0-9a-f]+ [0-9a-f]+ [AMD]$/);
+      if (
+        !header ||
+        ![header[1], header[2]].every((mode) => ['000000', '100644'].includes(mode)) ||
+        !documentation(records[index + 1])
+      )
+        return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** A pass is reusable only for the same tested tree, base, coverage and runner. */
 export function successCacheKey({ tree, matrix, base, scope, runtime }) {
   if (!base || !scope || !runtime) throw new Error('Missing cache identity');
@@ -135,8 +158,18 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.env.FULL_BROWSER_SUITE === 'true',
   );
   const output = JSON.stringify(matrix);
+  const documentationOnly = documentationOnlyForEvent(
+    process.env.GITHUB_EVENT_NAME,
+    event,
+    (base, head) =>
+      execFileSync('git', ['diff', '--raw', '-z', '--no-renames', `${base}...${head}`, '--'], {
+        encoding: 'utf8',
+      }),
+    process.env.FULL_BROWSER_SUITE === 'true',
+  );
   let cacheKey = '';
   if (
+    !documentationOnly &&
     process.env.GITHUB_EVENT_NAME === 'pull_request' &&
     process.env.FULL_BROWSER_SUITE !== 'true' &&
     process.env.GITHUB_REF &&
@@ -165,7 +198,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   if (process.env.GITHUB_OUTPUT)
     appendFileSync(
       process.env.GITHUB_OUTPUT,
-      `matrix=${output}\ncache_key=${cacheKey}\nreuse_allowed=${Boolean(cacheKey)}\n`,
+      `matrix=${output}\ncache_key=${cacheKey}\nreuse_allowed=${Boolean(cacheKey)}\ndocumentation_only=${documentationOnly}\n`,
     );
   console.log(output);
 }
