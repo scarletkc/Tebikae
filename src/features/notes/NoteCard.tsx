@@ -8,15 +8,43 @@ import MarkdownPreview from '../editor/MarkdownPreview';
 import { LabelBadge } from '../labels';
 import './notes.css';
 
+export function Highlight({ query, text }: { query: string; text: string }) {
+  const terms = query.toLocaleLowerCase().trim().split(/\s+/u).filter(Boolean);
+  if (!terms.length) return <>{text}</>;
+  const lower = text.toLocaleLowerCase();
+  const marks: { start: number; end: number }[] = [];
+  for (const term of terms) {
+    let index = lower.indexOf(term);
+    while (index !== -1) {
+      marks.push({ start: index, end: index + term.length });
+      index = lower.indexOf(term, index + Math.max(term.length, 1));
+    }
+  }
+  if (!marks.length) return <>{text}</>;
+  marks.sort((a, b) => a.start - b.start || b.end - a.end);
+  const parts: React.ReactNode[] = [];
+  let cursor = 0;
+  for (const mark of marks) {
+    if (mark.start < cursor) continue;
+    if (mark.start > cursor) parts.push(text.slice(cursor, mark.start));
+    parts.push(<mark key={mark.start}>{text.slice(mark.start, mark.end)}</mark>);
+    cursor = mark.end;
+  }
+  if (cursor < text.length) parts.push(text.slice(cursor));
+  return <>{parts}</>;
+}
+
 export default function NoteCard({
   note,
   labels,
+  query = '',
   onOpen,
   onChange,
   writable,
 }: {
   note: LocalNote;
   labels: Label[];
+  query?: string;
   onOpen(): void;
   onChange(action: 'pin' | 'archive' | 'trash' | 'restore'): void;
   writable: boolean;
@@ -45,7 +73,7 @@ export default function NoteCard({
               onClick={onOpen}
               aria-label={`${t('action.edit')}: ${document.title}`}
             >
-              {document.title}
+              <Highlight query={query} text={document.title} />
             </button>
           </h3>
           {document.meta.pinned && <Pin size={14} />}
@@ -65,7 +93,9 @@ export default function NoteCard({
               <span className={`preview-checkbox ${item.checked ? 'is-checked' : ''}`} aria-hidden="true">
                 {item.checked ? '✓' : ''}
               </span>
-              <span className={item.checked ? 'checked' : ''}>{item.text}</span>
+              <span className={item.checked ? 'checked' : ''}>
+                <Highlight query={query} text={item.text} />
+              </span>
             </div>
           ))}
           <button className="checklist-count" onClick={onOpen}>

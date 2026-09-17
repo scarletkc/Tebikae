@@ -447,6 +447,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           key={note.localId}
           note={note}
           labels={labels}
+          query={filters.query}
           writable={session.writable}
           onOpen={() => openNote(note)}
           onChange={(action) => void change(note, action)}

@@ -84,6 +84,7 @@ test('combined filters and preview navigation share the same result set', async 
   await expect(
     page.getByRole('button', { name: 'Edit note: A little checklist', exact: true }),
   ).toBeVisible();
+  await expect(page.locator('.note-card mark')).toHaveText(['tea']);
 });
 
 test('archive survives trash and restore, and JSON export contains no credentials', async ({
