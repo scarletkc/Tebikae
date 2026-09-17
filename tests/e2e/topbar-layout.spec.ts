@@ -118,7 +118,7 @@ for (const scenario of [
     await page.reload();
     const clear = topbar.locator('.search-clear-button');
     await expect(clear).toBeVisible();
-    await expect(clear).toHaveAccessibleName(/clear|action.clearSearchFilters/i);
+    await expect(clear).toHaveAccessibleName('Clear search and filters');
     await expect(topbar.locator('.filter-open-button')).toHaveText('');
     if (scenario.name !== 'query only')
       await expect(topbar.locator('.filter-open-button')).toHaveClass(/is-active/);

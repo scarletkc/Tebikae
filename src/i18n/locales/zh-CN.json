@@ -33,6 +33,7 @@
     "exportNote": "导出 Markdown",
     "create": "创建",
     "clear": "清空筛选",
+    "clearSearchFilters": "清空搜索和筛选",
     "filter": "筛选",
     "pin": "置顶笔记",
     "unpin": "取消置顶",
