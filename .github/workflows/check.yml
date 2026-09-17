@@ -3,18 +3,35 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - 'docs/**'
       - '**/*.md'
       - 'LICENSE'
   pull_request:
     paths-ignore:
-      - 'docs/**'
       - '**/*.md'
       - 'LICENSE'
+  schedule:
+    - cron: '23 3 * * *'
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: check-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
-  check:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.browsers.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: browsers
+        run: node scripts/ci-browser-plan.mjs
+  validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -27,16 +44,66 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm format:check
+      - run: node --test tests/ci/*.test.mjs
       - run: pnpm test
       - run: pnpm build
-      - run: pnpm exec playwright install --with-deps
-      - run: pnpm test:e2e
       - run: pnpm exec vite build --outDir .artifacts/pages-dist
         env:
           VITE_BASE_PATH: /Tebikae/
-      - run: pnpm test:pwa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: browser-builds
+          include-hidden-files: true
+          path: |
+            dist/
+            .artifacts/pages-dist/
+          retention-days: 1
+  browsers:
+    needs: [plan, validate]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    name: browser (${{ matrix.browser }})
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps "$BROWSER"
+        env:
+          BROWSER: ${{ matrix.browser }}
+      - uses: actions/download-artifact@v4
+        if: matrix.pwa
+        with:
+          name: browser-builds
+      - run: pnpm test:e2e --project="$BROWSER" --grep="$TEST_GREP"
+        env:
+          BROWSER: ${{ matrix.browser }}
+          TEST_GREP: ${{ matrix.grep }}
+      - run: pnpm test:pwa --project="pwa-$BROWSER" --project="pages-$BROWSER"
+        if: matrix.pwa
+        env:
+          BROWSER: ${{ matrix.browser }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: browser-test-results
-          path: playwright-report/
+          name: browser-test-results-${{ matrix.browser }}
+          include-hidden-files: true
+          path: |
+            playwright-report/
+            .artifacts/pwa-report/
+  check:
+    if: always()
+    needs: [plan, validate, browsers]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all selected checks to pass
+        env:
+          PLAN: ${{ needs.plan.result }}
+          VALIDATE: ${{ needs.validate.result }}
+          BROWSERS: ${{ needs.browsers.result }}
+        run: test "$PLAN" = success && test "$VALIDATE" = success && test "$BROWSERS" = success

@@ -22,7 +22,7 @@ pnpm test:e2e
 pnpm build
 ```
 
-Vitest 使用真实 Markdown 解析、Milkdown、fake-indexeddb 与 MSW 模拟请求失败。Playwright 的普通测试使用拦截的 GitHub API，不写入 GitHub。默认覆盖 Chromium、Firefox、WebKit；CI 安装对应浏览器。两类测试覆盖范围和剩余手工项目见[验收记录](acceptance.md)。
+Vitest 使用真实 Markdown 解析、Milkdown、fake-indexeddb 与 MSW 模拟请求失败。Playwright 的普通测试使用拦截的 GitHub API，不写入 GitHub。本地命令默认覆盖 Chromium、Firefox、WebKit；CI 根据改动选择浏览器和用例，普通 PR 以 Chromium 全量和 WebKit 核心流程为基础，规则及完整检查方式见[浏览器测试分层](browser-testing.md)。两类测试覆盖范围和剩余手工项目见[验收记录](acceptance.md)。
 
 品牌图标统一使用 `public/icon.svg` 的折角纸张与 T 图形。连接页、侧栏、手机导航和 favicon 直接引用这份 SVG；PWA 的 192px／512px 图标由它生成。不同主题保留品牌图标自身的配色，功能按钮继续使用各自的操作图标。
 
