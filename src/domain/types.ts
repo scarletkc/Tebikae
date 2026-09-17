@@ -96,6 +96,8 @@ export interface LocalNote {
   conflictFields?: string[];
   duplicate?: boolean;
   remoteUnavailable?: boolean;
+  /** Fingerprint of a restored backup record; used only for local import deduplication. */
+  importFingerprint?: string;
 }
 export interface UnmanagedIssue {
   scopeId: string;

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, ExternalLink, HardDrive, LogOut, Trash2, WifiOff } from 'lucide-react';
+import { Download, ExternalLink, HardDrive, LogOut, Trash2, Upload, WifiOff } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { usePreferences, type Theme } from '../../app/preferences';
 import { useSession, flushAllDrafts } from '../../app/session';
@@ -10,6 +10,7 @@ import { db } from '../../storage/db';
 import packageJson from '../../../package.json';
 import { prepareMarkdownExport, type MarkdownExportSnapshot } from '../../application/markdown-export';
 import MarkdownExportDialog from './MarkdownExportDialog';
+import BackupImportDialog from './BackupImportDialog';
 
 export default function Settings({ onConnect, offlineReady }: { onConnect(): void; offlineReady: boolean }) {
   const { t } = useTranslation();
@@ -20,6 +21,7 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
   const [busy, setBusy] = useState(false);
   const [preparingExport, setPreparingExport] = useState(false);
   const [markdownExport, setMarkdownExport] = useState<MarkdownExportSnapshot>();
+  const [importOpen, setImportOpen] = useState(false);
   const state = useLiveQuery(() => db.syncState.get(connection.scopeId), [connection.scopeId]);
   async function exportData() {
     await flushAllDrafts();
@@ -155,6 +157,14 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
           </button>
         </div>
         <p className="field-help">{t('settings.recoveries')}</p>
+        <button
+          className="button secondary"
+          disabled={busy || !session.writable}
+          onClick={() => setImportOpen(true)}
+        >
+          <Upload size={16} />
+          {t('backupImport.title')}
+        </button>
         <hr />
         <p>{t('settings.clearHelp')}</p>
         <button
@@ -186,6 +196,7 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
       {markdownExport && (
         <MarkdownExportDialog snapshot={markdownExport} onClose={() => setMarkdownExport(undefined)} />
       )}
+      {importOpen && <BackupImportDialog onClose={() => setImportOpen(false)} />}
     </section>
   );
 }

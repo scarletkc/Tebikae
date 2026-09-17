@@ -1285,6 +1285,66 @@ hr {
   overflow-y: auto;
   min-height: 0;
 }
+.backup-import-dialog {
+  width: min(94vw, 720px);
+}
+.backup-import-body {
+  padding: 0 24px 24px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.backup-import-file {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0;
+}
+.backup-import-file input {
+  max-width: 100%;
+}
+.backup-import-filename,
+.backup-import-note-title,
+.backup-import-invalid li {
+  overflow-wrap: anywhere;
+}
+.backup-import-notes {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+.backup-import-notes > li {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.backup-import-notes .check-label {
+  align-items: flex-start;
+  font-size: 14px;
+  font-weight: 500;
+}
+.backup-import-notes .check-label input {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.backup-import-notes .field-help {
+  margin: 4px 0 4px 23px;
+}
+.backup-import-excerpt {
+  margin: 4px 0 0 23px;
+  font-size: 12px;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.backup-import-body > .button,
+.backup-import-result {
+  margin-top: 16px;
+}
+.backup-import-body .banner {
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+.backup-import-body .banner p {
+  margin-top: 0;
+}
 .markdown-export-counts {
   margin: 20px 0;
 }

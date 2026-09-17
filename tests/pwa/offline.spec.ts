@@ -6,6 +6,7 @@ import zh from '../../src/i18n/locales/zh-CN.json' with { type: 'json' };
 import { blockGitHubAfterReload, disconnectNetwork } from './network';
 import { readFile } from 'node:fs/promises';
 import { strFromU8, unzipSync } from 'fflate';
+import { newMetadata } from '../../src/domain/codec';
 
 for (const language of ['en', 'zh-CN'] as const) {
   test(`production shell and first editor use work after a fully offline reload (${language})`, async ({
@@ -74,6 +75,44 @@ for (const language of ['en', 'zh-CN'] as const) {
     const download = await downloaded;
     const files = unzipSync(await readFile((await download.path())!));
     expect(strFromU8(files['notes/Weekend ideas.md']!)).toContain('首次离线编辑');
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await page.getByRole('button', { name: copy.backupImport.title, exact: true }).click();
+    await page.getByLabel(copy.backupImport.file, { exact: true }).setInputFiles({
+      name: 'offline-backup.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(
+        JSON.stringify({
+          format: 'issue-notes-export',
+          schemaVersion: 1,
+          labels: [],
+          notes: [
+            {
+              current: {
+                title: 'Imported offline',
+                markdown: '离线恢复的正文',
+                archived: false,
+                labelIds: [],
+                meta: newMetadata(),
+              },
+            },
+          ],
+        }),
+      ),
+    });
+    await page
+      .getByRole('button', { name: copy.backupImport.import.replace('{{count}}', '1'), exact: true })
+      .click();
+    await expect(
+      page.getByText(copy.backupImport.success.replace('{{imported}}', '1').replace('{{skipped}}', '0'), {
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.getByRole('button', { name: copy.backupImport.done, exact: true }).click();
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('a[href$="#/notes"]').click();
+    await expect(page.locator('.note-card').filter({ hasText: 'Imported offline' })).toContainText(
+      '离线恢复的正文',
+    );
     expect(remote.writes).toHaveLength(0);
   });
 }
