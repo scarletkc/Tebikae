@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 const editorTests = ['editor', 'notes', 'note-layout', 'reliability'];
 const storageTests = ['session', 'notes', 'reliability', 'backup-import', 'workspace-status'];
 const layoutTests = ['note-layout', 'topbar-layout', 'sidebar-controls', 'labels', 'notes'];
-const documentation = (path) => path.endsWith('.md') || path === 'LICENSE';
+const documentation = (path) =>
+  path === 'LICENSE' || (path.endsWith('.md') && (!path.includes('/') || path.startsWith('docs/')));
 
 /** Select extra engine coverage without repeating pure logic tests in every browser. */
 export function browserPlan(paths, full = false) {
@@ -97,6 +99,24 @@ export function planForEvent(eventName, event, changedPaths, forceFull = false) 
   }
 }
 
+/** A pass is reusable only for the same tested tree, base, coverage and runner. */
+export function successCacheKey({ tree, matrix, base, scope, runtime }) {
+  if (!base || !scope || !runtime) throw new Error('Missing cache identity');
+  const code = tree
+    .split('\0')
+    .filter(Boolean)
+    .filter((entry) => {
+      const separator = entry.indexOf('\t');
+      if (separator < 0) throw new Error('Invalid Git tree entry');
+      const path = entry.slice(separator + 1);
+      // Executable files and symlinks are never treated as documentation.
+      const prose = documentation(path);
+      return !entry.startsWith('100644 blob ') || !prose;
+    })
+    .sort();
+  return `ci-success-v1-${createHash('sha256').update(JSON.stringify({ code, matrix, base, scope, runtime })).digest('hex')}`;
+}
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
   const matrix = planForEvent(
@@ -115,6 +135,37 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.env.FULL_BROWSER_SUITE === 'true',
   );
   const output = JSON.stringify(matrix);
-  if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${output}\n`);
+  let cacheKey = '';
+  if (
+    process.env.GITHUB_EVENT_NAME === 'pull_request' &&
+    process.env.FULL_BROWSER_SUITE !== 'true' &&
+    process.env.GITHUB_REF &&
+    process.env.GITHUB_WORKFLOW &&
+    process.env.ImageOS &&
+    process.env.ImageVersion
+  ) {
+    try {
+      cacheKey = successCacheKey({
+        tree: execFileSync('git', ['ls-tree', '-rz', '--full-tree', 'HEAD'], { encoding: 'utf8' }),
+        matrix,
+        base: event.pull_request?.base.sha,
+        scope: `${process.env.GITHUB_WORKFLOW}:${process.env.GITHUB_REF}`,
+        runtime: [
+          process.version,
+          process.platform,
+          process.arch,
+          process.env.ImageOS,
+          process.env.ImageVersion,
+        ],
+      });
+    } catch {
+      // If provenance cannot be established, run the checks instead of reusing a pass.
+    }
+  }
+  if (process.env.GITHUB_OUTPUT)
+    appendFileSync(
+      process.env.GITHUB_OUTPUT,
+      `matrix=${output}\ncache_key=${cacheKey}\nreuse_allowed=${Boolean(cacheKey)}\n`,
+    );
   console.log(output);
 }

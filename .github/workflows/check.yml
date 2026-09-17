@@ -3,11 +3,13 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - '**/*.md'
+      - '*.md'
+      - 'docs/**/*.md'
       - 'LICENSE'
   pull_request:
     paths-ignore:
-      - '**/*.md'
+      - '*.md'
+      - 'docs/**/*.md'
       - 'LICENSE'
   workflow_dispatch:
   workflow_call:
@@ -20,12 +22,17 @@ permissions:
   contents: read
 concurrency:
   group: check-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: true
+  # Let a code run finish so subsequent documentation commits can reuse its result.
+  cancel-in-progress: false
 jobs:
   plan:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.browsers.outputs.matrix }}
+      cache_key: ${{ steps.browsers.outputs.cache_key }}
+      reuse_allowed: ${{ steps.browsers.outputs.reuse_allowed }}
+      reused: ${{ steps.previous.outputs.cache-hit == 'true' }}
+      run_checks: ${{ steps.previous.outputs.cache-hit != 'true' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,7 +44,19 @@ jobs:
         run: node scripts/ci-browser-plan.mjs
         env:
           FULL_BROWSER_SUITE: ${{ inputs.full || false }}
+      - uses: actions/cache/restore@v4
+        id: previous
+        if: steps.browsers.outputs.reuse_allowed == 'true'
+        with:
+          path: .ci-check/passed
+          key: ${{ steps.browsers.outputs.cache_key }}
+      - name: Explain reused verification
+        if: steps.previous.outputs.cache-hit == 'true'
+        run: |
+          echo 'Code, base, coverage and runner match a successful verification. Current formatting must still pass.' >> "$GITHUB_STEP_SUMMARY"
+          cat .ci-check/passed >> "$GITHUB_STEP_SUMMARY"
   validate:
+    needs: plan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,17 +67,24 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
+        if: needs.plan.outputs.run_checks == 'true'
       - run: pnpm lint
+        if: needs.plan.outputs.run_checks == 'true'
       - run: pnpm format:check
       - run: node --test tests/ci/*.test.mjs
+        if: needs.plan.outputs.run_checks == 'true'
       - run: pnpm test
+        if: needs.plan.outputs.run_checks == 'true'
       - run: pnpm build
+        if: needs.plan.outputs.run_checks == 'true'
         env:
           VITE_BASE_PATH: /
       - run: pnpm exec vite build --outDir .artifacts/pages-dist
+        if: needs.plan.outputs.run_checks == 'true'
         env:
           VITE_BASE_PATH: /Tebikae/
       - uses: actions/upload-artifact@v4
+        if: needs.plan.outputs.run_checks == 'true'
         with:
           name: browser-builds
           include-hidden-files: true
@@ -68,6 +94,7 @@ jobs:
           retention-days: 1
   browsers:
     needs: [plan, validate]
+    if: needs.plan.outputs.run_checks == 'true'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -81,9 +108,29 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Identify browser cache
+        id: playwright
+        run: |
+          node -e 'console.log("version=" + require("@playwright/test/package.json").version)' >> "$GITHUB_OUTPUT"
+          echo "image=${ImageOS:-unknown}" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v4
+        id: browser-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.image }}-${{ matrix.browser }}-${{ steps.playwright.outputs.version }}
       - run: pnpm exec playwright install --with-deps "$BROWSER"
+        if: steps.browser-cache.outputs.cache-hit != 'true'
         env:
           BROWSER: ${{ matrix.browser }}
+      - run: pnpm exec playwright install-deps "$BROWSER"
+        if: steps.browser-cache.outputs.cache-hit == 'true'
+        env:
+          BROWSER: ${{ matrix.browser }}
+      - uses: actions/cache/save@v4
+        if: steps.browser-cache.outputs.cache-hit != 'true'
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.browser-cache.outputs.cache-primary-key }}
       - uses: actions/download-artifact@v4
         if: matrix.pwa
         with:
@@ -114,4 +161,22 @@ jobs:
           PLAN: ${{ needs.plan.result }}
           VALIDATE: ${{ needs.validate.result }}
           BROWSERS: ${{ needs.browsers.result }}
-        run: test "$PLAN" = success && test "$VALIDATE" = success && test "$BROWSERS" = success
+          REUSED: ${{ needs.plan.outputs.reused }}
+        run: |
+          test "$PLAN" = success
+          test "$VALIDATE" = success
+          if [ "$REUSED" = true ]; then
+            test "$BROWSERS" = skipped
+          else
+            test "$BROWSERS" = success
+          fi
+      - name: Record successful code verification
+        if: needs.plan.outputs.reuse_allowed == 'true' && needs.plan.outputs.run_checks == 'true'
+        run: |
+          mkdir -p .ci-check
+          printf 'Verified by %s/%s/actions/runs/%s/attempts/%s\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" > .ci-check/passed
+      - uses: actions/cache/save@v4
+        if: needs.plan.outputs.reuse_allowed == 'true' && needs.plan.outputs.run_checks == 'true'
+        with:
+          path: .ci-check/passed
+          key: ${{ needs.plan.outputs.cache_key }}
