@@ -9,7 +9,6 @@ import type {
   OutboxEntry,
   RawIssueSnapshot,
   SyncState,
-  SyncStatus,
 } from '../domain/types';
 import { recoverInterruptedWrites, saveRecovery, type TebikaeDB } from '../storage/db';
 
@@ -224,6 +223,34 @@ export class SyncEngine {
               note.remoteUnavailable =
                 !seen.has(note.issueId) || Boolean(note.conflictFields?.includes('protocol'));
           });
+        // A completed full scan that never saw an Issue with a pending purge attempt is the
+        // only trustworthy confirmation that its deletion took effect: an inaccessible
+        // repository fails the scan itself, and a single GET cannot distinguish a deleted
+        // Issue from a private one the token can no longer see.
+        const confirmed = await this.db.notes
+          .where('scopeId')
+          .equals(scopeId)
+          .filter((note) => Boolean(note.issueId) && Boolean(note.purgeStartedAt) && !seen.has(note.issueId!))
+          .toArray();
+        for (const note of confirmed) {
+          await this.db.transaction(
+            'rw',
+            [
+              this.db.notes,
+              this.db.outbox,
+              this.db.recovery,
+              this.db.deletedIssues,
+              this.db.unmanagedIssues,
+              this.db.httpCache,
+            ],
+            async () => {
+              this.assertActive(generation);
+              await this.purgeLocalRecords(scopeId, note.localId, note.issueId);
+            },
+          );
+          this.editingIds.delete(note.localId);
+        }
+        if (confirmed.length) this.emit();
       }
       const stamp = now();
       await this.db.syncState.put({
@@ -263,7 +290,12 @@ export class SyncEngine {
       async () => {
         if (await this.db.deletedIssues.get([scopeId, remote.id])) return;
         let note = await this.db.notes.where('[scopeId+issueId]').equals([scopeId, remote.id]).first();
-        if (note?.purgeStartedAt) return;
+        if (note?.purgeStartedAt) {
+          // The Issue exists again, so a pending purge attempt never took effect remotely;
+          // drop the attempt and ingest the note normally so it stays recoverable.
+          await this.db.notes.update([scopeId, note.localId], { purgeStartedAt: undefined });
+          note.purgeStartedAt = undefined;
+        }
         if (!document) {
           const parsed = parseNoteBody(remote.body);
           if (parsed.status === 'managed') return;
@@ -791,6 +823,20 @@ export class SyncEngine {
     return this.flush(true);
   }
 
+  /** Removes every local trace of a note whose remote deletion is confirmed.
+   * Must run inside a transaction over notes, outbox, recovery, deletedIssues,
+   * unmanagedIssues, and httpCache. */
+  private async purgeLocalRecords(scopeId: string, localId: string, issueId?: number) {
+    if (issueId) {
+      await this.db.deletedIssues.put({ scopeId, issueId });
+      await this.db.unmanagedIssues.delete([scopeId, issueId]);
+      await this.db.httpCache.where('scopeId').equals(scopeId).delete();
+    }
+    await this.db.notes.delete([scopeId, localId]);
+    await this.db.outbox.delete([scopeId, localId]);
+    await this.db.recovery.where('[scopeId+localId]').equals([scopeId, localId]).delete();
+  }
+
   destroy(localId: string): Promise<void> {
     const scopeId = this.connection.scopeId;
     const inFlight = this.purging.get(localId);
@@ -818,9 +864,9 @@ export class SyncEngine {
         throw Object.assign(new Error('CREATE_NOT_CONFIRMED'), { failure: { code: 'NETWORK_UNCERTAIN' } });
       if (!localOnly) {
         // An earlier deleteIssue may have executed while its response was lost, leaving the
-        // note purged-but-uncertain. Reconcile first: resolve whether the Issue still exists
-        // and either finish the local cleanup or make the note deletable/recoverable again,
-        // keeping a deleted Issue distinct from an inaccessible one.
+        // note purged-but-uncertain. Reconcile first, but never treat a single GET as proof:
+        // GitHub also answers 404 for private resources the token can no longer see, so only
+        // a completed full scan (in pull) may confirm the deletion and clean up locally.
         if (note.purgeStartedAt) {
           if (typeof navigator !== 'undefined' && !navigator.onLine)
             throw Object.assign(new Error('OFFLINE'), { failure: { code: 'NETWORK_UNCERTAIN' } });
@@ -831,39 +877,11 @@ export class SyncEngine {
             await this.client.getIssue(this.connection, note.issueNumber!);
           } catch (error) {
             if (this.active(generation)) {
-              const failure = failureOf(error);
-              if (failure.code === 'NOT_FOUND_OR_INACCESSIBLE') {
-                // The deletion took effect remotely; only the response was lost.
-                await this.db.transaction(
-                  'rw',
-                  [
-                    this.db.notes,
-                    this.db.outbox,
-                    this.db.recovery,
-                    this.db.deletedIssues,
-                    this.db.unmanagedIssues,
-                    this.db.httpCache,
-                  ],
-                  async () => {
-                    this.assertActive(generation);
-                    await this.db.deletedIssues.put({ scopeId, issueId: note.issueId! });
-                    await this.db.unmanagedIssues.delete([scopeId, note.issueId!]);
-                    await this.db.httpCache.where('scopeId').equals(scopeId).delete();
-                    await this.db.notes.delete(key);
-                    await this.db.outbox.delete(key);
-                    await this.db.recovery.where('[scopeId+localId]').equals(key).delete();
-                  },
-                );
-                this.editingIds.delete(localId);
-                this.emit();
-                return;
-              }
-              // Inaccessible or still unknown: surface the failure and keep the note.
+              // The outcome stays unknown, so every record is kept and the note remains
+              // recoverable; the next completed full scan decides what happened.
               await this.db.notes.update(key, {
-                error: failure,
-                syncStatus: (['NETWORK_UNCERTAIN', 'SERVER_ERROR', 'SESSION_EXPIRED'].includes(failure.code)
-                  ? 'uncertain'
-                  : 'error') as SyncStatus,
+                error: failureOf(error),
+                syncStatus: 'uncertain' as const,
               });
             }
             throw error;
@@ -961,14 +979,8 @@ export class SyncEngine {
             )
               throw new Error('CREATE_NOT_CONFIRMED');
           }
-          if (final.issueId) {
-            await this.db.deletedIssues.put({ scopeId, issueId: final.issueId });
-            await this.db.unmanagedIssues.delete([scopeId, final.issueId]);
-            await this.db.httpCache.where('scopeId').equals(scopeId).delete();
-          }
-          await this.db.notes.delete(key);
-          await this.db.outbox.delete(key);
-          await this.db.recovery.where('[scopeId+localId]').equals(key).delete();
+          if (final.issueId) await this.purgeLocalRecords(scopeId, localId, final.issueId);
+          else await this.purgeLocalRecords(scopeId, localId);
           this.assertActive(generation);
         },
       );

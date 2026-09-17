@@ -256,7 +256,7 @@ describe('durable synchronization', () => {
     expect(await database.notes.count()).toBe(0);
   });
 
-  it('reconciles a lost deletion response after a restart and finishes the purge', async () => {
+  it('confirms a lost-response deletion through the next completed full scan', async () => {
     const remote = { ...raw(doc()), nodeId: 'I_kwDOlostResponse' };
     client.issues = [remote];
     await engine.pull();
@@ -282,18 +282,62 @@ describe('durable synchronization', () => {
     expect(stuck.purgeStartedAt).toBeDefined();
     expect(stuck.syncStatus).toBe('uncertain');
     expect(await database.deletedIssues.count()).toBe(0);
-    // A restart and a full pull mark the missing Issue unavailable but cannot resolve it.
+    // A restart and a completed full scan never see the Issue again; only that scan
+    // may confirm the deletion and finish the local cleanup.
     engine.stop();
     engine = new SyncEngine(database, client, connection);
     await engine.pull(true);
-    const pulled = (await database.notes.get([connection.scopeId, note.localId]))!;
-    expect(pulled.remoteUnavailable).toBe(true);
-    expect(pulled.purgeStartedAt).toBeDefined();
-    // Reconciling through destroy finds the Issue gone and completes the cleanup.
-    await engine.destroy(note.localId);
     expect(await database.notes.count()).toBe(0);
     expect(await database.outbox.count()).toBe(0);
     expect(await database.recovery.count()).toBe(0);
+    expect(await database.deletedIssues.get([connection.scopeId, remote.id])).toBeDefined();
+  });
+
+  it('keeps an ambiguous 404 during purge reconciliation recoverable', async () => {
+    const remote = raw(doc());
+    client.issues = [remote];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    // (1) The deletion fails before executing; the Issue remains on GitHub.
+    const remove = vi.spyOn(client, 'deleteIssue').mockRejectedValueOnce(error('NETWORK_UNCERTAIN'));
+    await expect(engine.destroy(note.localId)).rejects.toMatchObject({
+      failure: { code: 'NETWORK_UNCERTAIN' },
+    });
+    remove.mockRestore();
+    engine.stop();
+    engine = new SyncEngine(database, client, connection);
+    // (2) The reconciliation GET answers a permission-related 404.
+    const probe = vi.spyOn(client, 'getIssue').mockRejectedValueOnce(error('NOT_FOUND_OR_INACCESSIBLE'));
+    await expect(engine.destroy(note.localId)).rejects.toMatchObject({
+      failure: { code: 'NOT_FOUND_OR_INACCESSIBLE' },
+    });
+    // (3) Everything stays recoverable; no confirmed-deletion tombstone is written.
+    const kept = (await database.notes.get([connection.scopeId, note.localId]))!;
+    expect(kept.purgeStartedAt).toBeDefined();
+    expect(kept.error).toMatchObject({ code: 'NOT_FOUND_OR_INACCESSIBLE' });
+    expect(kept.syncStatus).toBe('uncertain');
+    expect(await database.outbox.count()).toBeGreaterThan(0);
+    expect(await database.deletedIssues.count()).toBe(0);
+    expect(client.issues).toHaveLength(1);
+    // (4) Access returns; a full scan sees the same Issue again, the pending attempt
+    // clears, and the note stays deletable and recoverable.
+    probe.mockRestore();
+    await engine.pull(true);
+    const recovered = (await database.notes.get([connection.scopeId, note.localId]))!;
+    expect(recovered.remoteUnavailable).toBe(false);
+    expect(recovered.purgeStartedAt).toBeUndefined();
+    await engine.destroy(note.localId);
+    expect(client.deletions).toHaveLength(1);
+    expect(await database.notes.count()).toBe(0);
     expect(await database.deletedIssues.get([connection.scopeId, remote.id])).toBeDefined();
   });
 
