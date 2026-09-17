@@ -9,6 +9,7 @@ import type {
   OutboxEntry,
   RawIssueSnapshot,
   SyncState,
+  SyncStatus,
 } from '../domain/types';
 import { recoverInterruptedWrites, saveRecovery, type TebikaeDB } from '../storage/db';
 
@@ -816,6 +817,65 @@ export class SyncEngine {
       )
         throw Object.assign(new Error('CREATE_NOT_CONFIRMED'), { failure: { code: 'NETWORK_UNCERTAIN' } });
       if (!localOnly) {
+        // An earlier deleteIssue may have executed while its response was lost, leaving the
+        // note purged-but-uncertain. Reconcile first: resolve whether the Issue still exists
+        // and either finish the local cleanup or make the note deletable/recoverable again,
+        // keeping a deleted Issue distinct from an inaccessible one.
+        if (note.purgeStartedAt) {
+          if (typeof navigator !== 'undefined' && !navigator.onLine)
+            throw Object.assign(new Error('OFFLINE'), { failure: { code: 'NETWORK_UNCERTAIN' } });
+          if (Date.now() < this.pausedUntil)
+            throw Object.assign(new Error('RATE_LIMITED'), { failure: { code: 'RATE_LIMITED' } });
+          this.assertActive(generation);
+          try {
+            await this.client.getIssue(this.connection, note.issueNumber!);
+          } catch (error) {
+            if (this.active(generation)) {
+              const failure = failureOf(error);
+              if (failure.code === 'NOT_FOUND_OR_INACCESSIBLE') {
+                // The deletion took effect remotely; only the response was lost.
+                await this.db.transaction(
+                  'rw',
+                  [
+                    this.db.notes,
+                    this.db.outbox,
+                    this.db.recovery,
+                    this.db.deletedIssues,
+                    this.db.unmanagedIssues,
+                    this.db.httpCache,
+                  ],
+                  async () => {
+                    this.assertActive(generation);
+                    await this.db.deletedIssues.put({ scopeId, issueId: note.issueId! });
+                    await this.db.unmanagedIssues.delete([scopeId, note.issueId!]);
+                    await this.db.httpCache.where('scopeId').equals(scopeId).delete();
+                    await this.db.notes.delete(key);
+                    await this.db.outbox.delete(key);
+                    await this.db.recovery.where('[scopeId+localId]').equals(key).delete();
+                  },
+                );
+                this.editingIds.delete(localId);
+                this.emit();
+                return;
+              }
+              // Inaccessible or still unknown: surface the failure and keep the note.
+              await this.db.notes.update(key, {
+                error: failure,
+                syncStatus: (['NETWORK_UNCERTAIN', 'SERVER_ERROR', 'SESSION_EXPIRED'].includes(failure.code)
+                  ? 'uncertain'
+                  : 'error') as SyncStatus,
+              });
+            }
+            throw error;
+          }
+          // The Issue still exists, so the earlier mutation never executed. Clear the
+          // attempt and the stale unavailability marker, then fall through to the
+          // normal verified deletion path.
+          await this.db.notes.update(key, { purgeStartedAt: undefined, remoteUnavailable: undefined });
+          note.purgeStartedAt = undefined;
+          note.remoteUnavailable = undefined;
+          this.assertActive(generation);
+        }
         if (
           !note.issueId ||
           !note.issueNumber ||
@@ -869,7 +929,7 @@ export class SyncEngine {
               error: failure,
               ...(['NETWORK_UNCERTAIN', 'SERVER_ERROR', 'SESSION_EXPIRED'].includes(failure.code)
                 ? { syncStatus: 'uncertain' as const }
-                : { purgeStartedAt: undefined }),
+                : { purgeStartedAt: undefined, syncStatus: 'error' as const }),
             });
           }
           throw error;

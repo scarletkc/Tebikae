@@ -256,6 +256,100 @@ describe('durable synchronization', () => {
     expect(await database.notes.count()).toBe(0);
   });
 
+  it('reconciles a lost deletion response after a restart and finishes the purge', async () => {
+    const remote = { ...raw(doc()), nodeId: 'I_kwDOlostResponse' };
+    client.issues = [remote];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    // The mutation executes on GitHub, then the response is lost.
+    vi.spyOn(client, 'deleteIssue').mockImplementation(async (_connection, nodeId) => {
+      client.issues = client.issues.filter((issue) => issue.nodeId !== nodeId);
+      throw error('NETWORK_UNCERTAIN');
+    });
+    await expect(engine.destroy(note.localId)).rejects.toMatchObject({
+      failure: { code: 'NETWORK_UNCERTAIN' },
+    });
+    const stuck = (await database.notes.get([connection.scopeId, note.localId]))!;
+    expect(stuck.purgeStartedAt).toBeDefined();
+    expect(stuck.syncStatus).toBe('uncertain');
+    expect(await database.deletedIssues.count()).toBe(0);
+    // A restart and a full pull mark the missing Issue unavailable but cannot resolve it.
+    engine.stop();
+    engine = new SyncEngine(database, client, connection);
+    await engine.pull(true);
+    const pulled = (await database.notes.get([connection.scopeId, note.localId]))!;
+    expect(pulled.remoteUnavailable).toBe(true);
+    expect(pulled.purgeStartedAt).toBeDefined();
+    // Reconciling through destroy finds the Issue gone and completes the cleanup.
+    await engine.destroy(note.localId);
+    expect(await database.notes.count()).toBe(0);
+    expect(await database.outbox.count()).toBe(0);
+    expect(await database.recovery.count()).toBe(0);
+    expect(await database.deletedIssues.get([connection.scopeId, remote.id])).toBeDefined();
+  });
+
+  it('retries deletion through reconciliation when the Issue still exists after a lost response', async () => {
+    client.issues = [raw(doc())];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    const remove = vi.spyOn(client, 'deleteIssue').mockRejectedValueOnce(error('NETWORK_UNCERTAIN'));
+    await expect(engine.destroy(note.localId)).rejects.toMatchObject({
+      failure: { code: 'NETWORK_UNCERTAIN' },
+    });
+    // The Issue is still on GitHub, so reconciliation clears the attempt and deletes again.
+    remove.mockRestore();
+    engine.stop();
+    engine = new SyncEngine(database, client, connection);
+    const probe = vi.spyOn(client, 'getIssue');
+    await engine.destroy(note.localId);
+    expect(probe).toHaveBeenCalledTimes(2);
+    expect(client.deletions).toHaveLength(1);
+    expect(await database.notes.count()).toBe(0);
+    expect(await database.deletedIssues.count()).toBe(1);
+  });
+
+  it('marks an already-synced note errored when GitHub explicitly rejects the deletion', async () => {
+    client.issues = [raw(doc())];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    vi.spyOn(client, 'deleteIssue').mockRejectedValue(error('FORBIDDEN'));
+    await expect(engine.destroy(note.localId)).rejects.toMatchObject({
+      failure: { code: 'FORBIDDEN' },
+    });
+    const rejected = (await database.notes.get([connection.scopeId, note.localId]))!;
+    expect(rejected.purgeStartedAt).toBeUndefined();
+    expect(rejected.error).toMatchObject({ code: 'FORBIDDEN' });
+    expect(rejected.syncStatus).toBe('error');
+    expect(await database.notes.count()).toBe(1);
+  });
+
   it('keeps an uncertain unsent create draft locally and allows deletion only after confirmation', async () => {
     client.failCreateAfterWrite = true;
     const draft = await createNote(connection.scopeId, doc(), database);
