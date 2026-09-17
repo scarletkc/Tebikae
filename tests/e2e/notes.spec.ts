@@ -94,6 +94,7 @@ test('archive survives trash and restore, and JSON export contains no credential
   await mockGitHub(context);
   await connect(page);
   await page.locator('a[href$="#/archive"]').click();
+  await expect(page.locator('.app-topbar .new-note-button')).toHaveCount(0);
   await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Move to trash', exact: true }).click();
   await closeDialog(page);

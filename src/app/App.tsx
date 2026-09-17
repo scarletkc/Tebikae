@@ -527,7 +527,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                 </IconButton>
               </span>
               {statusControl}
-              {route !== 'trash' && (
+              {route !== 'trash' && view !== 'archive' && (
                 <button
                   className="button primary new-note-button"
                   disabled={!session.writable}
