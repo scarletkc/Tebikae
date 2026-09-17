@@ -8,6 +8,8 @@ import MarkdownPreview from '../editor/MarkdownPreview';
 import { LabelBadge } from '../labels';
 import './notes.css';
 
+const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
 export function Highlight({ query, text }: { query: string; text: string }) {
   const terms = query.toLocaleLowerCase().trim().split(/\s+/u).filter(Boolean);
   if (!terms.length) return <>{text}</>;
@@ -21,6 +23,17 @@ export function Highlight({ query, text }: { query: string; text: string }) {
     }
   }
   if (!marks.length) return <>{text}</>;
+  const originalRanges: { start: number; end: number }[] = [];
+  for (const { segment, index } of graphemes.segment(text)) {
+    const range = { start: index, end: index + segment.length };
+    const foldedLength = segment.toLocaleLowerCase().length;
+    for (let i = 0; i < foldedLength; i++) originalRanges.push(range);
+  }
+  for (const mark of marks) {
+    const start = originalRanges[mark.start]!.start;
+    mark.end = originalRanges[mark.end - 1]!.end;
+    mark.start = start;
+  }
   marks.sort((a, b) => a.start - b.start || b.end - a.end);
   const parts: React.ReactNode[] = [];
   let cursor = 0;
