@@ -576,7 +576,7 @@ describe('durable synchronization', () => {
     expect(events).toEqual(['read', 'write', 'read']);
   });
 
-  it('spaces automatic note writes by at least 15 seconds and resumes the remaining intent', async () => {
+  it('spaces automatic note writes by at least 30 seconds and resumes the remaining intent', async () => {
     vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     const writes: number[] = [];
     let secondStarted!: () => void;
@@ -595,11 +595,11 @@ describe('durable synchronization', () => {
     await engine.pull();
     await engine.flush();
     expect(writes).toHaveLength(1);
-    await vi.advanceTimersByTimeAsync(14_999);
+    await vi.advanceTimersByTimeAsync(29_999);
     expect(writes).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(1);
     await second;
-    expect(writes[1]! - writes[0]!).toBeGreaterThanOrEqual(15_000);
+    expect(writes[1]! - writes[0]!).toBeGreaterThanOrEqual(30_000);
     await engine.pull();
   });
 

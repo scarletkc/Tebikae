@@ -447,6 +447,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           key={note.localId}
           note={note}
           labels={labels}
+          query={filters.query}
           writable={session.writable}
           onOpen={() => openNote(note)}
           onChange={(action) => void change(note, action)}
@@ -526,7 +527,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                 </IconButton>
               </span>
               {statusControl}
-              {route !== 'trash' && (
+              {route !== 'trash' && view !== 'archive' && (
                 <button
                   className="button primary new-note-button"
                   disabled={!session.writable}

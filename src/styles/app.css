@@ -1001,6 +1001,13 @@ hr {
   color: var(--text);
   opacity: 0.88;
 }
+mark {
+  background: color-mix(in srgb, var(--accent) 26%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 1px;
+  box-decoration-break: clone;
+}
 .card-labels {
   padding: 7px 20px 8px;
   display: flex;

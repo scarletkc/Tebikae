@@ -413,7 +413,7 @@ export class SyncEngine {
 
   flush(manual = false) {
     if (!manual) {
-      const wait = Math.max(0, this.lastAutoWrite + 15_000 - Date.now());
+      const wait = Math.max(0, this.lastAutoWrite + 30_000 - Date.now());
       if (wait > 0) {
         clearTimeout(this.autoTimer);
         this.autoTimer = setTimeout(() => {
@@ -447,13 +447,13 @@ export class SyncEngine {
           const note = await this.db.notes.get([entry.scopeId, entry.localId]);
           if (!note || note.duplicate || note.remoteUnavailable) continue;
           if (entry.kind === 'create' && entry.status === 'uncertain') continue;
-          if (!manual && this.lastAutoWrite && Date.now() - this.lastAutoWrite < 15_000) {
+          if (!manual && this.lastAutoWrite && Date.now() - this.lastAutoWrite < 30_000) {
             clearTimeout(this.autoTimer);
             this.autoTimer = setTimeout(
               () => {
                 void this.flush().catch(() => undefined);
               },
-              15_000 - (Date.now() - this.lastAutoWrite),
+              30_000 - (Date.now() - this.lastAutoWrite),
             );
             break;
           }
