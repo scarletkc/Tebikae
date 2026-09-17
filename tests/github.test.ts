@@ -43,6 +43,54 @@ function client(options: ConstructorParameters<typeof GitHubClient>[1] = {}) {
 }
 
 describe('GitHub adapter', () => {
+  it('deletes an Issue through GraphQL using its node ID, never REST DELETE or close', async () => {
+    const requests: unknown[] = [];
+    server.use(
+      http.post(`${origin}/graphql`, async ({ request }) => {
+        requests.push(await request.json());
+        return HttpResponse.json({ data: { deleteIssue: { clientMutationId: null } } });
+      }),
+    );
+    await client().api.deleteIssue(connection, 'I_1');
+    expect(requests).toEqual([
+      {
+        query: expect.stringContaining('deleteIssue(input: $input)'),
+        variables: { input: { issueId: 'I_1' } },
+      },
+    ]);
+  });
+
+  it.each([
+    [
+      { errors: [{ type: 'FORBIDDEN', message: 'private diagnostics' }], data: { deleteIssue: null } },
+      'FORBIDDEN',
+    ],
+    [{ errors: [{ type: 'NOT_FOUND' }] }, 'NOT_FOUND_OR_INACCESSIBLE'],
+    [{ errors: [{ type: 'RATE_LIMITED' }] }, 'RATE_LIMITED'],
+    [
+      { errors: [{ message: 'private diagnostics' }], data: { deleteIssue: { clientMutationId: null } } },
+      'SERVER_ERROR',
+    ],
+    [{ data: { deleteIssue: null } }, 'SERVER_ERROR'],
+    [{}, 'SERVER_ERROR'],
+  ])('rejects unsuccessful HTTP 200 GraphQL deletion responses %o', async (body, code) => {
+    server.use(http.post(`${origin}/graphql`, () => HttpResponse.json(body)));
+    const failure = await client()
+      .api.deleteIssue(connection, 'I_1')
+      .catch((error: unknown) => error);
+    expect(failure).toMatchObject({ code });
+    expect(JSON.stringify(failure)).not.toContain('private diagnostics');
+  });
+
+  it('rejects read-only and empty node ID deletions without dispatch', async () => {
+    const fetch = vi.fn();
+    const { api } = client({ fetch });
+    await expect(api.deleteIssue({ ...connection, readOnly: true }, 'I_1')).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+    await expect(api.deleteIssue(connection, '')).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect(fetch).not.toHaveBeenCalled();
+  });
   it('connects using only GET, scope identity, the explicit API version, and no cookie/referrer credentials', async () => {
     const calls: string[] = [];
     server.use(
