@@ -24,6 +24,7 @@ export interface MockGitHubState {
   issues: MockIssue[];
   labels: MockLabel[];
   dropNextCreateResponse: boolean;
+  failNextDeleteIssue: boolean;
   writes: { method: string; path: string; body: Record<string, unknown> | null }[];
   requests: { method: string; path: string }[];
 }
@@ -92,6 +93,7 @@ export async function mockGitHub(
     writes: [],
     requests: [],
     dropNextCreateResponse: false,
+    failNextDeleteIssue: false,
   };
   let clock = Date.parse('2026-09-16T09:00:00Z');
   await context.route('https://api.github.com/**', async (route) => {
@@ -113,6 +115,22 @@ export async function mockGitHub(
     const payload = request.postData() ? (request.postDataJSON() as Record<string, unknown>) : null;
     if (method !== 'GET') state.writes.push({ method, path, body: payload });
     if (path === '/user') return send({ id: 1, login: 'scarletkc' });
+    if (path === '/graphql') {
+      const query = String(payload?.query || '');
+      const issueId = String(
+        (payload?.variables as { input?: { issueId?: string } } | null)?.input?.issueId || '',
+      );
+      if (!query.includes('deleteIssue')) return send({ message: 'Unexpected GraphQL operation' }, 400);
+      if (state.failNextDeleteIssue) {
+        state.failNextDeleteIssue = false;
+        return send({ errors: [{ type: 'NETWORK', message: 'deletion failed' }], data: null });
+      }
+      const nodeId = String(issueId);
+      const before = state.issues.length;
+      state.issues = state.issues.filter((issue) => issue.node_id !== nodeId);
+      if (state.issues.length === before) return send({ errors: [{ type: 'NOT_FOUND' }], data: null });
+      return send({ data: { deleteIssue: { clientMutationId: null } } });
+    }
     if (path === '/repos/scarletkc/Tebikae-dev')
       return send({
         id: 2,

@@ -42,9 +42,11 @@ class FakeClient implements SyncClient {
   labels: Label[] = [];
   creates = 0;
   patches: unknown[] = [];
+  deletions: number[] = [];
   failCreateAfterWrite = false;
   failLabel = false;
   failPage = false;
+  failDelete = false;
   requestedSince?: string;
   onPatch?: () => Promise<void>;
   async getAnchor(): Promise<string | undefined> {
@@ -60,6 +62,13 @@ class FakeClient implements SyncClient {
     const issue = this.issues.find((item) => item.number === number);
     if (!issue) throw error('NOT_FOUND_OR_INACCESSIBLE');
     return structuredClone(issue);
+  }
+  async deleteIssue(_connection: Connection, nodeId: string) {
+    if (this.failDelete) throw error('NETWORK_UNCERTAIN');
+    const issue = this.issues.find((item) => item.nodeId === nodeId);
+    if (!issue) throw error('NOT_FOUND_OR_INACCESSIBLE');
+    this.issues = this.issues.filter((item) => item.nodeId !== nodeId);
+    this.deletions.push(issue.id);
   }
   async createIssue(_connection: Connection, payload: { title: string; body: string; labels?: string[] }) {
     this.creates++;
@@ -129,6 +138,243 @@ afterEach(async () => {
 const firstNote = async () => (await database.notes.toArray())[0]!;
 
 describe('durable synchronization', () => {
+  it('purges a locally trashed Issue using its fresh opaque node ID and clears local data', async () => {
+    const remote = { ...raw(doc()), nodeId: 'I_kwDOopaqueNode' };
+    client.issues = [remote];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    const remove = vi.spyOn(client, 'deleteIssue').mockImplementation(async (_connection, nodeId) => {
+      expect(nodeId).toBe(remote.nodeId);
+      client.issues = [];
+    });
+    const read = vi.spyOn(client, 'getIssue');
+    await engine.destroy(note.localId);
+    expect(read).toHaveBeenCalledWith(connection, remote.number);
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(await database.notes.count()).toBe(0);
+    expect(await database.outbox.count()).toBe(0);
+    expect(await database.recovery.count()).toBe(0);
+    expect(await database.deletedIssues.get([connection.scopeId, remote.id])).toBeDefined();
+  });
+
+  it('refuses to purge a note that is not trashed', async () => {
+    client.issues = [raw(doc())];
+    await engine.pull();
+    const note = await firstNote();
+    await expect(engine.destroy(note.localId)).rejects.toThrow('NOTE_NOT_TRASHED');
+    expect(await database.notes.count()).toBe(1);
+    expect(client.deletions).toHaveLength(0);
+  });
+
+  it('refuses purge for read-only connections and offline browsers', async () => {
+    client.issues = [raw(doc())];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    engine.stop();
+    engine = new SyncEngine(database, client, { ...connection, readOnly: true });
+    await expect(engine.destroy(note.localId)).rejects.toMatchObject({ failure: { code: 'FORBIDDEN' } });
+    engine.stop();
+    engine = new SyncEngine(database, client, connection);
+    const offline = vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    await expect(engine.destroy(note.localId)).rejects.toMatchObject({
+      failure: { code: 'NETWORK_UNCERTAIN' },
+    });
+    expect(await database.notes.count()).toBe(1);
+    expect(client.deletions).toHaveLength(0);
+    offline.mockRestore();
+  });
+
+  it('coalesces repeated purge requests into one in-flight deletion', async () => {
+    client.issues = [raw(doc())];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    let release!: () => void;
+    const holding = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const remove = vi.spyOn(client, 'deleteIssue').mockImplementation(() => holding);
+    const first = engine.destroy(note.localId);
+    const second = engine.destroy(note.localId);
+    release();
+    await Promise.all([first, second]);
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(await database.notes.count()).toBe(0);
+  });
+
+  it('keeps a trashed note locally when the GraphQL deletion fails', async () => {
+    client.issues = [raw(doc())];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    const remove = vi.spyOn(client, 'deleteIssue').mockRejectedValue(error('NETWORK_UNCERTAIN'));
+    await expect(engine.destroy(note.localId)).rejects.toMatchObject({
+      failure: { code: 'NETWORK_UNCERTAIN' },
+    });
+    const kept = (await database.notes.get([connection.scopeId, note.localId]))!;
+    expect(kept.current.meta.trashedAt).not.toBeNull();
+    expect(kept.error).toMatchObject({ code: 'NETWORK_UNCERTAIN' });
+    expect(kept.syncStatus).toBe('uncertain');
+    expect(await database.recovery.where('scopeId').equals(connection.scopeId).count()).toBe(0);
+    remove.mockRestore();
+    await engine.destroy(note.localId);
+    expect(client.deletions).toHaveLength(1);
+    expect(await database.notes.count()).toBe(0);
+  });
+
+  it('keeps an uncertain unsent create draft locally and allows deletion only after confirmation', async () => {
+    client.failCreateAfterWrite = true;
+    const draft = await createNote(connection.scopeId, doc(), database);
+    await engine.flush(true);
+    expect((await database.notes.get([connection.scopeId, draft.localId]))?.syncStatus).toBe('uncertain');
+    await saveNote(
+      connection.scopeId,
+      draft.localId,
+      {
+        ...doc(),
+        meta: { ...newMetadata(), trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    await expect(engine.destroy(draft.localId)).rejects.toThrow('CREATE_NOT_CONFIRMED');
+    expect(await database.notes.count()).toBe(1);
+  });
+
+  it('purges a locally trashed note without an Issue number', async () => {
+    const draft = await createNote(connection.scopeId, doc(), database);
+    const note = (await database.notes.get([connection.scopeId, draft.localId]))!;
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    await database.outbox.put({
+      scopeId: connection.scopeId,
+      localId: note.localId,
+      operationId: crypto.randomUUID(),
+      kind: 'create',
+      status: 'pending',
+      attemptStartedAt: new Date().toISOString(),
+    });
+    await expect(engine.destroy(note.localId)).rejects.toThrow('CREATE_NOT_CONFIRMED');
+    expect(await database.notes.count()).toBe(1);
+  });
+
+  it('conflicts instead of deleting when GitHub changed the Issue before purge', async () => {
+    client.issues = [raw(doc())];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    client.issues[0] = { ...raw(doc()), title: 'Changed on GitHub' };
+    await expect(engine.destroy(note.localId)).rejects.toThrow('REMOTE_CHANGED');
+    const kept = (await database.notes.get([connection.scopeId, note.localId]))!;
+    expect(kept.syncStatus).toBe('conflict');
+    expect(kept.conflictFields).toEqual(['remote-changed']);
+    expect(client.deletions).toHaveLength(0);
+  });
+
+  it('never resurrects a purged note and blocks its outbox entry from resending', async () => {
+    const remote = { ...raw(doc()), nodeId: 'I_kwDOgone' };
+    client.issues = [remote];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    client.issues = [remote, raw(doc(), 2)];
+    client.issues[1]!.id = 2;
+    await engine.destroy(note.localId);
+    client.issues = [remote];
+    await engine.pull(true);
+    expect(await database.notes.count()).toBe(0);
+    expect(await database.outbox.count()).toBe(0);
+  });
+
+  it('recovers an interrupted purge as uncertain and pauses the queue', async () => {
+    const remote = { ...raw(doc()), nodeId: 'I_kwDOinterrupted' };
+    client.issues = [remote];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      {
+        ...note.current,
+        meta: { ...note.current.meta, trashedAt: new Date().toISOString() },
+      },
+      database,
+    );
+    await database.notes.update([connection.scopeId, note.localId], {
+      purgeStartedAt: new Date().toISOString(),
+    });
+    await database.outbox.put({
+      scopeId: connection.scopeId,
+      localId: note.localId,
+      operationId: crypto.randomUUID(),
+      kind: 'update',
+      status: 'sending',
+    });
+    engine.stop();
+    engine = new SyncEngine(database, client, connection);
+    await engine.pull(true);
+    expect((await database.notes.get([connection.scopeId, note.localId]))?.syncStatus).toBe('uncertain');
+    client.issues = [];
+    await engine.flush(true);
+    expect(await database.notes.count()).toBe(1);
+  });
+
   it('creates an archived draft once and closes the acknowledged Issue', async () => {
     const document = { ...doc(), archived: true };
     const draft = await createNote(connection.scopeId, document, database);

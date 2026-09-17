@@ -47,7 +47,12 @@ export async function saveNote(
   return database.transaction('rw', database.notes, database.outbox, database.recovery, async () => {
     const previous = await requireNote(database, scopeId, localId);
     if (JSON.stringify(previous.current) === JSON.stringify(document)) return previous;
-    if (previous.duplicate || previous.remoteUnavailable || previous.conflictFields?.includes('protocol'))
+    if (
+      previous.purgeStartedAt ||
+      previous.duplicate ||
+      previous.remoteUnavailable ||
+      previous.conflictFields?.includes('protocol')
+    )
       throw new Error('NOTE_READ_ONLY');
     let desired = document;
     let conflicts: string[] = [];

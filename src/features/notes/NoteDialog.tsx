@@ -72,6 +72,20 @@ export default function NoteDialog({
   const idRef = useRef(localId);
   const latest = useLiveQuery(() => (localId ? db.notes.get([scope, localId]) : undefined), [scope, localId]);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
+  const [online, setOnline] = useState(navigator.onLine);
+  const purging = useRef(false);
+  const purged = useRef(false);
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
   const [saveError, setSaveError] = useState('');
   const [persistedRevision, setPersistedRevision] = useState(initialNote?.localRevision || 0);
   const persistence = useRef<Promise<void>>(Promise.resolve());
@@ -105,11 +119,17 @@ export default function NoteDialog({
     setDocument(docRef.current);
   }, [latest, saving, persistedRevision]);
   const readOnly =
-    !writable || document.meta.trashedAt !== null || !!latest?.duplicate || !!latest?.remoteUnavailable;
+    !writable ||
+    deleting ||
+    !!latest?.purgeStartedAt ||
+    document.meta.trashedAt !== null ||
+    !!latest?.duplicate ||
+    !!latest?.remoteUnavailable;
   const persist = useCallback(
-    async (options?: { finalizeEmptyTitle?: boolean }) => {
+    async (options?: { finalizeEmptyTitle?: boolean; beforePurge?: boolean }) => {
       clearTimeout(localTimer.current);
       const run = async () => {
+        if (purged.current || (purging.current && !options?.beforePurge)) return;
         const emptyTitle = !docRef.current.title.trim();
         // Title-only clearing is kept local; still persist the untitled fallback on close.
         if (version.current === savedVersion.current && !(options?.finalizeEmptyTitle && emptyTitle)) return;
@@ -193,7 +213,39 @@ export default function NoteDialog({
       2000,
     );
   }
+  async function purge() {
+    if (
+      purging.current ||
+      !engine ||
+      !writable ||
+      !online ||
+      !idRef.current ||
+      docRef.current.meta.trashedAt === null ||
+      !confirm(t('note.deleteConfirm'))
+    )
+      return;
+    purging.current = true;
+    setDeleting(true);
+    setDeleteError(false);
+    clearTimeout(localTimer.current);
+    clearTimeout(syncTimer.current);
+    try {
+      await persistence.current;
+      await editorFlush.current();
+      await persist({ beforePurge: true });
+      await engine.destroy(idRef.current);
+      purged.current = true;
+      engine.setEditing(idRef.current, false);
+      onClose();
+    } catch {
+      setDeleteError(true);
+    } finally {
+      purging.current = false;
+      setDeleting(false);
+    }
+  }
   async function close(direction?: -1 | 1) {
+    if (purging.current || purged.current) return;
     try {
       await editorFlush.current();
       await persist({ finalizeEmptyTitle: true });
@@ -493,17 +545,39 @@ export default function NoteDialog({
             </button>
           </details>
         )}
+        {deleteError && (
+          <div role="alert" className="error-box">
+            <p>{t('note.deleteFailed')}</p>
+          </div>
+        )}
       </div>
       <footer className="note-editor-footer">
         <div className="note-tools">
           {document.meta.trashedAt ? (
-            <IconButton
-              label={t('action.restore')}
-              disabled={!writable}
-              onClick={() => change((d) => ({ ...d, meta: { ...d.meta, trashedAt: null } }))}
-            >
-              <RotateCcw size={18} />
-            </IconButton>
+            <>
+              <IconButton
+                label={t('action.restore')}
+                disabled={!writable || deleting || !!latest?.purgeStartedAt}
+                onClick={() => change((d) => ({ ...d, meta: { ...d.meta, trashedAt: null } }))}
+              >
+                <RotateCcw size={18} />
+              </IconButton>
+              <IconButton
+                label={t(deleting ? 'note.deleting' : 'action.deleteForever')}
+                disabled={
+                  !engine ||
+                  !writable ||
+                  !online ||
+                  deleting ||
+                  !localId ||
+                  !!latest?.duplicate ||
+                  !!latest?.remoteUnavailable
+                }
+                onClick={() => void purge()}
+              >
+                <Trash2 size={18} />
+              </IconButton>
+            </>
           ) : (
             <>
               <IconButton

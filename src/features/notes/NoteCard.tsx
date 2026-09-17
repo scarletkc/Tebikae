@@ -53,6 +53,8 @@ export default function NoteCard({
   query = '',
   onOpen,
   onChange,
+  onPurge,
+  canPurge = false,
   writable,
 }: {
   note: LocalNote;
@@ -60,6 +62,8 @@ export default function NoteCard({
   query?: string;
   onOpen(): void;
   onChange(action: 'pin' | 'archive' | 'trash' | 'restore'): void;
+  onPurge?(): void;
+  canPurge?: boolean;
   writable: boolean;
 }) {
   const { t, i18n } = useTranslation();
@@ -151,9 +155,24 @@ export default function NoteCard({
         )}
         <div className="card-actions">
           {trashed ? (
-            <IconButton label={t('action.restore')} onClick={() => onChange('restore')} disabled={!editable}>
-              <RotateCcw size={16} />
-            </IconButton>
+            <>
+              <IconButton
+                label={t('action.restore')}
+                onClick={() => onChange('restore')}
+                disabled={!editable}
+              >
+                <RotateCcw size={16} />
+              </IconButton>
+              {onPurge && (
+                <IconButton
+                  label={t('action.deleteForever')}
+                  onClick={onPurge}
+                  disabled={!writable || !canPurge}
+                >
+                  <Trash2 size={16} />
+                </IconButton>
+              )}
+            </>
           ) : (
             <>
               <IconButton

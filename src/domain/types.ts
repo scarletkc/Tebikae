@@ -98,6 +98,11 @@ export interface LocalNote {
   remoteUnavailable?: boolean;
   /** Fingerprint of a restored backup record; used only for local import deduplication. */
   importFingerprint?: string;
+  purgeStartedAt?: string;
+}
+export interface DeletedIssue {
+  scopeId: string;
+  issueId: number;
 }
 export interface UnmanagedIssue {
   scopeId: string;

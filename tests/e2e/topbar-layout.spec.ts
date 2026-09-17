@@ -60,6 +60,42 @@ for (const width of [320, 390, 768, 1100, 1280]) {
   }
 }
 
+test('trash card deletion supports cancel, offline protection, failure and retry', async ({
+  page,
+  context,
+}) => {
+  const remote = await mockGitHub(context, [
+    mockIssue(1, 'Trashed note', 'Remove me', { trashedAt: '2026-09-16T08:00:00Z' }),
+  ]);
+  await connect(page);
+  await page.getByRole('link', { name: 'Trash', exact: true }).click();
+  const card = page.locator('.note-card');
+  const purge = card.getByRole('button', { name: /deleteForever|Delete forever/i });
+  await expect(purge).toBeEnabled();
+  await context.setOffline(true);
+  await expect(purge).toBeDisabled();
+  await context.setOffline(false);
+  await expect(purge).toBeEnabled();
+  page.once('dialog', (dialog) => void dialog.dismiss());
+  await purge.click();
+  await expect(card).toHaveCount(1);
+  expect(remote.writes.filter((write) => write.path === '/graphql')).toHaveLength(0);
+  remote.failNextDeleteIssue = true;
+  page.once('dialog', (dialog) => void dialog.accept());
+  await purge.click();
+  await expect.poll(() => remote.writes.filter((write) => write.path === '/graphql').length).toBe(1);
+  await expect(purge).toBeEnabled();
+  await expect(card).toHaveCount(1);
+  await expect(page.locator('.workspace-status')).toHaveClass(/status-error/);
+  page.once('dialog', (dialog) => void dialog.accept());
+  await purge.click();
+  await expect(card).toHaveCount(0);
+  expect(remote.issues).toHaveLength(0);
+  await page.reload();
+  await expect(page.locator('.workspace-status')).toHaveAttribute('data-loading', 'false');
+  await expect(card).toHaveCount(0);
+});
+
 test('topbar actions preserve filtering, sorting, views and route-specific controls', async ({ page }) => {
   const remote = await mockGitHub(page.context());
   await connect(page);

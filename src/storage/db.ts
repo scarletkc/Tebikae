@@ -1,6 +1,7 @@
 import Dexie, { type Table } from 'dexie';
 import type {
   Connection,
+  DeletedIssue,
   HttpCacheEntry,
   Label,
   LocalNote,
@@ -22,6 +23,7 @@ export class TebikaeDB extends Dexie {
   recovery!: Table<Recovery, number>;
   syncState!: Table<SyncState, string>;
   httpCache!: Table<HttpCacheEntry, [string, string, string, string]>;
+  deletedIssues!: Table<DeletedIssue, [string, number]>;
 
   constructor(name = 'tebikae') {
     super(name);
@@ -34,6 +36,9 @@ export class TebikaeDB extends Dexie {
       recovery: '++id,scopeId,[scopeId+localId]',
       syncState: 'scopeId',
       httpCache: '[scopeId+url+accept+apiVersion],scopeId',
+    });
+    this.version(2).stores({
+      deletedIssues: '[scopeId+issueId],scopeId',
     });
   }
 }
@@ -65,6 +70,11 @@ export async function saveRecovery(database: TebikaeDB, note: LocalNote, reason:
 /** A refresh after dispatch cannot establish whether GitHub executed the write. */
 export async function recoverInterruptedWrites(database: TebikaeDB, scopeId: string) {
   await database.transaction('rw', database.notes, database.outbox, async () => {
+    await database.notes
+      .where('scopeId')
+      .equals(scopeId)
+      .filter((note) => Boolean(note.purgeStartedAt))
+      .modify({ syncStatus: 'uncertain' });
     const entries = await database.outbox.where('scopeId').equals(scopeId).toArray();
     for (const entry of entries) {
       if (entry.status !== 'sending') continue;

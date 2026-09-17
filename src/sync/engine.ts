@@ -26,6 +26,7 @@ export interface SyncClient {
     number: number,
     payload: { title?: string; body?: string; state?: 'open' | 'closed'; state_reason?: 'completed' },
   ): Promise<RawIssueSnapshot>;
+  deleteIssue(connection: Connection, nodeId: string): Promise<void>;
   listLabels(connection: Connection): Promise<Label[]>;
   addLabels(connection: Connection, number: number, names: string[]): Promise<unknown>;
   removeLabel(connection: Connection, number: number, name: string): Promise<unknown>;
@@ -71,6 +72,7 @@ export class SyncEngine {
   private listeners = new Set<StatusListener>();
   private removeEvents?: () => void;
   private pausedUntil = 0;
+  private purging = new Map<string, Promise<void>>();
 
   constructor(
     readonly db: TebikaeDB,
@@ -256,8 +258,11 @@ export class SyncEngine {
       this.db.unmanagedIssues,
       this.db.outbox,
       this.db.recovery,
+      this.db.deletedIssues,
       async () => {
+        if (await this.db.deletedIssues.get([scopeId, remote.id])) return;
         let note = await this.db.notes.where('[scopeId+issueId]').equals([scopeId, remote.id]).first();
+        if (note?.purgeStartedAt) return;
         if (!document) {
           const parsed = parseNoteBody(remote.body);
           if (parsed.status === 'managed') return;
@@ -445,7 +450,7 @@ export class SyncEngine {
           )
             continue;
           const note = await this.db.notes.get([entry.scopeId, entry.localId]);
-          if (!note || note.duplicate || note.remoteUnavailable) continue;
+          if (!note || note.duplicate || note.remoteUnavailable || note.purgeStartedAt) continue;
           if (entry.kind === 'create' && entry.status === 'uncertain') continue;
           if (!manual && this.lastAutoWrite && Date.now() - this.lastAutoWrite < 30_000) {
             clearTimeout(this.autoTimer);
@@ -783,6 +788,137 @@ export class SyncEngine {
     await this.db.outbox.update([scopeId, localId], { status });
     await this.db.notes.update([scopeId, localId], { syncStatus: status, error: undefined });
     return this.flush(true);
+  }
+
+  destroy(localId: string): Promise<void> {
+    const scopeId = this.connection.scopeId;
+    const inFlight = this.purging.get(localId);
+    if (inFlight) return inFlight;
+    const promise = this.enqueue(async (generation) => {
+      const note = await this.db.notes.get([scopeId, localId]);
+      if (!note) return;
+      if (note.current.meta.trashedAt === null) throw new Error('NOTE_NOT_TRASHED');
+      if (this.connection.readOnly)
+        throw Object.assign(new Error('READ_ONLY'), { failure: { code: 'FORBIDDEN' } });
+      const key: [string, string] = [scopeId, localId];
+      const entry = await this.db.outbox.get(key);
+      const localOnly = !note.issueId && !note.issueNumber && !note.base && !note.lastSeenRemote;
+      if (
+        localOnly &&
+        (!entry ||
+          entry.kind !== 'create' ||
+          entry.attemptStartedAt ||
+          entry.attemptSnapshot ||
+          entry.status === 'sending' ||
+          entry.status === 'uncertain' ||
+          note.syncStatus === 'uncertain' ||
+          note.purgeStartedAt)
+      )
+        throw Object.assign(new Error('CREATE_NOT_CONFIRMED'), { failure: { code: 'NETWORK_UNCERTAIN' } });
+      if (!localOnly) {
+        if (
+          !note.issueId ||
+          !note.issueNumber ||
+          !note.base ||
+          note.duplicate ||
+          note.conflictFields?.length ||
+          note.remoteUnavailable
+        )
+          throw new Error('NOTE_NOT_PURGEABLE');
+        if (typeof navigator !== 'undefined' && !navigator.onLine)
+          throw Object.assign(new Error('OFFLINE'), { failure: { code: 'NETWORK_UNCERTAIN' } });
+        if (Date.now() < this.pausedUntil)
+          throw Object.assign(new Error('RATE_LIMITED'), { failure: { code: 'RATE_LIMITED' } });
+        const remote = await this.client.getIssue(this.connection, note.issueNumber);
+        this.assertActive(generation);
+        const document = snapshotToDocument(remote);
+        if (
+          !document ||
+          remote.id !== note.issueId ||
+          remote.number !== note.issueNumber ||
+          !remote.nodeId.trim() ||
+          document.meta.id !== note.current.meta.id ||
+          !this.sameRemoteContent(remote, note.base) ||
+          remote.updatedAt !== note.base.updatedAt
+        ) {
+          await this.conflict(note, remote, ['remote-changed']);
+          throw new Error('REMOTE_CHANGED');
+        }
+        await this.db.transaction('rw', this.db.notes, async () => {
+          this.assertActive(generation);
+          const fresh = await this.db.notes.get(key);
+          if (
+            !fresh ||
+            fresh.localRevision !== note.localRevision ||
+            !equal(fresh.current, note.current) ||
+            fresh.current.meta.trashedAt === null
+          )
+            throw new Error('NOTE_CHANGED');
+          await this.db.notes.update(key, { purgeStartedAt: now() });
+          this.assertActive(generation);
+        });
+        this.assertActive(generation);
+        this.lastAutoWrite = Date.now();
+        try {
+          await this.client.deleteIssue(this.connection, remote.nodeId);
+        } catch (error) {
+          if (this.active(generation)) {
+            const failure = failureOf(error);
+            this.pause(failure);
+            await this.db.notes.update(key, {
+              error: failure,
+              ...(['NETWORK_UNCERTAIN', 'SERVER_ERROR', 'SESSION_EXPIRED'].includes(failure.code)
+                ? { syncStatus: 'uncertain' as const }
+                : { purgeStartedAt: undefined }),
+            });
+          }
+          throw error;
+        }
+        this.assertActive(generation);
+      }
+      await this.db.transaction(
+        'rw',
+        [
+          this.db.notes,
+          this.db.outbox,
+          this.db.recovery,
+          this.db.deletedIssues,
+          this.db.unmanagedIssues,
+          this.db.httpCache,
+        ],
+        async () => {
+          this.assertActive(generation);
+          const final = await this.db.notes.get(key);
+          if (!final) return;
+          if (final.localRevision !== note.localRevision || !equal(final.current, note.current))
+            throw new Error('NOTE_CHANGED');
+          if (localOnly) {
+            const latestEntry = await this.db.outbox.get(key);
+            if (
+              latestEntry?.attemptStartedAt ||
+              latestEntry?.status === 'sending' ||
+              latestEntry?.status === 'uncertain'
+            )
+              throw new Error('CREATE_NOT_CONFIRMED');
+          }
+          if (final.issueId) {
+            await this.db.deletedIssues.put({ scopeId, issueId: final.issueId });
+            await this.db.unmanagedIssues.delete([scopeId, final.issueId]);
+            await this.db.httpCache.where('scopeId').equals(scopeId).delete();
+          }
+          await this.db.notes.delete(key);
+          await this.db.outbox.delete(key);
+          await this.db.recovery.where('[scopeId+localId]').equals(key).delete();
+          this.assertActive(generation);
+        },
+      );
+      this.editingIds.delete(localId);
+      this.emit();
+    }, 10);
+    this.purging.set(localId, promise);
+    return promise.finally(() => {
+      if (this.purging.get(localId) === promise) this.purging.delete(localId);
+    });
   }
 
   async createLabel(name: string, color = '8b8b8b'): Promise<Label> {
