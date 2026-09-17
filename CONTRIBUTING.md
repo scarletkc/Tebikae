@@ -24,26 +24,15 @@ See [development and deployment](docs/development.md) for environment details an
 
 ## Validation
 
-Before opening a PR, run focused tests for the behavior you changed and any relevant formatting, type, lint, or build checks. For editor or layout changes, also check the affected interactions locally and provide the screenshots required below. Report the commands, results, and any verification limits in the PR.
+Run focused tests for the behavior you changed, along with relevant formatting, type, lint, or build checks. For UI changes, check the affected interactions and provide the screenshots required below. See the [development guide](docs/development.md#检查) for commands.
 
-Choose the affected test files and browser. For example:
-
-```sh
-# A synchronization change
-pnpm exec vitest run tests/sync.test.ts
-
-# A note interaction change
-pnpm exec playwright install chromium
-pnpm test:e2e tests/e2e/notes.spec.ts --project=chromium
-```
-
-Contributors are not required to install all three browsers or repeat the complete E2E/PWA suites locally before opening a PR. CI runs static checks, the full unit suite, and browser coverage selected for the change; its required checks must pass before merging. Every Pages deployment additionally requires full Chromium, Firefox, and WebKit E2E/PWA checks before environment approval and publishes the tested build.
-
-Use the [development guide](docs/development.md#检查), [browser test selection](docs/browser-testing.md), and [PWA testing guide](docs/testing-pwa.md) when you need to reproduce a CI failure or investigate a browser-specific issue. Full local commands remain available for that purpose. Automated checks do not replace the affected-device verification needed for behavior such as mobile keyboards or input methods.
+Focused local validation is sufficient to open a PR. You do not need to install every browser or repeat the complete E2E/PWA suites locally. CI runs static checks, the full unit suite, and browser tests selected for the change. Its required checks must pass on the latest commit before merging; [browser test selection](docs/browser-testing.md) explains that coverage and the full checks required before deployment.
 
 For documentation-only changes, check formatting, links, and the accuracy of any commands or behavioral claims. A full application test run is not required for prose-only edits.
 
-Distinguish local results from CI results and disclose relevant unverified behavior; you do not need to enumerate every unrelated suite you left to CI. Tests against a real GitHub repository are opt-in and require separate authorization from the maintainer; follow the dedicated procedure in the development guide.
+In the PR, state which local commands and interactions you checked, their results, and any relevant behavior you could not verify. Keep local results separate from CI results. You do not need to list unrelated suites left to CI.
+
+Mobile keyboards, input methods, and other device-specific behavior need verification on the affected device or emulator. Tests that write to a real GitHub repository require separate maintainer authorization; follow the [live-repository procedure](docs/development.md#可选真实仓库验收).
 
 ## Required screenshots for UI changes
 

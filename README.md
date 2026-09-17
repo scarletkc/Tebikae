@@ -28,19 +28,9 @@ Select **Remember this connection in this browser** to save your connection with
 
 ## Development
 
-See [Contributing](CONTRIBUTING.md) for the contribution workflow, validation requirements, and required screenshots for UI changes.
+See [Contributing](CONTRIBUTING.md) for the contribution workflow and UI screenshot requirements. The [development guide](docs/development.md#检查) provides focused local test commands; [browser test selection](docs/browser-testing.md) explains CI coverage.
 
-```sh
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm exec playwright install
-pnpm test:e2e
-pnpm build
-pnpm preview
-```
-
-Production output is `dist/`; it needs no business backend. See [development and deployment](docs/development.md) for static hosting, the GitHub Pages base path, production PWA checks, and the opt-in live-repository test.
+Build with `pnpm build` and preview with `pnpm preview`. Production output is `dist/`; it needs no business backend. See [development and deployment](docs/development.md#通用静态托管) for hosting setup and the Pages deployment workflow.
 
 ## Project references
 
