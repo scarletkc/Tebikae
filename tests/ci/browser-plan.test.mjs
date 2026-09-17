@@ -72,12 +72,18 @@ test('assets, dependencies, build, workflow and unknown changes require full cov
     assert.deepEqual(browserPlan(['README.md', path]), full(), path);
 });
 
-test('nightly and manual runs always exercise every engine and production suite', () => {
-  for (const eventName of ['schedule', 'workflow_dispatch'])
-    assert.deepEqual(
-      planForEvent(eventName, {}, () => assert.fail('no diff needed')),
-      full(),
-    );
+test('manual runs always exercise every engine and production suite', () => {
+  assert.deepEqual(
+    planForEvent('workflow_dispatch', {}, () => assert.fail('no diff needed')),
+    full(),
+  );
+});
+
+test('deployment overrides the caller event and changed paths with full coverage', () => {
+  assert.deepEqual(
+    planForEvent('push', { before: 'old', after: 'new' }, () => ['src/domain/codec.ts'], true),
+    full(),
+  );
 });
 
 test('PR selection uses base/head merge-base; pushes use the complete before/after range', () => {
@@ -135,6 +141,7 @@ test('CLI handles renamed sensitive files and writes a parseable Actions output'
           GITHUB_EVENT_NAME: 'push',
           GITHUB_EVENT_PATH: eventPath,
           GITHUB_OUTPUT: outputPath,
+          FULL_BROWSER_SUITE: 'false',
         },
         encoding: 'utf8',
       },
@@ -142,6 +149,22 @@ test('CLI handles renamed sensitive files and writes a parseable Actions output'
     const matrix = JSON.parse(output);
     assert.equal(matrix.include.find((entry) => entry.browser === 'firefox').pwa, true);
     assert.deepEqual(JSON.parse(readFileSync(outputPath, 'utf8').trim().slice('matrix='.length)), matrix);
+    const deployment = execFileSync(
+      process.execPath,
+      [fileURLToPath(new URL('../../scripts/ci-browser-plan.mjs', import.meta.url))],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          GITHUB_EVENT_NAME: 'push',
+          GITHUB_EVENT_PATH: eventPath,
+          GITHUB_OUTPUT: join(root, 'deployment-output'),
+          FULL_BROWSER_SUITE: 'true',
+        },
+        encoding: 'utf8',
+      },
+    );
+    assert.deepEqual(JSON.parse(deployment), full());
   } finally {
     assert.equal(dirname(resolve(root)), resolve(tmpdir()));
     assert.ok(basename(root).startsWith('tebikae-ci-plan-'));

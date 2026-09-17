@@ -84,8 +84,8 @@ export function browserPlan(paths, full = false) {
   return { include };
 }
 
-export function planForEvent(eventName, event, changedPaths) {
-  if (['schedule', 'workflow_dispatch'].includes(eventName)) return browserPlan([], true);
+export function planForEvent(eventName, event, changedPaths, forceFull = false) {
+  if (forceFull || eventName === 'workflow_dispatch') return browserPlan([], true);
   const base = eventName === 'pull_request' ? event.pull_request?.base.sha : event.before;
   const head = eventName === 'pull_request' ? event.pull_request?.head.sha : event.after;
   if (!base || !head || /^0+$/.test(base)) return browserPlan([], true);
@@ -99,16 +99,20 @@ export function planForEvent(eventName, event, changedPaths) {
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
-  const matrix = planForEvent(process.env.GITHUB_EVENT_NAME, event, (base, head, mergeBase) =>
-    execFileSync(
-      'git',
-      ['diff', '--name-only', '-z', '--no-renames', `${base}${mergeBase ? '...' : '..'}${head}`, '--'],
-      {
-        encoding: 'utf8',
-      },
-    )
-      .split('\0')
-      .filter(Boolean),
+  const matrix = planForEvent(
+    process.env.GITHUB_EVENT_NAME,
+    event,
+    (base, head, mergeBase) =>
+      execFileSync(
+        'git',
+        ['diff', '--name-only', '-z', '--no-renames', `${base}${mergeBase ? '...' : '..'}${head}`, '--'],
+        {
+          encoding: 'utf8',
+        },
+      )
+        .split('\0')
+        .filter(Boolean),
+    process.env.FULL_BROWSER_SUITE === 'true',
   );
   const output = JSON.stringify(matrix);
   if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `matrix=${output}\n`);

@@ -48,7 +48,7 @@ Remove-Item Env:VITE_BASE_PATH
 
 Tebikae 选择 GitHub Pages 托管，自定义域名为 `tebikae.fog.moe`，DNS 在 Cloudflare 管理。域名直接提供站点根路径，因此 `.github/workflows/pages.yml` 使用 `VITE_BASE_PATH: /`，不使用仓库名路径。
 
-仓库包含手动触发的 `.github/workflows/pages.yml`，校验后上传并部署 `dist/`。工作流只有 contents 读取、Pages 写入和 OIDC 权限，没有用户笔记 Token。启用仓库 Pages 的 GitHub Actions 来源，并在仓库 Pages 设置中绑定 `tebikae.fog.moe` 后，添加 Cloudflare DNS 记录：
+仓库包含手动触发的 `.github/workflows/pages.yml`。每次部署先调用 `Check`，完成静态检查、单测及三浏览器全量 E2E／PWA 验证；全部成功后进入原有环境审批，部署同一次运行中已验证的 `dist/` 产物。工作流只有 contents 读取、Pages 写入和 OIDC 权限，没有用户笔记 Token。启用仓库 Pages 的 GitHub Actions 来源，并在仓库 Pages 设置中绑定 `tebikae.fog.moe` 后，添加 Cloudflare DNS 记录：
 
 | 类型  | 名称      | 目标                  | 代理     |
 | ----- | --------- | --------------------- | -------- |

@@ -9,23 +9,22 @@ concurrency:
   group: pages
   cancel-in-progress: false
 jobs:
+  verify:
+    uses: ./.github/workflows/check.yml
+    permissions:
+      contents: read
+    with:
+      full: true
   deploy:
+    needs: verify
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck && pnpm lint && pnpm test
-      - run: pnpm build
-        env:
-          VITE_BASE_PATH: /
+          name: browser-builds
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
