@@ -499,6 +499,50 @@ export class GitHubClient {
         .data,
     );
   }
+  async deleteIssue(connection: Connection, nodeId: string, signal?: AbortSignal): Promise<void> {
+    this.#path(connection);
+    if (connection.readOnly) throw new ApiError({ code: 'FORBIDDEN' });
+    if (typeof nodeId !== 'string' || !nodeId.trim()) throw new ApiError({ code: 'VALIDATION_FAILED' });
+    const { data } = await this.#request(
+      'POST',
+      '/graphql',
+      connection.scopeId,
+      {
+        query:
+          'mutation DeleteIssue($input: DeleteIssueInput!) { deleteIssue(input: $input) { clientMutationId } }',
+        variables: { input: { issueId: nodeId } },
+      },
+      signal,
+    );
+    const result = z
+      .object({
+        errors: z.array(z.object({ type: z.string().optional() })).optional(),
+        data: z
+          .object({ deleteIssue: z.object({ clientMutationId: z.string().nullable() }).nullable() })
+          .nullable()
+          .optional(),
+      })
+      .safeParse(data);
+    if (!result.success) throw new ApiError({ code: 'SERVER_ERROR' });
+    if (result.data.errors?.length) {
+      const types = result.data.errors.map((error) => error.type);
+      const code: ApiFailureCode = types.includes('RATE_LIMITED')
+        ? 'RATE_LIMITED'
+        : types.includes('FORBIDDEN')
+          ? 'FORBIDDEN'
+          : types.includes('NOT_FOUND')
+            ? 'NOT_FOUND_OR_INACCESSIBLE'
+            : 'SERVER_ERROR';
+      if (code === 'RATE_LIMITED') {
+        this.#blockedUntil = this.#now() + this.#secondaryDelay;
+        throw new ApiError({ code, retryAt: new Date(this.#blockedUntil).toISOString() });
+      }
+      throw new ApiError({ code });
+    }
+    if (!result.data.data?.deleteIssue) throw new ApiError({ code: 'SERVER_ERROR' });
+    for (const [key, entry] of this.#memoryCache)
+      if (entry.scopeId === connection.scopeId) this.#memoryCache.delete(key);
+  }
   async listLabels(connection: Connection, signal?: AbortSignal): Promise<Label[]> {
     const session = this.#credential();
     if (!session) throw new ApiError({ code: 'AUTH_REQUIRED' });

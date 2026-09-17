@@ -75,6 +75,64 @@ test(
   },
 );
 
+test('trash then delete forever removes the Issue through GraphQL and does not resurrect on refresh', async ({
+  page,
+  context,
+}) => {
+  const remote = await mockGitHub(context);
+  await connect(page);
+  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Move to trash', exact: true }).click();
+  await closeDialog(page);
+  await page.locator('a[href$="#/trash"]').click();
+  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  page.once('dialog', (confirmation) => void confirmation.dismiss());
+  await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await expect
+    .poll(() => remote.writes.filter((write) => write.path === '/graphql').length, { timeout: 5_000 })
+    .toBe(0);
+  expect(remote.issues.find((issue) => issue.number === 1)).toBeDefined();
+  page.on('dialog', (confirmation) => confirmation.accept());
+  await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await expect
+    .poll(() => remote.writes.filter((write) => write.path === '/graphql').length, { timeout: 10_000 })
+    .toBe(1);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.locator('.note-card')).toHaveCount(0);
+  expect(remote.issues.find((issue) => issue.number === 1)).toBeUndefined();
+  const deletes = remote.writes.filter((write) => write.path === '/graphql');
+  expect(deletes).toHaveLength(1);
+  expect(deletes[0]!.method).toBe('POST');
+  expect(JSON.stringify(deletes[0]!.body)).toContain('deleteIssue');
+  expect(remote.writes.some((write) => write.method === 'DELETE')).toBe(false);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true })).toHaveCount(0);
+  await expect(page.locator('.note-card')).toHaveCount(0);
+});
+
+test('a failed forever deletion keeps the note in the trash', async ({ page, context }) => {
+  const remote = await mockGitHub(context);
+  await connect(page);
+  await page.locator('a[href$="#/archive"]').click();
+  await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Move to trash', exact: true }).click();
+  await closeDialog(page);
+  await page.locator('a[href$="#/trash"]').click();
+  await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
+  remote.failNextDeleteIssue = true;
+  const dialog = page.getByRole('dialog');
+  page.once('dialog', (confirmation) => void confirmation.accept());
+  await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toBeVisible();
+  await closeDialog(page);
+  await page.locator('a[href$="#/trash"]').click();
+  await expect(
+    page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }),
+  ).toBeVisible();
+  expect(remote.issues.find((issue) => issue.number === 3)).toBeDefined();
+});
+
 test('combined filters and preview navigation share the same result set', async ({ page, context }) => {
   await mockGitHub(context);
   await connect(page);

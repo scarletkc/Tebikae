@@ -202,6 +202,17 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   function report(error: unknown) {
     setNotice(error instanceof ApiError ? t(`error.${error.code}`) : t('error.generic'));
   }
+  async function purge(note: LocalNote) {
+    if (!session.writable || !session.engine || !online || busy || !confirm(t('note.deleteConfirm'))) return;
+    setBusy(true);
+    try {
+      await session.engine.destroy(note.localId);
+    } catch (error) {
+      report(error);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function refresh() {
     setBusy(true);
     try {
@@ -487,6 +498,8 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           labels={labels}
           query={filters.query}
           writable={session.writable}
+          canPurge={session.writable && !!session.engine && online && !busy}
+          onPurge={() => void purge(note)}
           onOpen={() => openNote(note)}
           onChange={(action) => void change(note, action)}
         />
