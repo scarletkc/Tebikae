@@ -31,6 +31,8 @@ Markdown 导出逻辑改动额外运行跨浏览器导出与笔记用例。其�
 
 ## 本地复现
 
+贡献者本地运行与改动相关的用例即可，不必安装三个浏览器或重复完整 E2E／PWA 检查。以下命令用于按需复现 CI 覆盖范围；相关交互检查和截图要求仍按[贡献指南](../CONTRIBUTING.md#validation)执行。
+
 ```sh
 # 与普通 PR 相同的 E2E 基础覆盖
 pnpm exec playwright install chromium webkit

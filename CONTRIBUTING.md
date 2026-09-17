@@ -24,23 +24,26 @@ See [development and deployment](docs/development.md) for environment details an
 
 ## Validation
 
-For code changes, run the applicable checks and report the commands and results in the PR:
+Before opening a PR, run focused tests for the behavior you changed and any relevant formatting, type, lint, or build checks. For editor or layout changes, also check the affected interactions locally and provide the screenshots required below. Report the commands, results, and any verification limits in the PR.
+
+Choose the affected test files and browser. For example:
 
 ```sh
-pnpm typecheck
-pnpm lint
-pnpm format:check
-pnpm test
-pnpm exec playwright install
-pnpm test:e2e
-pnpm build
+# A synchronization change
+pnpm exec vitest run tests/sync.test.ts
+
+# A note interaction change
+pnpm exec playwright install chromium
+pnpm test:e2e tests/e2e/notes.spec.ts --project=chromium
 ```
 
-The browser suite covers Chromium, Firefox, and WebKit with mocked GitHub responses. Ordinary PRs run full Chromium E2E and production PWA checks plus WebKit smoke tests. Changes to browser-sensitive areas add the affected WebKit and Firefox suites. Every Pages deployment requires all three engines in full before environment approval and publishes the tested build; manually dispatched Check runs also select full coverage. There is no daily schedule. Local `pnpm test:e2e` still runs all three by default. See [browser test selection](docs/browser-testing.md) for the path rules and focused commands. For changes affecting offline behavior, service workers, production assets, or deployment paths, also run the production PWA checks described in [the PWA testing guide](docs/testing-pwa.md). The [CI workflow](.github/workflows/check.yml) defines the automated checks.
+Contributors are not required to install all three browsers or repeat the complete E2E/PWA suites locally before opening a PR. CI runs static checks, the full unit suite, and browser coverage selected for the change; its required checks must pass before merging. Every Pages deployment additionally requires full Chromium, Firefox, and WebKit E2E/PWA checks before environment approval and publishes the tested build.
+
+Use the [development guide](docs/development.md#检查), [browser test selection](docs/browser-testing.md), and [PWA testing guide](docs/testing-pwa.md) when you need to reproduce a CI failure or investigate a browser-specific issue. Full local commands remain available for that purpose. Automated checks do not replace the affected-device verification needed for behavior such as mobile keyboards or input methods.
 
 For documentation-only changes, check formatting, links, and the accuracy of any commands or behavioral claims. A full application test run is not required for prose-only edits.
 
-State any checks you did not run and why. Distinguish local results from CI results. Tests against a real GitHub repository are opt-in and require separate authorization from the maintainer; follow the dedicated procedure in the development guide.
+Distinguish local results from CI results and disclose relevant unverified behavior; you do not need to enumerate every unrelated suite you left to CI. Tests against a real GitHub repository are opt-in and require separate authorization from the maintainer; follow the dedicated procedure in the development guide.
 
 ## Required screenshots for UI changes
 

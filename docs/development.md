@@ -13,9 +13,14 @@ pnpm dev
 
 ## 检查
 
+贡献者本地按改动选择相关测试和静态检查即可，例如同步逻辑改动运行 `pnpm exec vitest run tests/sync.test.ts`，笔记交互改动运行 `pnpm test:e2e tests/e2e/notes.spec.ts --project=chromium`。界面改动仍需验证相关交互并按[贡献指南](../CONTRIBUTING.md#required-screenshots-for-ui-changes)提供截图。在 PR 中说明本地结果和相关未验证部分；完整静态检查、单测及所选浏览器测试由 CI 作为合并门槛执行，部署前再执行三浏览器全量检查。
+
+以下命令供需要时完整复现检查，不是每个 PR 提交前必须在本地逐项执行的清单：
+
 ```sh
 pnpm typecheck
 pnpm lint
+pnpm format:check
 pnpm test
 pnpm exec playwright install
 pnpm test:e2e
