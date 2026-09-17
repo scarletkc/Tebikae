@@ -24,23 +24,15 @@ See [development and deployment](docs/development.md) for environment details an
 
 ## Validation
 
-For code changes, run the applicable checks and report the commands and results in the PR:
+Run focused tests for the behavior you changed, along with relevant formatting, type, lint, or build checks. For UI changes, check the affected interactions and provide the screenshots required below. See the [development guide](docs/development.md#检查) for commands.
 
-```sh
-pnpm typecheck
-pnpm lint
-pnpm format:check
-pnpm test
-pnpm exec playwright install
-pnpm test:e2e
-pnpm build
-```
-
-The browser suite covers Chromium, Firefox, and WebKit with mocked GitHub responses. For changes affecting offline behavior, service workers, production assets, or deployment paths, also run the production PWA checks described in [the PWA testing guide](docs/testing-pwa.md). The [CI workflow](.github/workflows/check.yml) defines the automated checks.
+Focused local validation is sufficient to open a PR. You do not need to install every browser or repeat the complete E2E/PWA suites locally. CI runs static checks, the full unit suite, and browser tests selected for the change. Its required checks must pass on the latest commit before merging; [browser test selection](docs/browser-testing.md) explains that coverage and the full checks required before deployment.
 
 For documentation-only changes, check formatting, links, and the accuracy of any commands or behavioral claims. A full application test run is not required for prose-only edits.
 
-State any checks you did not run and why. Distinguish local results from CI results. Tests against a real GitHub repository are opt-in and require separate authorization from the maintainer; follow the dedicated procedure in the development guide.
+In the PR, state which local commands and interactions you checked, their results, and any relevant behavior you could not verify. Keep local results separate from CI results. You do not need to list unrelated suites left to CI.
+
+Mobile keyboards, input methods, and other device-specific behavior need verification on the affected device or emulator. Tests that write to a real GitHub repository require separate maintainer authorization; follow the [live-repository procedure](docs/development.md#可选真实仓库验收).
 
 ## Required screenshots for UI changes
 

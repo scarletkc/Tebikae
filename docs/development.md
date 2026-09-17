@@ -13,16 +13,28 @@ pnpm dev
 
 ## 检查
 
+按改动选择本地命令。以下示例分别验证同步逻辑和笔记交互，可将测试文件替换为实际涉及的文件：
+
 ```sh
-pnpm typecheck
-pnpm lint
-pnpm test
-pnpm exec playwright install
-pnpm test:e2e
-pnpm build
+pnpm exec vitest run tests/sync.test.ts
+pnpm exec playwright install chromium
+pnpm test:e2e tests/e2e/notes.spec.ts --project=chromium
 ```
 
-Vitest 使用真实 Markdown 解析、Milkdown、fake-indexeddb 与 MSW 模拟请求失败。Playwright 的普通测试使用拦截的 GitHub API，不写入 GitHub。默认覆盖 Chromium、Firefox、WebKit；CI 安装对应浏览器。两类测试覆盖范围和剩余手工项目见[验收记录](acceptance.md)。
+需要复现静态检查或扩大验证范围时，使用下列命令：
+
+| 目的            | 命令                              |
+| --------------- | --------------------------------- |
+| 类型检查        | `pnpm typecheck`                  |
+| 代码规范        | `pnpm lint`                       |
+| 格式检查        | `pnpm format:check`               |
+| 完整应用单测    | `pnpm test`                       |
+| CI 测试选择规则 | `node --test tests/ci/*.test.mjs` |
+| 生产构建        | `pnpm build`                      |
+
+这些命令供按需运行，提交前的验证和截图要求见[贡献指南](../CONTRIBUTING.md#validation)。跨浏览器命令与 CI 选择规则集中在[浏览器测试分层](browser-testing.md)，生产离线场景的复现方法见 [PWA 验收说明](testing-pwa.md)。
+
+Vitest 使用真实 Markdown 解析、Milkdown、fake-indexeddb 和 MSW 验证逻辑与请求失败场景。Playwright 用测试响应替代 GitHub API，不写入远端仓库。历史验证结果及剩余手工项目见[验收记录](acceptance.md)。
 
 品牌图标统一使用 `public/icon.svg` 的折角纸张与 T 图形。连接页、侧栏、手机导航和 favicon 直接引用这份 SVG；PWA 的 192px／512px 图标由它生成。不同主题保留品牌图标自身的配色，功能按钮继续使用各自的操作图标。
 
@@ -46,9 +58,17 @@ Remove-Item Env:VITE_BASE_PATH
 
 ### GitHub Pages
 
-Tebikae 选择 GitHub Pages 托管，自定义域名为 `tebikae.fog.moe`，DNS 在 Cloudflare 管理。域名直接提供站点根路径，因此 `.github/workflows/pages.yml` 使用 `VITE_BASE_PATH: /`，不使用仓库名路径。
+Tebikae 使用 GitHub Pages 托管，自定义域名为 `tebikae.fog.moe`，DNS 在 Cloudflare 管理。域名提供站点根路径，部署所用的 `dist/` 由 `Check` 以 `VITE_BASE_PATH: /` 构建。
 
-仓库包含手动触发的 `.github/workflows/pages.yml`，校验后上传并部署 `dist/`。工作流只有 contents 读取、Pages 写入和 OIDC 权限，没有用户笔记 Token。启用仓库 Pages 的 GitHub Actions 来源，并在仓库 Pages 设置中绑定 `tebikae.fog.moe` 后，添加 Cloudflare DNS 记录：
+获得部署授权后，在 Actions 中运行 `Deploy Pages` 并选择 `main`，或执行：
+
+```sh
+gh workflow run pages.yml --repo scarletkc/Tebikae --ref main
+```
+
+[Pages 工作流](../.github/workflows/pages.yml)先调用 `Check`，完成静态检查、单测及三浏览器全量 E2E／PWA 验证。全部通过后，部署任务进入 `github-pages` 环境审批；批准后发布同一次运行中已验证的 `dist/`，不重新构建。任何必需检查失败都会阻止部署。部署完成后，核对线上 `build-info.json` 的 commit 是否与本次发布提交一致。
+
+工作流使用 contents 读取、Pages 写入和 OIDC 权限，不使用用户笔记 Token。首次设置时，启用仓库 Pages 的 GitHub Actions 来源，在 Pages 设置中绑定 `tebikae.fog.moe`，再添加 Cloudflare DNS 记录：
 
 | 类型  | 名称      | 目标                  | 代理     |
 | ----- | --------- | --------------------- | -------- |
@@ -78,7 +98,7 @@ node scripts/test-live.mjs
 Remove-Item Env:TEBIKAE_LIVE_TEST
 ```
 
-脚本优先使用运行进程中的 `TEBIKAE_TEST_TOKEN`，否则读取现有 GitHub CLI 登录令牌；凭证不写文件、不启用浏览器 trace。它会创建带验收前缀的笔记及测试标签，经真实界面完成写入后将笔记留在归档，输出不含凭证的 `.artifacts/live-acceptance.json`。使用 CLI 已登录令牌通过，不能替代最小权限 fine-grained PAT 的单独验收。
+脚本优先使用运行进程中的 `TEBIKAE_TEST_TOKEN`，否则读取现有 GitHub CLI 登录令牌；凭证不写文件、不启用浏览器 trace。它会创建带验收前缀的笔记及测试标签，经真实界面完成写入后将笔记留在归档，输出不含凭证的 `.artifacts/live-acceptance.json`。使用 GitHub CLI 令牌验证成功，也不能替代最小权限 fine-grained PAT 的单独验收。
 
 ## 发布和回滚
 

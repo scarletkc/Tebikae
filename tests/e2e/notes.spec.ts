@@ -2,67 +2,78 @@ import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 import { closeDialog, connect, mockGitHub } from './fixtures';
 
-test('connect and unchanged reading keep existing Issues intact', async ({ page, context }) => {
-  const remote = await mockGitHub(context);
-  await connect(page);
-  await expect(page.locator('.note-card')).toHaveCount(2);
-  await expect(page.getByText('Hidden pull request', { exact: true })).toHaveCount(0);
-  expect(remote.writes).toHaveLength(0);
-  const initialBody = remote.issues[0]!.body;
-  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
-  await expect(page.locator('.ProseMirror')).toBeVisible();
-  await page.getByRole('button', { name: 'Edit Markdown', exact: true }).click();
-  await page.getByRole('button', { name: 'Visual editor', exact: true }).click();
-  await closeDialog(page);
-  expect(remote.writes).toHaveLength(0);
-  expect(remote.issues[0]!.body).toBe(initialBody);
-});
+test(
+  'connect and unchanged reading keep existing Issues intact',
+  { tag: '@smoke' },
+  async ({ page, context }) => {
+    const remote = await mockGitHub(context);
+    await connect(page);
+    await expect(page.locator('.note-card')).toHaveCount(2);
+    await expect(page.getByText('Hidden pull request', { exact: true })).toHaveCount(0);
+    expect(remote.writes).toHaveLength(0);
+    const initialBody = remote.issues[0]!.body;
+    await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+    await expect(page.locator('.ProseMirror')).toBeVisible();
+    await page.getByRole('button', { name: 'Edit Markdown', exact: true }).click();
+    await page.getByRole('button', { name: 'Visual editor', exact: true }).click();
+    await closeDialog(page);
+    expect(remote.writes).toHaveLength(0);
+    expect(remote.issues[0]!.body).toBe(initialBody);
+  },
+);
 
-test('a visual draft is saved locally, synced once, and available after automatic reconnection', async ({
-  page,
-  context,
-}) => {
-  const remote = await mockGitHub(context);
-  await connect(page);
-  await page.getByRole('button', { name: 'New note', exact: true }).first().click();
-  await page.getByRole('dialog').getByLabel('Title', { exact: true }).fill('A fresh browser note');
-  await page.locator('.ProseMirror[contenteditable="true"]').fill('Written in the visual editor. 中文内容。');
-  await page.getByRole('button', { name: 'Sync now', exact: true }).click();
-  await expect(page.locator('.note-save-row').getByRole('status')).toContainText('Synced to GitHub');
-  expect(
-    remote.writes.filter((request) => request.method === 'POST' && request.path.endsWith('/issues')),
-  ).toHaveLength(1);
-  expect(remote.issues.find((issue) => issue.title === 'A fresh browser note')?.body).toContain('中文内容');
-  await closeDialog(page);
-  await page.reload();
-  await expect(
-    page.getByRole('button', { name: 'Edit note: A fresh browser note', exact: true }),
-  ).toBeVisible();
-  const storage = await page.evaluate(() =>
-    JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }),
-  );
-  expect(storage).not.toContain('browser-test-token');
-});
+test(
+  'a visual draft is saved locally, synced once, and available after automatic reconnection',
+  { tag: '@smoke' },
+  async ({ page, context }) => {
+    const remote = await mockGitHub(context);
+    await connect(page);
+    await page.getByRole('button', { name: 'New note', exact: true }).first().click();
+    await page.getByRole('dialog').getByLabel('Title', { exact: true }).fill('A fresh browser note');
+    await page
+      .locator('.ProseMirror[contenteditable="true"]')
+      .fill('Written in the visual editor. 中文内容。');
+    await page.getByRole('button', { name: 'Sync now', exact: true }).click();
+    await expect(page.locator('.note-save-row').getByRole('status')).toContainText('Synced to GitHub');
+    expect(
+      remote.writes.filter((request) => request.method === 'POST' && request.path.endsWith('/issues')),
+    ).toHaveLength(1);
+    expect(remote.issues.find((issue) => issue.title === 'A fresh browser note')?.body).toContain('中文内容');
+    await closeDialog(page);
+    await page.reload();
+    await expect(
+      page.getByRole('button', { name: 'Edit note: A fresh browser note', exact: true }),
+    ).toBeVisible();
+    const storage = await page.evaluate(() =>
+      JSON.stringify({ local: { ...localStorage }, session: { ...sessionStorage } }),
+    );
+    expect(storage).not.toContain('browser-test-token');
+  },
+);
 
-test('offline input persists locally and reopens without entering a token', async ({ page, context }) => {
-  const remote = await mockGitHub(context);
-  await connect(page);
-  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
-  await expect(page.locator('.ProseMirror[contenteditable="true"]')).toBeVisible();
-  await context.setOffline(true);
-  await page.getByRole('dialog').getByLabel('Title', { exact: true }).fill('Edited while offline');
-  await closeDialog(page);
-  await expect(
-    page.getByRole('button', { name: 'Edit note: Edited while offline', exact: true }),
-  ).toBeVisible();
-  expect(remote.issues[0]!.title).toBe('Weekend ideas');
-  // Restore the saved connection when the dev shell can be loaded again.
-  await context.setOffline(false);
-  await page.reload();
-  await expect(
-    page.getByRole('button', { name: 'Edit note: Edited while offline', exact: true }),
-  ).toBeVisible();
-});
+test(
+  'offline input persists locally and reopens without entering a token',
+  { tag: '@smoke' },
+  async ({ page, context }) => {
+    const remote = await mockGitHub(context);
+    await connect(page);
+    await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+    await expect(page.locator('.ProseMirror[contenteditable="true"]')).toBeVisible();
+    await context.setOffline(true);
+    await page.getByRole('dialog').getByLabel('Title', { exact: true }).fill('Edited while offline');
+    await closeDialog(page);
+    await expect(
+      page.getByRole('button', { name: 'Edit note: Edited while offline', exact: true }),
+    ).toBeVisible();
+    expect(remote.issues[0]!.title).toBe('Weekend ideas');
+    // Restore the saved connection when the dev shell can be loaded again.
+    await context.setOffline(false);
+    await page.reload();
+    await expect(
+      page.getByRole('button', { name: 'Edit note: Edited while offline', exact: true }),
+    ).toBeVisible();
+  },
+);
 
 test('trash then delete forever removes the Issue through GraphQL and does not resurrect on refresh', async ({
   page,
