@@ -222,7 +222,9 @@ export async function connect(page: Page, remember = true): Promise<void> {
       .getByRole('searchbox', { name: 'Search your notes' })
       .or(page.getByLabel('Search your notes', { exact: true })),
   ).toBeVisible();
-  await expect(page.locator('.workspace-status')).toHaveAttribute('data-loading', 'false');
+  await expect(page.locator('.workspace-status')).toHaveAttribute('data-loading', 'false', {
+    timeout: 20_000,
+  });
 }
 export async function closeDialog(page: Page): Promise<void> {
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).last().click();

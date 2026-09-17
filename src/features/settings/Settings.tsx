@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, ExternalLink, HardDrive, LogOut, Trash2, Upload, WifiOff } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Download, ExternalLink, GitBranch, HardDrive, LogOut, Trash2, Upload, WifiOff } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { usePreferences, type Theme } from '../../app/preferences';
 import { useSession, flushAllDrafts } from '../../app/session';
@@ -117,6 +118,14 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
             {t('action.close')}
           </button>
         </div>
+      </div>
+      <div className="settings-section">
+        <h2>{t('nav.issues')}</h2>
+        <p>{t('home.issuesDescription')}</p>
+        <Link className="button secondary" to="/issues">
+          <GitBranch size={16} />
+          {t('nav.issues')}
+        </Link>
       </div>
       <div className="settings-section">
         <h2>{t('settings.data')}</h2>

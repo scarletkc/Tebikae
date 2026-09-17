@@ -9,7 +9,6 @@ import {
   FileText,
   GitBranch,
   Grid2X2,
-  Layers,
   List,
   Menu,
   NotebookPen,
@@ -18,6 +17,8 @@ import {
   Search,
   Settings as SettingsIcon,
   SlidersHorizontal,
+  Tag,
+  Tags,
   Trash2,
   X,
 } from 'lucide-react';
@@ -150,6 +151,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     kind?: NoteKind;
     ids: string[];
     initial?: LocalNote;
+    labelIds?: number[];
   } | null>(null);
   const [issue, setIssue] = useState<UnmanagedIssue | null>(null);
   const notes = useLiveQuery(() => db.notes.where('scopeId').equals(scope).toArray(), [scope], []);
@@ -188,6 +190,15 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       window.removeEventListener('offline', update);
     };
   }, []);
+  function newNote() {
+    setSelection({
+      kind: 'markdown',
+      ids: [],
+      labelIds: filters.unlabeledOnly
+        ? []
+        : [...new Set(filters.labelIds)].filter((id) => labels.some((label) => label.id === id)),
+    });
+  }
   function report(error: unknown) {
     setNotice(error instanceof ApiError ? t(`error.${error.code}`) : t('error.generic'));
   }
@@ -337,10 +348,8 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   );
   const navItems = [
     ['notes', NotebookPen],
-    ['all', Layers],
     ['archive', Archive],
     ['trash', Trash2],
-    ['issues', GitBranch],
   ] as const;
   const nav = (
     <>
@@ -379,28 +388,57 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
         </IconButton>
       </div>
       <div className="label-nav">
+        <button
+          type="button"
+          className={`nav-item ${!filters.labelIds.length && !filters.unlabeledOnly ? 'selected' : ''}`}
+          aria-pressed={!filters.labelIds.length && !filters.unlabeledOnly}
+          onClick={() => {
+            setFilters({ ...filters, unlabeledOnly: false, labelIds: [] });
+            if (route === 'settings' || route === 'issues') navigate('/notes');
+            setDrawer(false);
+          }}
+        >
+          <Tags size={16} />
+          <span>{t('label.all')}</span>
+        </button>
+        <button
+          type="button"
+          className={`nav-item ${filters.unlabeledOnly ? 'selected' : ''}`}
+          aria-pressed={filters.unlabeledOnly}
+          onClick={() => {
+            setFilters({ ...filters, unlabeledOnly: true, labelIds: [] });
+            if (route === 'settings' || route === 'issues') navigate('/notes');
+            if (!filters.unlabeledOnly) setDrawer(false);
+          }}
+        >
+          <Tag size={15} />
+          <span>{t('label.unlabeled')}</span>
+        </button>
         {labels.length ? (
-          labels.map((label) => (
-            <button
-              key={label.id}
-              className={`nav-item ${filters.labelIds.includes(label.id) ? 'selected' : ''}`}
-              onClick={() => {
-                setFilters({
-                  ...filters,
-                  unlabeledOnly: false,
-                  labelIds: filters.labelIds.includes(label.id)
-                    ? filters.labelIds.filter((id) => id !== label.id)
-                    : [...filters.labelIds, label.id],
-                });
-                if (route === 'settings' || route === 'issues') navigate('/notes');
-                setDrawer(false);
-              }}
-            >
-              <LabelDot color={label.color} />
-              <span>{label.name}</span>
-              <span className="nav-count">{counts[label.id] || 0}</span>
-            </button>
-          ))
+          labels.map((label) => {
+            const selected = filters.labelIds.includes(label.id);
+            return (
+              <button
+                key={label.id}
+                type="button"
+                className={`nav-item ${selected ? 'selected' : ''}`}
+                aria-pressed={selected}
+                onClick={() => {
+                  setFilters({
+                    ...filters,
+                    unlabeledOnly: false,
+                    labelIds: selected ? [] : [label.id],
+                  });
+                  if (route === 'settings' || route === 'issues') navigate('/notes');
+                  setDrawer(false);
+                }}
+              >
+                <LabelDot color={label.color} />
+                <span>{label.name}</span>
+                <span className="nav-count">{counts[label.id] || 0}</span>
+              </button>
+            );
+          })
         ) : (
           <p className="empty-labels">{t('label.empty')}</p>
         )}
@@ -483,22 +521,29 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
               value={filters.query}
               onChange={(e) => setFilters({ ...filters, query: e.target.value })}
             />
-            {filters.query && (
-              <IconButton label={t('action.clear')} onClick={() => setFilters({ ...filters, query: '' })}>
+            {route !== 'settings' && route !== 'issues' && (
+              <IconButton
+                label={t('action.filter')}
+                className={`filter-open-button ${filterCount(filters) ? 'is-active' : ''}`}
+                onClick={() => setFiltersOpen(true)}
+              >
+                <SlidersHorizontal size={16} />
+              </IconButton>
+            )}
+            {(filters.query || filterCount(filters) > 0) && (
+              <IconButton
+                label={t('action.clearSearchFilters')}
+                className="search-clear-button"
+                onClick={() => {
+                  setFilters({ ...defaultFilters, view, sort: filters.sort });
+                }}
+              >
                 <X size={15} />
               </IconButton>
             )}
           </div>
           {route !== 'settings' && route !== 'issues' && (
             <div className="topbar-note-actions">
-              <button
-                className={`button filter-button ${filterCount(filters) ? 'is-active' : ''}`}
-                onClick={() => setFiltersOpen(true)}
-              >
-                <SlidersHorizontal size={16} />
-                {t('action.filter')}
-                {filterCount(filters) > 0 && <span className="count-badge">{filterCount(filters)}</span>}
-              </button>
               <select
                 aria-label={t('filter.sort')}
                 value={filters.sort}
@@ -531,7 +576,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                 <button
                   className="button primary new-note-button"
                   disabled={!session.writable}
-                  onClick={() => setSelection({ kind: 'markdown', ids: [] })}
+                  onClick={newNote}
                 >
                   <Plus size={18} />
                   {t('action.new')}
@@ -585,11 +630,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                       <h2>{t(notes.length ? 'home.noResults' : 'home.empty')}</h2>
                       <p>{t(notes.length ? 'home.noResultsDescription' : 'home.emptyDescription')}</p>
                       {!notes.length && view === 'notes' && (
-                        <button
-                          className="button secondary"
-                          disabled={!session.writable}
-                          onClick={() => setSelection({ kind: 'markdown', ids: [] })}
-                        >
+                        <button className="button secondary" disabled={!session.writable} onClick={newNote}>
                           <Plus size={17} />
                           {t('action.new')}
                         </button>
@@ -675,6 +716,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           initialNote={selection.initial}
           kind={selection.kind}
           labels={labels}
+          initialLabelIds={selection.labelIds}
           onClose={() => setSelection(null)}
           onNavigate={navigateNote}
           canPrevious={!!selection.id && selection.ids.indexOf(selection.id) > 0}

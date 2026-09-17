@@ -189,6 +189,8 @@
     "red": "Rose"
   },
   "label": {
+    "all": "All",
+    "unlabeled": "Unlabeled",
     "new": "New label",
     "name": "Label name",
     "color": "Label color",
