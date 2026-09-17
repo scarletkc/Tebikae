@@ -1,5 +1,102 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { closeDialog, connect, mockGitHub } from './fixtures';
+
+test('sidebar labels select exclusively with All and Unlabeled shortcuts', async ({ page, context }) => {
+  await mockGitHub(context);
+  await connect(page);
+  const ideas = page.locator('.sidebar .label-nav').getByRole('button', { name: /^Ideas/ });
+  const personal = page.locator('.sidebar .label-nav').getByRole('button', { name: /^Personal/ });
+  const all = page.locator('.sidebar .label-nav').getByRole('button', { name: 'All' });
+  const unlabeled = page.locator('.sidebar .label-nav').getByRole('button', { name: 'Unlabeled' });
+  const chips = page.locator('.filter-chips .chip-label');
+  await ideas.click();
+  await expect(ideas).toHaveAttribute('aria-pressed', 'true');
+  await personal.click();
+  await expect(ideas).toHaveAttribute('aria-pressed', 'false');
+  await expect(personal).toHaveAttribute('aria-pressed', 'true');
+  await expect(chips).toHaveCount(1);
+  await unlabeled.click();
+  await expect(personal).toHaveAttribute('aria-pressed', 'false');
+  await expect(unlabeled).toHaveAttribute('aria-pressed', 'true');
+  await expect(chips).toHaveCount(0);
+  await expect(page.locator('.filter-chips .chip')).toHaveCount(1);
+  await personal.click();
+  await expect(unlabeled).toHaveAttribute('aria-pressed', 'false');
+  await expect(chips).toHaveCount(1);
+  await ideas.click();
+  await expect(ideas).toHaveAttribute('aria-pressed', 'true');
+  await all.click();
+  await expect(ideas).toHaveAttribute('aria-pressed', 'false');
+  await expect(chips).toHaveCount(0);
+  await all.click();
+  await expect(page.locator('.filter-chips .chip')).toHaveCount(0);
+});
+
+async function storedNoteLabels(page: Page) {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('tebikae');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<number[][]>((resolve, reject) => {
+        const request = database.transaction('notes').objectStore('notes').getAll();
+        request.onsuccess = () =>
+          resolve(request.result.map((note: { current: { labelIds: number[] } }) => note.current.labelIds));
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      database.close();
+    }
+  });
+}
+
+for (const entry of ['topbar', 'empty']) {
+  for (const unlabeledOnly of [false, true]) {
+    test(`${entry} new note inherits only valid labels, unlabeledOnly=${unlabeledOnly}, and blank drafts are discarded`, async ({
+      page,
+      context,
+    }) => {
+      const remote = await mockGitHub(context, []);
+      await connect(page);
+      await page
+        .locator('.sidebar .label-nav')
+        .getByRole('button', { name: /^Ideas/ })
+        .click();
+      await page.evaluate((unlabeledOnly) => {
+        const key = Object.keys(sessionStorage).find((key) => key.startsWith('tebikae.filters.'))!;
+        const filters = JSON.parse(sessionStorage.getItem(key)!);
+        sessionStorage.setItem(
+          key,
+          JSON.stringify({ ...filters, labelIds: [11, 12, 999, 11], unlabeledOnly }),
+        );
+      }, unlabeledOnly);
+      await page.reload();
+      await expect(page.locator('.sidebar .label-nav button')).toHaveCount(4);
+      const create = page
+        .locator(entry === 'topbar' ? '.app-topbar' : '.empty-state')
+        .getByRole('button', { name: 'New note', exact: true });
+      const dialog = page.getByRole('dialog');
+      await create.click();
+      await expect(dialog.getByLabel('Ideas', { exact: true })).toBeChecked({ checked: !unlabeledOnly });
+      await expect(dialog.getByLabel('Personal', { exact: true })).toBeChecked({ checked: !unlabeledOnly });
+      await closeDialog(page);
+      expect(await storedNoteLabels(page)).toEqual([]);
+      expect(remote.writes).toHaveLength(0);
+      await create.click();
+      await dialog.getByLabel('Title', { exact: true }).fill(`Inherited ${entry}`);
+      await dialog.getByRole('button', { name: 'Sync now', exact: true }).click();
+      await expect(dialog.locator('.note-save-row').getByRole('status')).toContainText('Synced to GitHub');
+      expect(await storedNoteLabels(page)).toEqual([unlabeledOnly ? [] : [11, 12]]);
+      expect(remote.issues[0]!.labels.map((label) => label.id)).toEqual(unlabeledOnly ? [] : [11, 12]);
+      expect(
+        remote.writes.filter((write) => write.method === 'POST' && write.path.endsWith('/issues')),
+      ).toHaveLength(1);
+      await closeDialog(page);
+    });
+  }
+}
 
 test('creating a label preserves the selected color through GitHub and Dexie', async ({ page, context }) => {
   const state = await mockGitHub(context);
@@ -45,7 +142,7 @@ for (const theme of ['light', 'dark'] as const) {
     await mockGitHub(context);
     await connect(page);
     await page.evaluate((theme) => document.documentElement.setAttribute('data-theme', theme), theme);
-    await page.locator('.filter-button').click();
+    await page.locator('.filter-open-button').click();
     const dialog = page.getByRole('dialog');
     const badge = dialog.locator('.label-badge').filter({ hasText: 'Ideas' });
     await expect(badge.locator('.label-dot')).toHaveCSS('background-color', 'rgb(177, 198, 176)');

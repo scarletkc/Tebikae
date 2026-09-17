@@ -135,7 +135,7 @@ test('combined filters and preview navigation share the same result set', async 
   await expect(page.getByRole('button', { name: 'Previous note', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Next note', exact: true })).toBeDisabled();
   await closeDialog(page);
-  await page.getByRole('button', { name: 'Clear filters', exact: true }).click();
+  await page.locator('.search-box .search-clear-button').click();
   await expect(page.locator('.note-card')).toHaveCount(2);
   await page.getByLabel('Search your notes', { exact: true }).fill('tea ideas');
   await expect(page.locator('.note-card')).toHaveCount(1);
@@ -204,7 +204,8 @@ test('explicit conversion preserves an existing Issue and label changes use incr
 }) => {
   const remote = await mockGitHub(context);
   await connect(page);
-  await page.locator('a[href$="#/issues"]').click();
+  await page.getByRole('link', { name: 'Settings', exact: true }).click();
+  await page.locator('.settings-page').getByRole('link', { name: 'Existing Issues', exact: true }).click();
   await page.locator('.note-card').filter({ hasText: 'An ordinary Issue' }).getByRole('button').click();
   await page.getByRole('button', { name: 'Turn into a note', exact: true }).click();
   await expect(page.locator('.note-save-row').getByRole('status')).toContainText('Synced to GitHub');

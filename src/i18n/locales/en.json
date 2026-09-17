@@ -33,6 +33,7 @@
     "exportNote": "Export Markdown",
     "create": "Create",
     "clear": "Clear filters",
+    "clearSearchFilters": "Clear search and filters",
     "filter": "Filters",
     "pin": "Pin note",
     "unpin": "Unpin note",
@@ -193,6 +194,8 @@
     "red": "Rose"
   },
   "label": {
+    "all": "All",
+    "unlabeled": "Unlabeled",
     "new": "New label",
     "name": "Label name",
     "color": "Label color",

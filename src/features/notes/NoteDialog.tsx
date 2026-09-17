@@ -42,6 +42,7 @@ export default function NoteDialog({
   initialNote,
   kind = 'markdown',
   labels,
+  initialLabelIds,
   onClose,
   onNavigate,
   canPrevious,
@@ -50,6 +51,7 @@ export default function NoteDialog({
   initialNote?: LocalNote;
   kind?: NoteKind;
   labels: Label[];
+  initialLabelIds?: number[];
   onClose(): void;
   onNavigate(direction: -1 | 1): void;
   canPrevious: boolean;
@@ -62,7 +64,13 @@ export default function NoteDialog({
   const [document, setDocument] = useState<NoteDocument>(() =>
     initialNote
       ? structuredClone(initialNote.current)
-      : { title: '', markdown: '', meta: newMetadata(kind), archived: false, labelIds: [] },
+      : {
+          title: '',
+          markdown: '',
+          meta: newMetadata(kind),
+          archived: false,
+          labelIds: initialLabelIds ? [...initialLabelIds] : [],
+        },
   );
   const docRef = useRef(document);
   const version = useRef(0);
