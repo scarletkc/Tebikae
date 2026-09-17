@@ -36,6 +36,8 @@ import { db } from '../../storage/db';
 import { safeHref } from '../../security/urls';
 import { usePwaUpdate } from '../../app/pwa';
 import { LabelBadge } from '../labels';
+import { TextContextMenu } from '../editor/TextContextMenu';
+import { LabelContextMenu } from '../labels/LabelContextMenu';
 const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'));
 
 export default function NoteDialog({
@@ -330,14 +332,16 @@ export default function NoteDialog({
       className={`note-dialog note-${document.meta.color}`}
     >
       <div className="note-dialog-scroll">
-        <input
-          className="note-title-input"
-          aria-label={t('note.title')}
-          placeholder={t('note.titlePlaceholder')}
-          value={document.title}
-          readOnly={readOnly}
-          onChange={(e) => change((d) => ({ ...d, title: e.target.value }))}
-        />
+        <TextContextMenu readOnly={readOnly}>
+          <input
+            className="note-title-input"
+            aria-label={t('note.title')}
+            placeholder={t('note.titlePlaceholder')}
+            value={document.title}
+            readOnly={readOnly}
+            onChange={(e) => change((d) => ({ ...d, title: e.target.value }))}
+          />
+        </TextContextMenu>
         {pwa.available && (
           <div className="banner">
             <span>{t('settings.update')}</span>
@@ -514,7 +518,17 @@ export default function NoteDialog({
                         }))
                       }
                     />
-                    <LabelBadge label={label} />
+                    <LabelContextMenu
+                      label={label}
+                      onRemove={
+                        !readOnly && document.labelIds.includes(label.id)
+                          ? () =>
+                              change((d) => ({ ...d, labelIds: d.labelIds.filter((id) => id !== label.id) }))
+                          : undefined
+                      }
+                    >
+                      <LabelBadge label={label} />
+                    </LabelContextMenu>
                   </label>
                 ))
               ) : (

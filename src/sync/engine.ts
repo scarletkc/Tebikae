@@ -13,6 +13,12 @@ import type {
 import { recoverInterruptedWrites, saveRecovery, type TebikaeDB } from '../storage/db';
 
 export interface SyncClient {
+  updateLabel?(
+    connection: Connection,
+    name: string,
+    payload: { new_name?: string; color?: string },
+  ): Promise<Label>;
+  deleteLabel?(connection: Connection, name: string): Promise<void>;
   pollIntervalMs?: number;
   getAnchor(connection: Connection): Promise<string | undefined>;
   listIssues(connection: Connection, options?: { since?: string }): AsyncIterable<RawIssueSnapshot[]>;
@@ -991,6 +997,65 @@ export class SyncEngine {
     return promise.finally(() => {
       if (this.purging.get(localId) === promise) this.purging.delete(localId);
     });
+  }
+
+  updateLabel(id: number, payload: { new_name?: string; color?: string }) {
+    return this.enqueue(async (generation) => {
+      if (this.connection.readOnly || !this.client.updateLabel) throw new Error('READ_ONLY');
+      const scopeId = this.connection.scopeId;
+      const label = await this.db.labels.get([scopeId, id]);
+      if (!label) throw new Error('LABEL_NOT_FOUND');
+      const updated = await this.client.updateLabel(this.connection, label.name, payload);
+      this.assertActive(generation);
+      await this.db.labels.put({ ...updated, scopeId });
+    }, 10);
+  }
+
+  deleteLabel(id: number) {
+    return this.enqueue(async (generation) => {
+      if (this.connection.readOnly || !this.client.deleteLabel) throw new Error('READ_ONLY');
+      const scopeId = this.connection.scopeId;
+      const label = await this.db.labels.get([scopeId, id]);
+      if (!label) throw new Error('LABEL_NOT_FOUND');
+      await this.client.deleteLabel(this.connection, label.name);
+      this.assertActive(generation);
+      // Deletion is already applied on GitHub. Remove the ID from local baselines and
+      // queued snapshots as well, so an unrelated draft cannot resurrect it.
+      await this.db.transaction(
+        'rw',
+        this.db.labels,
+        this.db.notes,
+        this.db.outbox,
+        this.db.unmanagedIssues,
+        async () => {
+          this.assertActive(generation);
+          await this.db.labels.delete([scopeId, id]);
+          await this.db.notes
+            .where('scopeId')
+            .equals(scopeId)
+            .modify((note) => {
+              note.current.labelIds = note.current.labelIds.filter((value) => value !== id);
+              for (const snapshot of [note.base, note.lastSeenRemote])
+                if (snapshot) snapshot.labels = snapshot.labels.filter((l) => l.id !== id);
+            });
+          await this.db.outbox
+            .where('scopeId')
+            .equals(scopeId)
+            .modify((entry) => {
+              for (const doc of [entry.attemptSnapshot, entry.attemptLocalSnapshot])
+                if (doc) doc.labelIds = doc.labelIds.filter((value) => value !== id);
+              for (const snapshot of [entry.attemptBase, entry.forceExpectedRemote])
+                if (snapshot) snapshot.labels = snapshot.labels.filter((l) => l.id !== id);
+            });
+          await this.db.unmanagedIssues
+            .where('scopeId')
+            .equals(scopeId)
+            .modify((row) => {
+              row.snapshot.labels = row.snapshot.labels.filter((l) => l.id !== id);
+            });
+        },
+      );
+    }, 10);
   }
 
   async createLabel(name: string, color = '8b8b8b'): Promise<Label> {

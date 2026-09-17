@@ -4,7 +4,9 @@ import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
 import { commandsCtx, editorViewCtx } from '@milkdown/kit/core';
 import type { Ctx } from '@milkdown/kit/ctx';
 import type { Command } from '@milkdown/kit/prose/state';
-import { Selection } from '@milkdown/kit/prose/state';
+import { AllSelection, Selection } from '@milkdown/kit/prose/state';
+import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
+import { TextContextMenu } from './TextContextMenu';
 import { lift, setBlockType, toggleMark, wrapIn } from '@milkdown/kit/prose/commands';
 import { liftListItem, sinkListItem, wrapInList } from '@milkdown/kit/prose/schema-list';
 import { redo, undo } from '@milkdown/kit/prose/history';
@@ -104,6 +106,32 @@ function EditorBody({
   const [linkText, setLinkText] = useState('');
   const [linkError, setLinkError] = useState(false);
   const [codeLanguage, setCodeLanguage] = useState('');
+  const [context, setContext] = useState({
+    selected: false,
+    table: false,
+    list: false,
+    task: false,
+    checked: false,
+    code: false,
+    quote: false,
+    link: '',
+  });
+  const [clipboardError, setClipboardError] = useState(false);
+  const [touchSelection, setTouchSelection] = useState(false);
+  useEffect(() => {
+    const update = () => {
+      if (!window.matchMedia?.('(pointer: coarse)').matches) return;
+      const selected = window.getSelection();
+      setTouchSelection(
+        !!selected &&
+          !selected.isCollapsed &&
+          !!selected.anchorNode &&
+          !!container.current?.contains(selected.anchorNode),
+      );
+    };
+    document.addEventListener('selectionchange', update);
+    return () => document.removeEventListener('selectionchange', update);
+  }, []);
   const { loading, get } = useEditor(
     (root) =>
       createMarkdownEditor(
@@ -335,6 +363,230 @@ function EditorBody({
       {icon}
     </ToolButton>
   );
+  const prepareMenu = ({
+    x,
+    y,
+    preserveSelection,
+  }: {
+    x: number;
+    y: number;
+    preserveSelection?: boolean;
+  }) => {
+    get()?.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      const hit = preserveSelection ? null : view.posAtCoords({ left: x, top: y });
+      if (
+        hit &&
+        (view.state.selection.empty ||
+          hit.pos < view.state.selection.from ||
+          hit.pos > view.state.selection.to)
+      )
+        view.dispatch(view.state.tr.setSelection(Selection.near(view.state.doc.resolve(hit.pos))));
+      const { selection, schema } = view.state;
+      const nodes = Array.from({ length: selection.$from.depth }, (_, i) => selection.$from.node(i + 1));
+      const item = nodes.find((n) => n.type.name === 'list_item');
+      setContext({
+        selected: !selection.empty,
+        table: isInTable(view.state),
+        list: !!item,
+        task: item?.attrs.checked != null,
+        checked: item?.attrs.checked === true,
+        code: nodes.some((n) => n.type.name === 'code_block'),
+        quote: nodes.some((n) => n.type.name === 'blockquote'),
+        link: String(schema.marks.link?.isInSet(selection.$from.marks())?.attrs.href ?? ''),
+      });
+    });
+  };
+  const copyText = (cut = false, code = false) => {
+    get()?.action((ctx) => {
+      const view = ctx.get(editorViewCtx),
+        { state } = view;
+      const selection = state.selection;
+      const text = code
+        ? selection.$from.parent.textContent
+        : state.doc.textBetween(selection.from, selection.to, '\n');
+      void navigator.clipboard
+        .writeText(text)
+        .then(() => {
+          if (cut && !readOnly && view.state.doc.eq(state.doc))
+            view.dispatch(view.state.tr.deleteRange(selection.from, selection.to));
+        })
+        .catch(() => setClipboardError(true));
+    });
+  };
+  const block = (name: string, attrs?: Record<string, unknown>) =>
+    command((ctx) => setBlockType(ctx.get(editorViewCtx).state.schema.nodes[name]!, attrs));
+  const item = (key: string, run: () => void): MenuAction => ({
+    label: t(`editor.${key}`),
+    run,
+    disabled: readOnly || loading,
+  });
+  const conversions: MenuAction[] = [
+    item('paragraph', () => block('paragraph')),
+    ...[1, 2, 3].map((level) => ({
+      label: t('editor.headingLevel', { level }),
+      disabled: readOnly,
+      run: () => block('heading', { level }),
+    })),
+    item('bulletList', () => list(false)),
+    item('orderedList', () => list(true)),
+    item('taskList', task),
+    item('quote', () =>
+      command((ctx) =>
+        context.quote ? lift : wrapIn(ctx.get(editorViewCtx).state.schema.nodes.blockquote!),
+      ),
+    ),
+    item('codeBlock', () => block('code_block', { language: codeLanguage })),
+  ];
+  const editorItems: MenuAction[] = [
+    ...(context.selected
+      ? [
+          { label: t('context.cut'), disabled: readOnly, run: () => copyText(true) },
+          { label: t('context.copy'), run: () => copyText() },
+        ]
+      : []),
+    {
+      label: t('context.paste'),
+      disabled: readOnly,
+      run: () => {
+        void navigator.clipboard
+          .readText()
+          .then((text) =>
+            run((ctx) => {
+              const view = ctx.get(editorViewCtx);
+              view.pasteText(text);
+            }),
+          )
+          .catch(() => setClipboardError(true));
+      },
+    },
+    {
+      label: t('context.allText'),
+      run: () =>
+        get()?.action((ctx) => {
+          const view = ctx.get(editorViewCtx);
+          view.dispatch(view.state.tr.setSelection(new AllSelection(view.state.doc)));
+          view.focus();
+        }),
+    },
+    ...(context.selected
+      ? [
+          item('bold', () => mark('strong')),
+          item('italic', () => mark('emphasis')),
+          item('strike', () => mark('strike_through')),
+          item('inlineCode', () => mark('inlineCode')),
+          item('link', openLink),
+        ]
+      : []),
+    ...(context.link
+      ? [
+          item('link', openLink),
+          {
+            label: t('context.copyLink'),
+            run: () => {
+              void navigator.clipboard.writeText(context.link).catch(() => setClipboardError(true));
+            },
+          },
+          item('removeLink', () => applyLink(true)),
+        ]
+      : []),
+    {
+      label: t(context.selected ? 'context.convert' : 'context.insert'),
+      separator: true,
+      disabled: readOnly,
+      children: [
+        ...conversions,
+        ...(!context.selected
+          ? [
+              item('link', openLink),
+              item('table', insertTable),
+              item('rule', () =>
+                run((ctx) => {
+                  const view = ctx.get(editorViewCtx);
+                  view.dispatch(view.state.tr.replaceSelectionWith(view.state.schema.nodes.hr!.create()));
+                }),
+              ),
+            ]
+          : []),
+      ],
+    },
+    ...(context.list
+      ? [
+          item('indent', () =>
+            command((ctx) => sinkListItem(ctx.get(editorViewCtx).state.schema.nodes.list_item!)),
+          ),
+          item('outdent', () =>
+            command((ctx) => liftListItem(ctx.get(editorViewCtx).state.schema.nodes.list_item!)),
+          ),
+        ]
+      : []),
+    ...(context.task
+      ? [
+          {
+            label: t(context.checked ? 'context.incomplete' : 'context.complete'),
+            disabled: readOnly,
+            run: () =>
+              run((ctx) => {
+                const view = ctx.get(editorViewCtx),
+                  { $from } = view.state.selection;
+                for (let d = $from.depth; d > 0; d--)
+                  if ($from.node(d).type.name === 'list_item') {
+                    view.dispatch(
+                      view.state.tr.setNodeMarkup($from.before(d), undefined, {
+                        ...$from.node(d).attrs,
+                        checked: !context.checked,
+                      }),
+                    );
+                    break;
+                  }
+              }),
+          },
+        ]
+      : []),
+    ...(context.quote ? [item('quote', () => command(() => lift))] : []),
+    ...(context.table
+      ? [
+          item('addRow', () => run((ctx) => ctx.get(commandsCtx).call(addRowAfterCommand.key))),
+          item('addColumn', () => command(() => addColumnAfter)),
+          item('deleteRow', removeTableRows),
+          item('deleteColumn', () => command(() => deleteColumn)),
+          item('deleteTable', () => command(() => deleteTable)),
+        ]
+      : []),
+    ...(context.code
+      ? [
+          {
+            label: t('context.language'),
+            disabled: readOnly,
+            run: () => {
+              get()?.action((ctx) => {
+                const view = ctx.get(editorViewCtx);
+                const dom = view.domAtPos(view.state.selection.from).node;
+                const el = dom instanceof Element ? dom : dom.parentElement;
+                (
+                  el?.closest('.editor-code-block')?.querySelector('input') as HTMLInputElement | null
+                )?.focus();
+              });
+            },
+          },
+          { label: t('context.copyCode'), run: () => copyText(false, true) },
+          item('paragraph', () => block('paragraph')),
+          {
+            label: t('context.deleteCode'),
+            disabled: readOnly,
+            danger: true,
+            run: () =>
+              run((ctx) => {
+                const view = ctx.get(editorViewCtx);
+                const { $from } = view.state.selection;
+                view.dispatch(view.state.tr.delete($from.before(), $from.after()));
+              }),
+          },
+        ]
+      : []),
+    { ...item('undo', () => command(() => undo)), separator: true },
+    item('redo', () => command(() => redo)),
+  ];
   return (
     <div className="markdown-editor" ref={container}>
       <div className="editor-modebar">
@@ -518,22 +770,48 @@ function EditorBody({
         </>
       )}
       <div hidden={mode !== 'visual'} className="editor-visual">
-        <Milkdown />
+        <ContextMenu allowText items={editorItems} onPrepare={prepareMenu}>
+          <Milkdown />
+        </ContextMenu>
       </div>
+      {touchSelection && mode === 'visual' && (
+        <div
+          className="editor-selection-toolbar"
+          role="toolbar"
+          aria-label={t('editor.toolbar')}
+          onPointerDown={(e) => e.preventDefault()}
+        >
+          <button type="button" onClick={() => copyText()}>
+            {t('context.copy')}
+          </button>
+          <button type="button" disabled={readOnly} onClick={() => mark('strong')}>
+            {t('editor.bold')}
+          </button>
+          <button type="button" disabled={readOnly} onClick={openLink}>
+            {t('editor.link')}
+          </button>
+          <ContextMenu explicit items={editorItems} onPrepare={prepareMenu}>
+            <span />
+          </ContextMenu>
+        </div>
+      )}
+      {clipboardError && <p role="alert">{t('context.clipboardError')}</p>}
       {mode === 'source' && (
-        <textarea
-          className="editor-source"
-          aria-label={t('editor.sourceBody')}
-          value={source}
-          readOnly={readOnly}
-          spellCheck={false}
-          onCompositionStart={session.compositionStart}
-          onCompositionEnd={session.compositionEnd}
-          onChange={(event) => {
-            setSource(event.target.value);
-            session.setSource(event.target.value);
-          }}
-        />
+        <TextContextMenu markdown readOnly={readOnly}>
+          <textarea
+            className="editor-source"
+            aria-label={t('editor.sourceBody')}
+            value={source}
+            readOnly={readOnly}
+            spellCheck={false}
+            onCompositionStart={session.compositionStart}
+            onCompositionEnd={session.compositionEnd}
+            onChange={(event) => {
+              setSource(event.target.value);
+              session.setSource(event.target.value);
+            }}
+          />
+        </TextContextMenu>
       )}
       {loading && (
         <p role="status" className="editor-loading">

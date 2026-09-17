@@ -44,5 +44,7 @@
   "image": "图片占位",
   "loading": "正在加载编辑器…",
   "loadFailed": "可视化编辑器加载失败，Markdown 原文已保留，可继续在这里编辑。",
-  "unsupported": "这条笔记包含无法安全往返编辑的 HTML 或 Markdown 扩展语法，已保留原始源码，可继续在这里编辑。"
+  "unsupported": "这条笔记包含无法安全往返编辑的 HTML 或 Markdown 扩展语法，已保留原始源码，可继续在这里编辑。",
+  "copyCode": "复制代码",
+  "clipboardError": "无法访问剪贴板，请使用系统复制粘贴快捷键或原生文字菜单。"
 }

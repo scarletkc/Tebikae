@@ -118,6 +118,88 @@ function taskItemView(
   };
 }
 
+function codeBlockView(
+  initial: ProseNode,
+  view: EditorView,
+  getPos: () => number | undefined,
+  events: EditorEvents,
+): NodeView {
+  let node = initial;
+  const dom = document.createElement('div');
+  dom.className = 'editor-code-block';
+  const bar = document.createElement('div');
+  bar.className = 'code-block-header';
+  bar.contentEditable = 'false';
+  const language = document.createElement('input');
+  language.setAttribute('aria-label', events.label('codeLanguage'));
+  language.placeholder = 'Plain Text';
+  language.maxLength = 40;
+  const list = document.createElement('datalist');
+  list.id = `languages-${crypto.randomUUID()}`;
+  language.setAttribute('list', list.id);
+  for (const value of [
+    'javascript',
+    'typescript',
+    'python',
+    'rust',
+    'c',
+    'cpp',
+    'json',
+    'bash',
+    'tsx',
+    'toml',
+    'nginx',
+  ]) {
+    const option = document.createElement('option');
+    option.value = value;
+    list.append(option);
+  }
+  const copy = document.createElement('button');
+  copy.type = 'button';
+  copy.textContent = events.label('copyCode');
+  const status = document.createElement('span');
+  status.setAttribute('role', 'status');
+  copy.addEventListener('click', () => {
+    void navigator.clipboard.writeText(node.textContent).catch(() => {
+      status.textContent = events.label('clipboardError');
+    });
+  });
+  const pre = document.createElement('pre'),
+    contentDOM = document.createElement('code');
+  pre.append(contentDOM);
+  const update = () => {
+    language.value = String(node.attrs.language ?? '');
+    pre.dataset.language = language.value;
+    language.disabled = events.readOnly();
+  };
+  language.addEventListener('change', () => {
+    const pos = getPos();
+    if (events.readOnly() || pos === undefined) return update();
+    view.dispatch(
+      view.state.tr.setNodeMarkup(pos, undefined, {
+        ...node.attrs,
+        language: language.value.replace(/[\r\n`]/g, '').trim(),
+      }),
+    );
+  });
+  bar.append(language, list, copy, status);
+  dom.append(bar, pre);
+  update();
+  return {
+    dom,
+    contentDOM,
+    update(next) {
+      if (next.type !== node.type) return false;
+      node = next;
+      update();
+      return true;
+    },
+    stopEvent: (event) => event.target instanceof globalThis.Node && bar.contains(event.target),
+    ignoreMutation: (mutation) =>
+      mutation.type !== 'selection' && (bar.contains(mutation.target) || mutation.target === dom),
+  };
+}
+
 export function createMarkdownEditor(
   root: HTMLElement,
   markdown: string,
@@ -224,6 +306,7 @@ export function createMarkdownEditor(
           nodeViews: {
             ...previous.nodeViews,
             list_item: (node, view, getPos) => taskItemView(node, view, getPos, events),
+            code_block: (node, view, getPos) => codeBlockView(node, view, getPos, events),
           },
         }));
       })

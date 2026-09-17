@@ -44,5 +44,7 @@
   "image": "Image placeholder",
   "loading": "Loading editor…",
   "loadFailed": "The visual editor could not load. Your Markdown is preserved and can be edited here.",
-  "unsupported": "This note contains HTML or Markdown extensions that cannot be safely edited visually. Its original source is preserved here."
+  "unsupported": "This note contains HTML or Markdown extensions that cannot be safely edited visually. Its original source is preserved here.",
+  "copyCode": "Copy code",
+  "clipboardError": "Clipboard access failed. Use the system copy/paste shortcut or native text menu."
 }
