@@ -52,12 +52,104 @@ for (const width of [320, 390, 768, 1100, 1280]) {
       await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(300);
       expect((await topbar.boundingBox())!.y).toBe(0);
       await checkBounds();
+      await topbar.locator('.search-box input').fill('合成');
+      await topbar.locator('.filter-open-button').click();
+      await page.getByRole('dialog').locator('.color-choice.note-yellow input').check();
+      await page.getByRole('dialog').locator('.dialog-header button').click();
+      await expect(topbar.locator('.search-clear-button')).toBeVisible();
+      await checkBounds();
+      await topbar.locator('.search-clear-button').click();
+      await expect(page.locator('.note-card')).toHaveCount(30);
       await page.screenshot({ path: testInfo.outputPath('scrolled.png') });
       await newNote.click();
       await expect(page.getByRole('dialog')).toBeVisible();
       expect(await topbar.evaluate((element) => getComputedStyle(element).zIndex)).toBe('20');
     });
   }
+}
+
+for (const scenario of [
+  { name: 'query only', query: 'Weekend', filters: {} },
+  { name: 'labels only', query: '', filters: { labelIds: [11, 12] } },
+  { name: 'unlabeled only', query: '', filters: { unlabeledOnly: true } },
+  { name: 'color only', query: '', filters: { colors: ['yellow'] } },
+  { name: 'kind only', query: '', filters: { kinds: ['markdown'] } },
+  { name: 'pinned only', query: '', filters: { pinned: 'pinned' } },
+  { name: 'unsynced only', query: '', filters: { unsyncedOnly: true } },
+  ...['createdFrom', 'createdTo', 'updatedFrom', 'updatedTo'].map((key) => ({
+    name: key,
+    query: '',
+    filters: { [key]: '2026-09-15' },
+  })),
+  {
+    name: 'query and every filter',
+    query: 'Weekend',
+    filters: {
+      labelIds: [11, 12],
+      labelMatch: 'any',
+      unlabeledOnly: true,
+      colors: ['yellow'],
+      kinds: ['markdown'],
+      pinned: 'unpinned',
+      unsyncedOnly: true,
+      createdFrom: '2026-09-01',
+      createdTo: '2026-09-30',
+      updatedFrom: '2026-09-01',
+      updatedTo: '2026-09-30',
+    },
+  },
+]) {
+  test(`search X clears ${scenario.name} while preserving sort and views`, async ({ page, context }) => {
+    await mockGitHub(context);
+    await connect(page);
+    const topbar = page.locator('.app-topbar');
+    await expect(topbar.locator('.search-clear-button')).toHaveCount(0);
+    await topbar.locator('select').selectOption('title');
+    await topbar.getByRole('button', { name: 'List view', exact: true }).click();
+    await page.getByRole('link', { name: 'Archive', exact: true }).click();
+    await page.evaluate((scenario) => {
+      const key = Object.keys(sessionStorage).find((key) => key.startsWith('tebikae.filters.'))!;
+      const filters = JSON.parse(sessionStorage.getItem(key)!);
+      sessionStorage.setItem(
+        key,
+        JSON.stringify({ ...filters, ...scenario.filters, query: scenario.query, view: 'archive' }),
+      );
+    }, scenario);
+    await page.reload();
+    const clear = topbar.locator('.search-clear-button');
+    await expect(clear).toBeVisible();
+    await expect(clear).toHaveAccessibleName('Clear search and filters');
+    await expect(topbar.locator('.filter-open-button')).toHaveText('');
+    if (scenario.name !== 'query only')
+      await expect(topbar.locator('.filter-open-button')).toHaveClass(/is-active/);
+    await expect(page.locator('.filter-chips > button:not(.chip)')).toHaveCount(0);
+    await clear.click();
+    await expect(clear).toHaveCount(0);
+    await expect(topbar.locator('.search-box input')).toHaveValue('');
+    await expect(topbar.locator('.filter-open-button')).not.toHaveClass(/is-active/);
+    await expect(page.locator('.filter-chips')).toHaveCount(0);
+    await expect(topbar.locator('select')).toHaveValue('title');
+    await expect(page).toHaveURL(/#\/archive$/);
+    await expect(topbar.getByRole('button', { name: 'List view', exact: true })).toHaveClass(/selected/);
+    await expect(page.locator('.notes-list .note-card')).toHaveCount(1);
+    expect(
+      await page.evaluate(() => {
+        const key = Object.keys(sessionStorage).find((key) => key.startsWith('tebikae.filters.'))!;
+        return JSON.parse(sessionStorage.getItem(key)!);
+      }),
+    ).toEqual({
+      view: 'archive',
+      query: '',
+      labelIds: [],
+      labelMatch: 'all',
+      unlabeledOnly: false,
+      colors: [],
+      kinds: [],
+      pinned: 'all',
+      unsyncedOnly: false,
+      sort: 'title',
+    });
+  });
 }
 
 test('topbar actions preserve filtering, sorting, views and route-specific controls', async ({ page }) => {
@@ -70,7 +162,10 @@ test('topbar actions preserve filtering, sorting, views and route-specific contr
   await topbar.getByRole('button', { name: 'Filters', exact: true }).click();
   await page.getByRole('dialog').getByLabel('Personal', { exact: true }).check();
   await closeDialog(page);
-  await expect(topbar.locator('.count-badge')).toHaveText('1');
+  await expect(topbar.locator('.search-box .filter-open-button')).toHaveClass(/is-active/);
+  await expect(topbar.locator('.filter-open-button')).toHaveText('');
+  await expect(topbar.locator('.count-badge')).toHaveCount(0);
+  await expect(page.locator('.filter-chips > button:not(.chip)')).toHaveCount(0);
   await expect(page.locator('.note-card')).toHaveCount(1);
   await topbar.locator('select').selectOption('title');
   await expect(topbar.locator('select')).toHaveValue('title');
@@ -80,7 +175,8 @@ test('topbar actions preserve filtering, sorting, views and route-specific contr
   await expect(page.locator('.notes-list')).toHaveCount(0);
   await page.getByRole('link', { name: 'Trash', exact: true }).click();
   await expect(topbar.locator('.new-note-button')).toHaveCount(0);
-  await expect(topbar.locator('.filter-button')).toBeVisible();
+  await expect(topbar.locator('.filter-open-button')).toBeVisible();
+  await expect(topbar.locator('.filter-clear-button')).toHaveCount(0);
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await expect(topbar.locator('.topbar-note-actions')).toHaveCount(0);
   expect(remote.writes).toHaveLength(0);

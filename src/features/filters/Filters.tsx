@@ -77,12 +77,6 @@ export function FilterChips({
           </button>
         );
       })}
-      <button
-        className="text-button"
-        onClick={() => setFilters({ ...defaultFilters, view: f.view, query: f.query })}
-      >
-        {t('action.clear')}
-      </button>
     </div>
   ) : null;
 }
