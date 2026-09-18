@@ -28,7 +28,7 @@ import { usePreferences } from './preferences';
 import { PwaUpdateContext } from './pwa';
 import { Brand, IconButton, Modal, PreferencesControls, download } from './ui';
 import { db } from '../storage/db';
-import { defaultFilters, filterNotes, labelCounts } from '../domain/filters';
+import { defaultFilters, filterNotes, labelCounts, sidebarLabels } from '../domain/filters';
 import WorkspaceStatus, { type WorkspaceNotice } from './WorkspaceStatus';
 import type { LocalNote, NoteFilters, NoteKind, UnmanagedIssue } from '../domain/types';
 import { summarizeNoteStatuses } from './note-status';
@@ -172,6 +172,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       return {};
     }
   }, [notes, activeFilters, labels]);
+  const sidebarLabelList = useMemo(() => sidebarLabels(notes, labels), [notes, labels]);
   function setFilters(next: NoteFilters) {
     updateFilters(next);
     setLimit(100);
@@ -426,7 +427,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           <span>{t('label.unlabeled')}</span>
         </button>
         {labels.length ? (
-          labels.map((label) => {
+          sidebarLabelList.map((label) => {
             const selected = filters.labelIds.includes(label.id);
             return (
               <button

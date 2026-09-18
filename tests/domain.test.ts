@@ -7,7 +7,7 @@ import {
   snapshotToDocument,
   validateDocument,
 } from '../src/domain/codec';
-import { defaultFilters, filterNotes, labelCounts } from '../src/domain/filters';
+import { defaultFilters, filterNotes, labelCounts, sidebarLabels } from '../src/domain/filters';
 import {
   checkVisualSupport,
   isSimpleChecklist,
@@ -241,6 +241,43 @@ describe('shared note filtering', () => {
       filterNotes(data, { ...defaultFilters, view: 'all', sort: 'title' }).map((x) => x.localId),
     ).toEqual(['a', 'b']);
     expect(filterNotes(data, { ...defaultFilters, view: 'all' }).map((x) => x.localId)).toEqual(['b', 'a']);
+  });
+});
+
+describe('sidebar labels', () => {
+  const repoLabels = [label(1, 'bug'), label(2, 'Ideas'), label(3, 'Archive only'), label(4, 'Trash only')];
+  const sidebarNotes = [
+    note('used', document({ labelIds: [2] })),
+    note('archived', document({ labelIds: [3], archived: true })),
+    note('trashed', document({ labelIds: [4], meta: { ...fixedMeta, trashedAt: '2026-09-16T10:00:00Z' } })),
+  ];
+  it('lists only labels used by at least one non-trashed note', () => {
+    expect(sidebarLabels(sidebarNotes, repoLabels).map((item) => item.id)).toEqual([2, 3]);
+  });
+  it('hides repository labels that no Tebikae note uses, regardless of their names', () => {
+    expect(sidebarLabels([], repoLabels)).toEqual([]);
+    expect(sidebarLabels(sidebarNotes, repoLabels).some((item) => item.name === 'bug')).toBe(false);
+  });
+  it('hides labels used only by trashed notes but keeps labels used by archived notes', () => {
+    const visible = sidebarLabels(sidebarNotes, repoLabels).map((item) => item.id);
+    expect(visible).not.toContain(4);
+    expect(visible).toContain(3);
+  });
+  it('shows a label again once its only trashed note is restored', () => {
+    const restored = [...sidebarNotes, note('restored', document({ labelIds: [4] }))];
+    expect(sidebarLabels(restored, repoLabels).map((item) => item.id)).toEqual([2, 3, 4]);
+  });
+  it('keeps the full label set available to filters, search, and editors', () => {
+    expect(sidebarLabels(sidebarNotes, repoLabels)).not.toBe(repoLabels);
+    expect(repoLabels).toHaveLength(4);
+    expect(
+      filterNotes(sidebarNotes, { ...defaultFilters, view: 'trash', labelIds: [4] }, repoLabels).map(
+        (item) => item.localId,
+      ),
+    ).toEqual(['trashed']);
+    expect(
+      filterNotes(sidebarNotes, { ...defaultFilters, view: 'trash', query: 'Trash only' }, repoLabels),
+    ).toHaveLength(1);
   });
 });
 
