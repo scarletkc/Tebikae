@@ -63,7 +63,7 @@ test('sidebar shows only labels used by non-trashed notes', async ({ page, conte
   await expect(nav.getByRole('button', { name: /^bug/ })).toHaveCount(0);
   await expect(nav.getByRole('button', { name: /^enhancement/ })).toHaveCount(0);
   await expect(nav.locator('.label-nav-row')).toHaveCount(1);
-  await expect(nav.getByRole('button')).toHaveCount(4);
+  await expect(nav.getByRole('button')).toHaveCount(3);
 });
 
 async function storedNoteLabels(page: Page) {

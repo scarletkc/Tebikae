@@ -5,6 +5,7 @@ import './menus.css';
 import { useTranslation } from 'react-i18next';
 import { type ReactNode } from 'react';
 import { usePreferences } from './preferences';
+import { ContextMenu, type MenuAction } from './ContextMenu';
 export function Brand() {
   return (
     <div className="brand">
@@ -73,35 +74,55 @@ export function LanguageControl({
     </DropdownMenu.Trigger>
   );
   return (
-    <DropdownMenu.Root>
-      {trigger}
-      <DropdownMenu.Portal>
-        <DropdownMenu.Content className="language-menu-content" align="start" sideOffset={6} loop>
-          <DropdownMenu.RadioGroup value={value} onValueChange={(next) => onChange(next as LanguageValue)}>
-            {LANGUAGES.map((language) => (
-              <DropdownMenu.RadioItem
-                key={language.value}
-                value={language.value}
-                className="language-menu-item"
-              >
-                <span className="language-menu-check">
-                  <DropdownMenu.ItemIndicator>
-                    <Check size={15} aria-hidden="true" />
-                  </DropdownMenu.ItemIndicator>
-                </span>
-                {language.label}
-              </DropdownMenu.RadioItem>
-            ))}
-          </DropdownMenu.RadioGroup>
-        </DropdownMenu.Content>
-      </DropdownMenu.Portal>
-    </DropdownMenu.Root>
+    <ContextMenu
+      contextName="language"
+      items={LANGUAGES.map((language) => ({
+        label: language.label,
+        icon: Languages,
+        checked: value === language.value,
+        keepOpen: false,
+        run: () => onChange(language.value),
+      }))}
+    >
+      <DropdownMenu.Root>
+        {trigger}
+        <DropdownMenu.Portal>
+          <DropdownMenu.Content className="language-menu-content" align="start" sideOffset={6} loop>
+            <DropdownMenu.RadioGroup value={value} onValueChange={(next) => onChange(next as LanguageValue)}>
+              {LANGUAGES.map((language) => (
+                <DropdownMenu.RadioItem
+                  key={language.value}
+                  value={language.value}
+                  className="language-menu-item"
+                >
+                  <span className="language-menu-check">
+                    <DropdownMenu.ItemIndicator>
+                      <Check size={15} aria-hidden="true" />
+                    </DropdownMenu.ItemIndicator>
+                  </span>
+                  <Languages size={15} className="language-menu-icon" aria-hidden="true" />
+                  {language.label}
+                </DropdownMenu.RadioItem>
+              ))}
+            </DropdownMenu.RadioGroup>
+          </DropdownMenu.Content>
+        </DropdownMenu.Portal>
+      </DropdownMenu.Root>
+    </ContextMenu>
   );
 }
 
 export function PreferencesControls({ compact = false }: { compact?: boolean }) {
   const prefs = usePreferences();
   const { t } = useTranslation();
+  const themeIcons = { system: Monitor, light: Sun, dark: Moon } as const;
+  const themeItems: MenuAction[] = (['system', 'light', 'dark'] as const).map((theme) => ({
+    label: t(`settings.${theme}`),
+    icon: themeIcons[theme],
+    checked: prefs.theme === theme,
+    keepOpen: false,
+    run: () => prefs.setTheme(theme),
+  }));
   return (
     <div className="preferences-controls">
       <LanguageControl
@@ -110,20 +131,22 @@ export function PreferencesControls({ compact = false }: { compact?: boolean }) 
         label={t('settings.language')}
         mode={compact ? 'icon' : 'text'}
       />
-      <IconButton
-        label={t(`settings.${prefs.theme}`)}
-        onClick={() =>
-          prefs.setTheme(prefs.theme === 'system' ? 'light' : prefs.theme === 'light' ? 'dark' : 'system')
-        }
-      >
-        {prefs.theme === 'dark' ? (
-          <Moon size={18} />
-        ) : prefs.theme === 'light' ? (
-          <Sun size={18} />
-        ) : (
-          <Monitor size={18} />
-        )}
-      </IconButton>
+      <ContextMenu contextName="theme" items={themeItems}>
+        <IconButton
+          label={t(`settings.${prefs.theme}`)}
+          onClick={() =>
+            prefs.setTheme(prefs.theme === 'system' ? 'light' : prefs.theme === 'light' ? 'dark' : 'system')
+          }
+        >
+          {prefs.theme === 'dark' ? (
+            <Moon size={18} />
+          ) : prefs.theme === 'light' ? (
+            <Sun size={18} />
+          ) : (
+            <Monitor size={18} />
+          )}
+        </IconButton>
+      </ContextMenu>
     </div>
   );
 }
