@@ -22,11 +22,9 @@ import { addRowAfterCommand, insertTableCommand } from '@milkdown/kit/preset/gfm
 import {
   Bold,
   CheckSquare,
-  ClipboardPaste,
   Code,
   CodeXml,
   Columns3,
-  Copy,
   CornerDownLeft,
   IndentDecrease,
   IndentIncrease,
@@ -34,20 +32,14 @@ import {
   Link,
   List,
   ListOrdered,
-  Languages,
   Minus,
-  Plus,
   Quote,
   Redo2,
   Rows3,
-  Scissors,
   Strikethrough,
   Table,
-  Type,
   Trash2,
-  Unlink,
   Undo2,
-  type LucideIcon,
 } from 'lucide-react';
 import { checkVisualSupport } from '../../domain/markdown';
 import { safeHref } from '../../security/urls';
@@ -404,36 +396,8 @@ function EditorBody({
   };
   const block = (name: string, attrs?: Record<string, unknown>) =>
     command((ctx) => setBlockType(ctx.get(editorViewCtx).state.schema.nodes[name]!, attrs));
-  const editorIcons: Record<string, LucideIcon> = {
-    paragraph: Type,
-    bulletList: List,
-    orderedList: ListOrdered,
-    taskList: CheckSquare,
-    quote: Quote,
-    codeBlock: CodeXml,
-    indent: IndentIncrease,
-    outdent: IndentDecrease,
-    outdentBlock: IndentDecrease,
-    bold: Bold,
-    italic: Italic,
-    strike: Strikethrough,
-    inlineCode: Code,
-    link: Link,
-    editLink: Link,
-    removeLink: Unlink,
-    table: Table,
-    addRow: Rows3,
-    addColumn: Columns3,
-    deleteRow: Rows3,
-    deleteColumn: Columns3,
-    deleteTable: Trash2,
-    rule: Minus,
-    undo: Undo2,
-    redo: Redo2,
-  };
   const item = (key: string, run: () => void): MenuAction => ({
-    label: t(`editor.menu.${key}`, { defaultValue: t(`editor.${key}`) }),
-    icon: editorIcons[key],
+    label: t(`editor.${key}`),
     run,
     disabled: readOnly || loading,
   });
@@ -467,7 +431,6 @@ function EditorBody({
     ? [
         {
           label: t(context.checked ? 'context.incomplete' : 'context.complete'),
-          icon: CheckSquare,
           disabled: readOnly,
           run: () =>
             run((ctx) => {
@@ -491,7 +454,6 @@ function EditorBody({
     item('paragraph', () => block('paragraph')),
     ...[1, 2, 3].map((level) => ({
       label: t('editor.headingLevel', { level }),
-      icon: Type,
       disabled: readOnly,
       run: () => block('heading', { level }),
     })),
@@ -506,13 +468,12 @@ function EditorBody({
   const editorItems: MenuAction[] = [
     ...(context.selected
       ? [
-          { label: t('context.cut'), icon: Scissors, disabled: readOnly, run: () => copyText(true) },
-          { label: t('context.copy'), icon: Copy, run: () => copyText() },
+          { label: t('context.cut'), disabled: readOnly, run: () => copyText(true) },
+          { label: t('context.copy'), run: () => copyText() },
         ]
       : []),
     {
       label: t('context.paste'),
-      icon: ClipboardPaste,
       disabled: readOnly,
       run: () => {
         void navigator.clipboard
@@ -530,7 +491,6 @@ function EditorBody({
       ? [
           {
             label: t('context.allText'),
-            icon: List,
             run: () =>
               get()?.action((ctx) => {
                 const view = ctx.get(editorViewCtx);
@@ -544,7 +504,6 @@ function EditorBody({
       ? [
           {
             label: t('editor.formatMenu'),
-            icon: Type,
             separator: true,
             children: [
               ...(!context.code
@@ -560,7 +519,6 @@ function EditorBody({
                 ? [
                     {
                       label: t('context.copyLink'),
-                      icon: Copy,
                       run: () => {
                         void navigator.clipboard.writeText(context.link).catch(() => setClipboardError(true));
                       },
@@ -575,7 +533,6 @@ function EditorBody({
       : []),
     {
       label: t('editor.paragraphMenu'),
-      icon: Type,
       separator: !context.selected && !context.link,
       disabled: readOnly || loading,
       children: conversions,
@@ -584,7 +541,6 @@ function EditorBody({
       ? [
           {
             label: t('editor.insertMenu'),
-            icon: Plus,
             disabled: readOnly || loading,
             children: [
               item('link', openLink),
@@ -599,7 +555,6 @@ function EditorBody({
       ? [
           {
             label: t('editor.tableMenu'),
-            icon: Table,
             children: [
               item('addRow', () => run((ctx) => ctx.get(commandsCtx).call(addRowAfterCommand.key))),
               item('addColumn', () => command(() => addColumnAfter)),
@@ -614,11 +569,9 @@ function EditorBody({
       ? [
           {
             label: t('editor.codeMenu'),
-            icon: Code,
             children: [
               {
                 label: t('context.language'),
-                icon: Languages,
                 disabled: readOnly,
                 run: () => {
                   get()?.action((ctx) => {
@@ -631,11 +584,10 @@ function EditorBody({
                   });
                 },
               },
-              { label: t('context.copyCode'), icon: Copy, run: () => copyText(false, true) },
+              { label: t('context.copyCode'), run: () => copyText(false, true) },
               item('paragraph', () => block('paragraph')),
               {
                 label: t('context.deleteCode'),
-                icon: Trash2,
                 disabled: readOnly,
                 danger: true,
                 run: () =>

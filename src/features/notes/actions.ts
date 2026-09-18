@@ -1,8 +1,6 @@
 import type { TFunction } from 'i18next';
-import { Archive, ArchiveRestore, Palette, Pin, RotateCcw, Tag, Trash2 } from 'lucide-react';
 import { NOTE_COLORS, type Label, type LocalNote, type NoteDocument } from '../../domain/types';
 import type { MenuAction } from '../../app/ContextMenu';
-import { safeLabelColor } from '../labels/color';
 
 export const canEditNote = (note: LocalNote) =>
   !note.duplicate &&
@@ -25,7 +23,6 @@ export function noteActions(
     return [
       {
         label: t('action.restore'),
-        icon: RotateCcw,
         disabled,
         run: () =>
           mutate((d) => {
@@ -44,7 +41,6 @@ export function noteActions(
             ? 'action.unpin'
             : 'action.pin',
       ),
-      icon: Pin,
       disabled,
       run: () =>
         mutate((d) => {
@@ -52,15 +48,13 @@ export function noteActions(
         }),
     },
     {
-      label: t('context.labels'),
-      icon: Tag,
+      label: t('note.labels'),
       disabled,
       children: labels.length
         ? labels.map((label) => {
             const count = notes.filter((n) => n.current.labelIds.includes(label.id)).length;
             return {
               label: label.name,
-              swatch: safeLabelColor(label.color) ?? 'var(--muted)',
               checked: count === notes.length ? true : count ? 'indeterminate' : false,
               run: () =>
                 mutate((d) => {
@@ -71,15 +65,13 @@ export function noteActions(
                 }),
             };
           })
-        : [{ label: t('label.empty'), icon: Tag, disabled: true }],
+        : [{ label: t('label.empty'), disabled: true }],
     },
     {
       label: t('context.color'),
-      icon: Palette,
       disabled,
       children: NOTE_COLORS.map((color) => ({
         label: t(`color.${color}`),
-        swatch: `var(--card-${color})`,
         checked: notes.every((n) => n.current.meta.color === color),
         run: () =>
           mutate((d) => {
@@ -97,7 +89,6 @@ export function noteActions(
             ? 'action.unarchive'
             : 'action.archive',
       ),
-      icon: allArchived ? ArchiveRestore : Archive,
       disabled,
       run: () =>
         mutate((d) => {
@@ -106,7 +97,6 @@ export function noteActions(
     },
     {
       label: t('action.trash'),
-      icon: Trash2,
       danger: true,
       separator: true,
       disabled,
