@@ -38,7 +38,23 @@ import { usePwaUpdate } from '../../app/pwa';
 import { LabelBadge } from '../labels';
 import { TextContextMenu } from '../editor/TextContextMenu';
 import { LabelContextMenu } from '../labels/LabelContextMenu';
-const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'));
+/**
+ * The editor chunk is lazy-loaded so the shell stays small for offline precache. A
+ * transient fetch failure (spotty network, a Service Worker eviction mid-load) must
+ * not leave the dialog stuck on the spinner, so retry the import a few times.
+ */
+const MarkdownEditor = lazy(async () => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await import('../editor/MarkdownEditor');
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+});
 
 export default function NoteDialog({
   initialNote,
