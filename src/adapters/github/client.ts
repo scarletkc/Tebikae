@@ -585,6 +585,29 @@ export class GitHubClient {
       ).data,
     );
   }
+  async updateLabel(
+    connection: Connection,
+    name: string,
+    payload: { new_name?: string; color?: string },
+  ): Promise<Label> {
+    return mapLabel(
+      (
+        await this.#request(
+          'PATCH',
+          `${this.#path(connection)}/labels/${encodeURIComponent(name)}`,
+          connection.scopeId,
+          payload,
+        )
+      ).data,
+    );
+  }
+  async deleteLabel(connection: Connection, name: string): Promise<void> {
+    await this.#request(
+      'DELETE',
+      `${this.#path(connection)}/labels/${encodeURIComponent(name)}`,
+      connection.scopeId,
+    );
+  }
   async addLabels(
     connection: Connection,
     number: number,

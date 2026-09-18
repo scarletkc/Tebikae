@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-const editorTests = ['editor', 'notes', 'note-layout', 'reliability'];
+const editorTests = ['editor', 'notes', 'note-layout', 'reliability', 'context-menu'];
 const storageTests = ['session', 'notes', 'reliability', 'backup-import', 'workspace-status'];
 const layoutTests = ['note-layout', 'topbar-layout', 'sidebar-controls', 'labels', 'notes'];
 const documentation = (path) =>

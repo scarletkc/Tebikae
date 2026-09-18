@@ -667,7 +667,10 @@ hr {
   color: var(--muted);
 }
 .label-nav {
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: 100%;
+  min-width: 0;
   flex: 1;
   min-height: 20px;
 }

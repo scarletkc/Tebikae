@@ -62,7 +62,8 @@ test('sidebar shows only labels used by non-trashed notes', async ({ page, conte
   await expect(nav.getByRole('button', { name: /^Personal/ })).toHaveCount(0);
   await expect(nav.getByRole('button', { name: /^bug/ })).toHaveCount(0);
   await expect(nav.getByRole('button', { name: /^enhancement/ })).toHaveCount(0);
-  await expect(nav.getByRole('button')).toHaveCount(3);
+  await expect(nav.locator('.label-nav-row')).toHaveCount(1);
+  await expect(nav.getByRole('button')).toHaveCount(4);
 });
 
 async function storedNoteLabels(page: Page) {
@@ -109,6 +110,7 @@ for (const entry of ['topbar', 'empty']) {
       }, unlabeledOnly);
       await page.reload();
       // Labels used by no note stay out of the sidebar, but the active filters survive intact.
+      await expect(page.locator('.sidebar .label-nav .label-nav-row')).toHaveCount(0);
       await expect(page.locator('.sidebar .label-nav button')).toHaveCount(2);
       await page.getByRole('button', { name: 'Filters', exact: true }).click();
       const restored = page.getByRole('dialog');

@@ -36,7 +36,25 @@ import { db } from '../../storage/db';
 import { safeHref } from '../../security/urls';
 import { usePwaUpdate } from '../../app/pwa';
 import { LabelBadge } from '../labels';
-const MarkdownEditor = lazy(() => import('../editor/MarkdownEditor'));
+import { TextContextMenu } from '../editor/TextContextMenu';
+import { LabelContextMenu } from '../labels/LabelContextMenu';
+/**
+ * The editor chunk is lazy-loaded so the shell stays small for offline precache. A
+ * transient fetch failure (spotty network, a Service Worker eviction mid-load) must
+ * not leave the dialog stuck on the spinner, so retry the import a few times.
+ */
+const MarkdownEditor = lazy(async () => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      return await import('../editor/MarkdownEditor');
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolve) => setTimeout(resolve, 250 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+});
 
 export default function NoteDialog({
   initialNote,
@@ -330,14 +348,16 @@ export default function NoteDialog({
       className={`note-dialog note-${document.meta.color}`}
     >
       <div className="note-dialog-scroll">
-        <input
-          className="note-title-input"
-          aria-label={t('note.title')}
-          placeholder={t('note.titlePlaceholder')}
-          value={document.title}
-          readOnly={readOnly}
-          onChange={(e) => change((d) => ({ ...d, title: e.target.value }))}
-        />
+        <TextContextMenu readOnly={readOnly}>
+          <input
+            className="note-title-input"
+            aria-label={t('note.title')}
+            placeholder={t('note.titlePlaceholder')}
+            value={document.title}
+            readOnly={readOnly}
+            onChange={(e) => change((d) => ({ ...d, title: e.target.value }))}
+          />
+        </TextContextMenu>
         {pwa.available && (
           <div className="banner">
             <span>{t('settings.update')}</span>
@@ -514,7 +534,17 @@ export default function NoteDialog({
                         }))
                       }
                     />
-                    <LabelBadge label={label} />
+                    <LabelContextMenu
+                      label={label}
+                      onRemove={
+                        !readOnly && document.labelIds.includes(label.id)
+                          ? () =>
+                              change((d) => ({ ...d, labelIds: d.labelIds.filter((id) => id !== label.id) }))
+                          : undefined
+                      }
+                    >
+                      <LabelBadge label={label} />
+                    </LabelContextMenu>
                   </label>
                 ))
               ) : (

@@ -49,7 +49,10 @@ for (const language of ['en', 'zh-CN'] as const) {
     await expect(page.getByLabel(copy.home.search, { exact: true })).toBeVisible();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.locator('.note-card').filter({ hasText: 'Weekend ideas' }).locator('.note-open').click();
-    await expect(page.locator('.ProseMirror[contenteditable="true"]')).toBeVisible();
+    // The editor chunk is lazy-loaded. Playwright's Windows WebKit can terminate a
+    // Service Worker intercepted fetch when the origin sockets close at the same
+    // moment, so allow the chunk time to resolve from the precache before failing.
+    await expect(page.locator('.ProseMirror[contenteditable="true"]')).toBeVisible({ timeout: 30_000 });
     await page
       .locator('.ProseMirror[contenteditable="true"]')
       .fill('First editor opened offline. 首次离线编辑。');

@@ -7,6 +7,9 @@ import { IconButton } from '../../app/ui';
 import MarkdownPreview from '../editor/MarkdownPreview';
 import { LabelBadge } from '../labels';
 import './notes.css';
+import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
+import { LabelContextMenu } from '../labels/LabelContextMenu';
+import { canEditNote } from './actions';
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
@@ -56,7 +59,15 @@ export default function NoteCard({
   onPurge,
   canPurge = false,
   writable,
+  menuItems = [],
+  selected = false,
+  onSelect,
+  onRemoveLabel,
 }: {
+  menuItems?: MenuAction[];
+  selected?: boolean;
+  onSelect?: (event: React.MouseEvent) => boolean;
+  onRemoveLabel?: (id: number) => void;
   note: LocalNote;
   labels: Label[];
   query?: string;
@@ -77,125 +88,153 @@ export default function NoteCard({
   );
   const preview = document.markdown.slice(0, 2400);
   const trashed = document.meta.trashedAt !== null;
-  const editable = writable && !note.duplicate && !note.remoteUnavailable;
+  const editable = writable && canEditNote(note);
   const updated =
     note.syncStatus === 'synced' ? note.base?.updatedAt || note.localModifiedAt : note.localModifiedAt;
   return (
-    <article className={`note-card note-${document.meta.color}`}>
-      <div className="note-summary">
-        <div className="card-title">
-          <h3>
-            <button
-              className="note-open"
-              onClick={onOpen}
-              aria-label={`${t('action.edit')}: ${document.title}`}
-            >
-              <Highlight query={query} text={document.title} />
-            </button>
-          </h3>
-          {document.meta.pinned && <Pin size={14} />}
-        </div>
-        {!checklist.length && (
-          <MarkdownPreview value={preview || t('note.blank')} compact className="card-rich-preview" />
-        )}
-      </div>
-      {checklist.length > 0 && (
-        <div className="card-checklist">
-          {checklist.slice(0, 4).map((item) => (
-            <div
-              className="checklist-preview-item"
-              key={item.index}
-              style={{ paddingInlineStart: Math.min(item.depth, 3) * 10 }}
-            >
-              <span className={`preview-checkbox ${item.checked ? 'is-checked' : ''}`} aria-hidden="true">
-                {item.checked ? '✓' : ''}
-              </span>
-              <span className={item.checked ? 'checked' : ''}>
-                <Highlight query={query} text={item.text} />
-              </span>
-            </div>
-          ))}
-          <button className="checklist-count" onClick={onOpen}>
-            {t('note.done', { done: checklist.filter((x) => x.checked).length, total: checklist.length })}
-          </button>
-        </div>
-      )}
-      {document.labelIds.length > 0 && (
-        <div className="card-labels">
-          {document.labelIds.slice(0, 2).map((id) => (
-            <LabelBadge key={id} label={labels.find((l) => l.id === id)} fallback={`#${id}`} />
-          ))}
-          {document.labelIds.length > 2 && (
-            <span
-              title={document.labelIds
-                .slice(2)
-                .map((id) => labels.find((l) => l.id === id)?.name || `#${id}`)
-                .join(', ')}
-            >
-              +{document.labelIds.length - 2}
-            </span>
-          )}
-        </div>
-      )}
-      <div className="card-footer">
-        <time dateTime={updated}>
-          {new Intl.DateTimeFormat(i18n.language, { month: 'short', day: 'numeric' }).format(
-            new Date(updated),
-          )}
-        </time>
-        {note.syncStatus !== 'synced' && (
-          <span
-            className={`card-status status-${note.syncStatus}`}
-            title={t(`status.${note.syncStatus}`)}
-            aria-label={t(`status.${note.syncStatus}`)}
-          >
-            <CircleAlert size={13} />
-            <span>{t(`status.${note.syncStatus}`)}</span>
+    <ContextMenu items={menuItems} className="context-card">
+      <article
+        className={`note-card note-${document.meta.color} ${selected ? 'is-selected' : ''}`}
+        tabIndex={0}
+        onClickCapture={(e) => {
+          if ((e.target as Element).closest('.card-actions, .label-badge, [role="menu"]')) return;
+          if (onSelect?.(e)) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }}
+      >
+        {selected && (
+          <span className="note-selected-mark" aria-label={t('context.selected')}>
+            ✓
           </span>
         )}
-        <div className="card-actions">
-          {trashed ? (
-            <>
-              <IconButton
-                label={t('action.restore')}
-                onClick={() => onChange('restore')}
-                disabled={!editable}
+        <div className="note-summary">
+          <div className="card-title">
+            <h3>
+              <button
+                className="note-open"
+                onClick={onOpen}
+                aria-label={`${t('action.edit')}: ${document.title}`}
               >
-                <RotateCcw size={16} />
-              </IconButton>
-              {onPurge && (
-                <IconButton
-                  label={t('action.deleteForever')}
-                  onClick={onPurge}
-                  disabled={!writable || !canPurge}
-                >
-                  <Trash2 size={16} />
-                </IconButton>
-              )}
-            </>
-          ) : (
-            <>
-              <IconButton
-                label={t(document.meta.pinned ? 'action.unpin' : 'action.pin')}
-                onClick={() => onChange('pin')}
-                disabled={!editable}
-              >
-                <Pin size={16} />
-              </IconButton>
-              <IconButton
-                label={t(document.archived ? 'action.unarchive' : 'action.archive')}
-                onClick={() => onChange('archive')}
-                disabled={!editable}
-              >
-                {document.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
-              </IconButton>
-              <IconButton label={t('action.trash')} onClick={() => onChange('trash')} disabled={!editable}>
-                <Trash2 size={16} />
-              </IconButton>
-            </>
+                <Highlight query={query} text={document.title} />
+              </button>
+            </h3>
+            {document.meta.pinned && <Pin size={14} />}
+          </div>
+          {!checklist.length && (
+            <MarkdownPreview value={preview || t('note.blank')} compact className="card-rich-preview" />
           )}
         </div>
-      </div>
-    </article>
+        {checklist.length > 0 && (
+          <div className="card-checklist">
+            {checklist.slice(0, 4).map((item) => (
+              <div
+                className="checklist-preview-item"
+                key={item.index}
+                style={{ paddingInlineStart: Math.min(item.depth, 3) * 10 }}
+              >
+                <span className={`preview-checkbox ${item.checked ? 'is-checked' : ''}`} aria-hidden="true">
+                  {item.checked ? '✓' : ''}
+                </span>
+                <span className={item.checked ? 'checked' : ''}>
+                  <Highlight query={query} text={item.text} />
+                </span>
+              </div>
+            ))}
+            <button className="checklist-count" onClick={onOpen}>
+              {t('note.done', { done: checklist.filter((x) => x.checked).length, total: checklist.length })}
+            </button>
+          </div>
+        )}
+        {document.labelIds.length > 0 && (
+          <div className="card-labels">
+            {document.labelIds.slice(0, 2).map((id) => {
+              const label = labels.find((l) => l.id === id);
+              return label && onRemoveLabel ? (
+                <LabelContextMenu
+                  key={id}
+                  label={label}
+                  onRemove={editable ? () => onRemoveLabel(id) : undefined}
+                >
+                  <LabelBadge label={label} />
+                </LabelContextMenu>
+              ) : (
+                <LabelBadge key={id} label={label} fallback={`#${id}`} />
+              );
+            })}
+            {document.labelIds.length > 2 && (
+              <span
+                title={document.labelIds
+                  .slice(2)
+                  .map((id) => labels.find((l) => l.id === id)?.name || `#${id}`)
+                  .join(', ')}
+              >
+                +{document.labelIds.length - 2}
+              </span>
+            )}
+          </div>
+        )}
+        <div className="card-footer">
+          <time dateTime={updated}>
+            {new Intl.DateTimeFormat(i18n.language, { month: 'short', day: 'numeric' }).format(
+              new Date(updated),
+            )}
+          </time>
+          {note.syncStatus !== 'synced' && (
+            <span
+              className={`card-status status-${note.syncStatus}`}
+              title={t(`status.${note.syncStatus}`)}
+              aria-label={t(`status.${note.syncStatus}`)}
+            >
+              <CircleAlert size={13} />
+              <span>{t(`status.${note.syncStatus}`)}</span>
+            </span>
+          )}
+          <div className="card-actions">
+            {trashed ? (
+              <>
+                <IconButton
+                  label={t('action.restore')}
+                  onClick={() => onChange('restore')}
+                  disabled={!editable}
+                >
+                  <RotateCcw size={16} />
+                </IconButton>
+                {onPurge && (
+                  <IconButton
+                    label={t('action.deleteForever')}
+                    onClick={onPurge}
+                    disabled={!writable || !canPurge}
+                  >
+                    <Trash2 size={16} />
+                  </IconButton>
+                )}
+              </>
+            ) : (
+              <>
+                <IconButton
+                  label={t(document.meta.pinned ? 'action.unpin' : 'action.pin')}
+                  onClick={() => onChange('pin')}
+                  disabled={!editable}
+                >
+                  <Pin size={16} />
+                </IconButton>
+                <IconButton
+                  label={t(document.archived ? 'action.unarchive' : 'action.archive')}
+                  onClick={() => onChange('archive')}
+                  disabled={!editable}
+                >
+                  {document.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+                </IconButton>
+                <IconButton label={t('action.trash')} onClick={() => onChange('trash')} disabled={!editable}>
+                  <Trash2 size={16} />
+                </IconButton>
+              </>
+            )}
+          </div>
+        </div>
+      </article>
+    </ContextMenu>
   );
 }

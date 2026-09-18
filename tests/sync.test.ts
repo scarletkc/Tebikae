@@ -107,6 +107,18 @@ class FakeClient implements SyncClient {
     this.labels.push(label);
     return label;
   }
+  async updateLabel(_connection: Connection, name: string, payload: { new_name?: string; color?: string }) {
+    const label = this.labels.find((l) => l.name === name)!;
+    if (payload.new_name) label.name = payload.new_name;
+    if (payload.color) label.color = payload.color;
+    return structuredClone(label);
+  }
+  async deleteLabel(_connection: Connection, name: string) {
+    if (this.failLabel) throw error('FORBIDDEN');
+    const id = this.labels.find((l) => l.name === name)!.id;
+    this.labels = this.labels.filter((l) => l.id !== id);
+    for (const issue of this.issues) issue.labels = issue.labels.filter((l) => l.id !== id);
+  }
   async addLabels(_connection: Connection, number: number, names: string[]) {
     if (this.failLabel) throw error('FORBIDDEN');
     const issue = this.issues.find((item) => item.number === number)!;
@@ -138,6 +150,33 @@ afterEach(async () => {
 const firstNote = async () => (await database.notes.toArray())[0]!;
 
 describe('durable synchronization', () => {
+  it('label deletion cleans pending drafts and baselines without deleting notes or restoring the label', async () => {
+    const label = { id: 21, name: 'Work', color: '123456', description: null };
+    client.labels = [label];
+    client.issues = [{ ...raw(doc()), labels: [label] }];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      { ...note.current, markdown: 'Unsynced draft' },
+      database,
+    );
+    await engine.updateLabel(label.id, { new_name: 'Team', color: 'abcdef' });
+    expect((await database.labels.get([connection.scopeId, label.id]))?.name).toBe('Team');
+    client.failLabel = true;
+    await expect(engine.deleteLabel(label.id)).rejects.toThrow('FORBIDDEN');
+    expect((await firstNote()).current.labelIds).toEqual([21]);
+    client.failLabel = false;
+    await engine.deleteLabel(label.id);
+    expect(await database.notes.count()).toBe(1);
+    expect((await firstNote()).current.labelIds).toEqual([]);
+    expect((await firstNote()).base?.labels).toEqual([]);
+    expect((await firstNote()).current.markdown).toBe('Unsynced draft');
+    await engine.flush(true);
+    expect(client.issues[0]?.labels).toEqual([]);
+    expect(client.issues[0]?.body).toContain('Unsynced draft');
+  });
   it('purges a locally trashed Issue using its fresh opaque node ID and clears local data', async () => {
     const remote = { ...raw(doc()), nodeId: 'I_kwDOopaqueNode' };
     client.issues = [remote];
@@ -737,22 +776,27 @@ describe('durable synchronization', () => {
     expect(await database.outbox.count()).toBe(0);
   });
 
-  it('recovers a lost POST response by UUID across every page without another POST', async () => {
-    client.issues = Array.from({ length: 110 }, (_, index) => raw(doc(), index + 1));
-    const draft = await createNote(connection.scopeId, doc(), database);
-    client.failCreateAfterWrite = true;
-    await engine.flush(true);
-    expect((await database.notes.get([connection.scopeId, draft.localId]))?.syncStatus).toBe('uncertain');
-    await engine.flush(true);
-    expect(client.creates).toBe(1);
-    engine.stop();
-    engine = new SyncEngine(database, client, connection);
-    await engine.pull(true);
-    expect((await database.notes.get([connection.scopeId, draft.localId]))?.issueNumber).toBe(111);
-    await engine.flush(true);
-    expect(client.creates).toBe(1);
-    expect(await database.outbox.count()).toBe(0);
-  });
+  // Paged scans of 110 issues sit close to the default limit once the suite runs in parallel.
+  it(
+    'recovers a lost POST response by UUID across every page without another POST',
+    { timeout: 12_000 },
+    async () => {
+      client.issues = Array.from({ length: 110 }, (_, index) => raw(doc(), index + 1));
+      const draft = await createNote(connection.scopeId, doc(), database);
+      client.failCreateAfterWrite = true;
+      await engine.flush(true);
+      expect((await database.notes.get([connection.scopeId, draft.localId]))?.syncStatus).toBe('uncertain');
+      await engine.flush(true);
+      expect(client.creates).toBe(1);
+      engine.stop();
+      engine = new SyncEngine(database, client, connection);
+      await engine.pull(true);
+      expect((await database.notes.get([connection.scopeId, draft.localId]))?.issueNumber).toBe(111);
+      await engine.flush(true);
+      expect(client.creates).toBe(1);
+      expect(await database.outbox.count()).toBe(0);
+    },
+  );
 
   it('keeps a newer input revision when the old PATCH response arrives', async () => {
     client.issues = [raw(doc())];

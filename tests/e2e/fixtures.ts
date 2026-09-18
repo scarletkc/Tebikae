@@ -155,6 +155,23 @@ export async function mockGitHub(
       }
       return send(state.labels);
     }
+    const labelMatch = /^\/repos\/scarletkc\/Tebikae-dev\/labels\/(.+)$/u.exec(path);
+    if (labelMatch) {
+      const label = state.labels.find((l) => l.name === decodeURIComponent(labelMatch[1]!));
+      if (!label) return send({ message: 'Not found' }, 404);
+      if (method === 'DELETE') {
+        state.labels = state.labels.filter((l) => l.id !== label.id);
+        for (const issue of state.issues) issue.labels = issue.labels.filter((l) => l.id !== label.id);
+        return route.fulfill({ status: 204, headers });
+      }
+      if (method === 'PATCH') {
+        if (typeof payload?.new_name === 'string') label.name = payload.new_name;
+        if (typeof payload?.color === 'string') label.color = payload.color;
+        for (const issue of state.issues)
+          issue.labels = issue.labels.map((l) => (l.id === label.id ? { ...label } : l));
+        return send(label);
+      }
+    }
     const match = /^\/repos\/scarletkc\/Tebikae-dev\/issues(?:\/(\d+))?(?:\/labels(?:\/(.*))?)?$/u.exec(path);
     if (!match) return send({ message: 'Unexpected mocked endpoint' }, 404);
     const number = match[1] ? Number(match[1]) : undefined;

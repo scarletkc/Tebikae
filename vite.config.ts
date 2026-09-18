@@ -68,6 +68,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        cacheId: 'tebikae',
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,json}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         navigateFallback: `${base}index.html`,

@@ -12,13 +12,20 @@ export default function NotesGrid({ children, list }: { children: ReactNode; lis
         if (card) item.style.gridRowEnd = `span ${Math.ceil(card.getBoundingClientRect().height + gap)}`;
       }
     };
-    const observer = new ResizeObserver(measure);
+    let frame = 0;
+    const observer = new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    });
     observer.observe(grid);
     for (const item of Array.from(grid.children)) {
       if (item.firstElementChild) observer.observe(item.firstElementChild);
     }
     measure();
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(frame);
+    };
   }, [children, list]);
   return (
     <div ref={ref} className={`notes-grid ${list ? 'notes-list' : 'notes-masonry'}`}>
