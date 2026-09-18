@@ -46,6 +46,26 @@ Mobile keyboards, input methods, and other device-specific behavior need verific
 - Inspect the screenshots for clipped text, overflow, overlap, alignment, and controls that are hard to see or reach. Describe the interactions you checked separately; a screenshot alone cannot verify keyboard navigation or that an action works.
 - Refresh the screenshots after follow-up commits change the UI they show. Use synthetic content and ensure screenshots contain no credentials or private data.
 
+Use `pnpm screenshots` to capture the built-in scenarios. If they do not cover your change, modify or add scenarios and mock data under `tests/screenshots/`; extend the shared helpers or configuration when needed. Passing the existing scenarios does not establish coverage of new UI or states. See the [screenshot guide](docs/screenshots.md) for focused commands, helper methods, and an example of adding a scenario.
+
+If you cannot upload screenshots in the browser and have push access to this repository, use [GitHub CLI attachments](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli). Check `gh pr comment --help` for `--attach` and upgrade `gh` if it is missing. Put captions and visual verification notes in `screenshots.md`, then replace `PR_NUMBER` and the image paths below:
+
+```sh
+gh pr comment PR_NUMBER --repo scarletkc/Tebikae --body-file screenshots.md --attach before.png --attach after.png
+```
+
+If you do not have push access here, upload the screenshots as attachments to an issue in your own public fork, then copy the uploaded image links into this PR. Replace `YOUR_USERNAME/Tebikae` with your fork, enable issues there if needed, and create the screenshot issue:
+
+```sh
+gh repo edit YOUR_USERNAME/Tebikae --enable-issues
+gh issue create --repo YOUR_USERNAME/Tebikae --title "Screenshots for Tebikae PR PR_NUMBER" --body-file screenshots.md --attach before.png --attach after.png
+gh issue view SCREENSHOT_ISSUE_NUMBER --repo YOUR_USERNAME/Tebikae --json body --jq .body
+```
+
+Use the issue number returned by `gh issue create` for `SCREENSHOT_ISSUE_NUMBER`. Save the Markdown printed by `gh issue view`, which contains the uploaded image URLs, as UTF-8 in `uploaded-screenshots.md`. Post it with `gh pr comment PR_NUMBER --repo scarletkc/Tebikae --body-file uploaded-screenshots.md` (without `--attach`) and verify that reviewers can open the images.
+
+Keep review screenshots out of Git commits and the PR's file changes. Do not create a separate branch just to host them.
+
 If you cannot capture the affected UI, explain the limitation and keep the PR in draft until screenshot verification is complete.
 
 ## Opening a pull request

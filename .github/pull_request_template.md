@@ -1,5 +1,7 @@
 <!-- Use a Conventional Commit title, such as fix(editor): preserve unsaved text. -->
 
+- [ ] I have carefully read the [contribution guide](https://github.com/scarletkc/Tebikae/blob/main/CONTRIBUTING.md).
+
 ## Background and rationale
 
 <!-- What problem does this address, or why is this change needed?
