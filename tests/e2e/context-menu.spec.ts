@@ -134,7 +134,10 @@ test('keyboard selection stays out of text fields and trash menus expose only re
   await page.keyboard.press('ControlOrMeta+A');
   await expect(page.locator('.note-card.is-selected')).toHaveCount(2);
   await page.locator('.sidebar').getByRole('link', { name: 'Trash', exact: true }).click();
-  await page.locator('.note-card').focus();
+  await expect(page.getByRole('heading', { level: 1, name: 'Trash' })).toBeVisible();
+  const trashCard = page.locator('.note-card', { hasText: 'Trash' });
+  await expect(trashCard).toBeVisible();
+  await trashCard.focus();
   await page.keyboard.press('Shift+F10');
   await expect(page.getByRole('menuitem', { name: 'Restore note', exact: true })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'Pin note', exact: true })).toHaveCount(0);
@@ -248,5 +251,7 @@ test('nested task list reads and toggles innermost task state', async ({ page, c
   await page.getByRole('menuitem', { name: 'Paragraph' }).hover();
   await expect(page.getByRole('menuitem', { name: 'Mark complete' })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: 'Mark incomplete' })).toHaveCount(0);
+  await editor.click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
   await closeDialog(page);
 });

@@ -48,6 +48,7 @@ test('update waiting preserves the open editor until the user saves and accepts 
 
 test('the settings force-update button clears caches, reloads and keeps the saved session', async ({
   page,
+  browserName,
 }) => {
   await mockGitHub(page.context());
   await connect(page);
@@ -55,24 +56,27 @@ test('the settings force-update button clears caches, reloads and keeps the save
 
   // Seed another app's cache and registration on the same origin.
   await page.evaluate(() => caches.open('another-app-user-content'));
-  await page.context().route('**/review-other-app/**', (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: 'application/javascript',
-      body: 'self.addEventListener("install", () => self.skipWaiting());',
-    }),
-  );
-  await page.evaluate(() =>
-    navigator.serviceWorker.register('/review-other-app/sw.js', { scope: '/review-other-app/' }),
-  );
-  await expect
-    .poll(async () =>
-      page.evaluate(async () => {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        return regs.some((r) => r.scope.includes('/review-other-app/'));
+  const supportsSwRouteMock = browserName === 'chromium';
+  if (supportsSwRouteMock) {
+    await page.context().route('**/review-other-app/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/javascript',
+        body: 'self.addEventListener("install", () => self.skipWaiting());',
       }),
-    )
-    .toBe(true);
+    );
+    await page.evaluate(() =>
+      navigator.serviceWorker.register('/review-other-app/sw.js', { scope: '/review-other-app/' }),
+    );
+    await expect
+      .poll(async () =>
+        page.evaluate(async () => {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          return regs.some((r) => r.scope.includes('/review-other-app/'));
+        }),
+      )
+      .toBe(true);
+  }
 
   await page.locator('.sidebar').getByRole('link', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Update Tebikae', exact: true }).click();
@@ -88,16 +92,25 @@ test('the settings force-update button clears caches, reloads and keeps the save
     .toBeGreaterThan(0);
   // Foreign cache and registration must survive the force update.
   expect(await page.evaluate(() => caches.has('another-app-user-content'))).toBe(true);
-  expect(
-    await page.evaluate(async () => {
-      const all = await navigator.serviceWorker.getRegistrations();
-      return all.some((r) => r.scope.includes('/review-other-app/'));
-    }),
-  ).toBe(true);
-  await expect
-    .poll(
-      async () => page.evaluate(() => navigator.serviceWorker.getRegistrations().then((all) => all.length)),
-      { timeout: 30_000 },
-    )
-    .toBe(2);
+  if (supportsSwRouteMock) {
+    expect(
+      await page.evaluate(async () => {
+        const all = await navigator.serviceWorker.getRegistrations();
+        return all.some((r) => r.scope.includes('/review-other-app/'));
+      }),
+    ).toBe(true);
+    await expect
+      .poll(
+        async () => page.evaluate(() => navigator.serviceWorker.getRegistrations().then((all) => all.length)),
+        { timeout: 30_000 },
+      )
+      .toBe(2);
+  } else {
+    await expect
+      .poll(
+        async () => page.evaluate(() => navigator.serviceWorker.getRegistrations().then((all) => all.length)),
+        { timeout: 30_000 },
+      )
+      .toBe(1);
+  }
 });
