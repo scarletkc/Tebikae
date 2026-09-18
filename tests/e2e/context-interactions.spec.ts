@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { connect, mockGitHub, mockIssue } from './fixtures';
 
 for (const width of [1280, 390, 320]) {
-  test(`long label keeps count and toggle visible at ${width}px`, async ({ page, context }) => {
+  test(`long label keeps count stable and enters selection mode at ${width}px`, async ({ page, context }) => {
     await page.setViewportSize({ width, height: 844 });
     const remote = await mockGitHub(context);
     remote.labels[0]!.name = '非常长的标签名称用于验证单行省略和固定侧栏宽度'.repeat(3);
@@ -14,13 +14,11 @@ for (const width of [1280, 390, 320]) {
     const layout = await row.evaluate((element) => {
       const name = element.querySelector<HTMLElement>('.label-name')!;
       const count = element.querySelector<HTMLElement>('.label-count')!;
-      const toggle = element.querySelector<HTMLElement>('.label-filter-toggle')!;
       const nav = element.closest('.label-nav')!;
       return {
         row: element.getBoundingClientRect().toJSON(),
         name: name.getBoundingClientRect().toJSON(),
         count: count.getBoundingClientRect().toJSON(),
-        toggle: toggle.getBoundingClientRect().toJSON(),
         truncated: name.scrollWidth > name.clientWidth,
         ellipsis: getComputedStyle(name).textOverflow,
         rowOverflow: element.scrollWidth > element.clientWidth,
@@ -32,9 +30,32 @@ for (const width of [1280, 390, 320]) {
     expect(layout.rowOverflow).toBe(false);
     expect(layout.navOverflow).toBe(false);
     expect(layout.name.right).toBeLessThanOrEqual(layout.count.left);
-    expect(layout.count.right).toBeLessThanOrEqual(layout.toggle.left);
-    expect(layout.toggle.right).toBeLessThanOrEqual(layout.row.right + 1);
-    expect(layout.row.right - layout.toggle.right).toBeLessThanOrEqual(1);
+    await expect(row.locator('.label-filter-toggle')).toHaveCount(0);
+    await row.getByRole('button').first().click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Select', exact: true }).click();
+    await expect(row.locator('.label-filter-toggle')).toBeVisible();
+    if (width === 1280 || width === 390)
+      await page.screenshot({ path: `.artifacts/issue14-label-selection-${width}.png` });
+    const selectionLayout = await row.evaluate((element) => {
+      const name = element.querySelector<HTMLElement>('.label-name')!;
+      const count = element.querySelector<HTMLElement>('.label-count')!;
+      const toggle = element.querySelector<HTMLElement>('.label-filter-toggle')!;
+      return {
+        name: name.getBoundingClientRect().toJSON(),
+        count: count.getBoundingClientRect().toJSON(),
+        toggle: toggle.getBoundingClientRect().toJSON(),
+        row: element.getBoundingClientRect().toJSON(),
+        rowOverflow: element.scrollWidth > element.clientWidth,
+        navOverflow: element.closest('.label-nav')!.scrollWidth > element.closest('.label-nav')!.clientWidth,
+      };
+    });
+    expect(selectionLayout.rowOverflow).toBe(false);
+    expect(selectionLayout.navOverflow).toBe(false);
+    expect(selectionLayout.name.right).toBeLessThanOrEqual(selectionLayout.count.left);
+    expect(selectionLayout.count.right).toBeLessThanOrEqual(selectionLayout.toggle.left);
+    expect(selectionLayout.toggle.right).toBeLessThanOrEqual(selectionLayout.row.right + 1);
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await expect(row.locator('.label-filter-toggle')).toHaveCount(0);
     await expect(page.locator('.context-more')).toHaveCount(0);
   });
 }
@@ -50,6 +71,77 @@ test('blank list offers new note but card context never bubbles into it', async 
   await page.locator('.note-card').first().click({ button: 'right' });
   await expect(page.getByRole('menuitem', { name: 'Select', exact: true })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'New note', exact: true })).toHaveCount(0);
+});
+
+test('workspace controls expose their issue menus and suppress undefined native menus', async ({
+  page,
+  context,
+}) => {
+  await mockGitHub(context);
+  await connect(page);
+
+  await page.getByRole('button', { name: 'New note', exact: true }).click({ button: 'right' });
+  await expect(page.getByRole('menuitem', { name: 'New note', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'New checklist', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  const search = page.getByRole('textbox', { name: 'Search your notes', exact: true });
+  await search.click({ button: 'right' });
+  await expect(page.getByRole('menuitem', { name: 'Cut', exact: true })).toHaveAttribute('data-disabled', '');
+  await expect(page.getByRole('menuitem', { name: 'Copy', exact: true })).toHaveAttribute(
+    'data-disabled',
+    '',
+  );
+  await expect(page.getByRole('menuitem', { name: 'Paste', exact: true })).not.toHaveAttribute(
+    'data-disabled',
+  );
+  await expect(page.getByRole('menuitem', { name: 'Clear', exact: true })).toHaveAttribute(
+    'data-disabled',
+    '',
+  );
+  await page.screenshot({ path: '.artifacts/issue14-search-menu.png' });
+  await page.keyboard.press('Escape');
+  await search.fill('weekend');
+  await search.click({ button: 'right' });
+  await expect(page.getByRole('menuitem', { name: 'Clear', exact: true })).not.toHaveAttribute(
+    'data-disabled',
+  );
+  await page.getByRole('menuitem', { name: 'Clear', exact: true }).click();
+  await expect(search).toHaveValue('');
+
+  await page.getByRole('button', { name: 'Grid view', exact: true }).click({ button: 'right' });
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Grid view', exact: true })).toHaveAttribute(
+    'aria-checked',
+    'true',
+  );
+  await page.getByRole('menuitemcheckbox', { name: 'List view', exact: true }).click();
+  await expect(page.locator('.notes-list')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Language', exact: true }).click({ button: 'right' });
+  await expect(page.getByRole('menuitemcheckbox', { name: 'English', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitemcheckbox', { name: '简体中文', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.getByRole('button', { name: 'Follow system', exact: true }).click({ button: 'right' });
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Follow system', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Light', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Dark', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  await page.locator('.repository-pill').click({ button: 'right' });
+  await expect(
+    page.getByRole('menuitem', { name: 'Switch / reconnect repository…', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Open on GitHub', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Copy', exact: true })).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  const prevented = await page.locator('.workspace-footer').evaluate((element) => {
+    const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
+    element.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  expect(prevented).toBe(true);
 });
 
 test('touch cancellation handles up cancel scrolling and motion outside target', async ({

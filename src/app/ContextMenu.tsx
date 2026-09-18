@@ -1,18 +1,83 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { useRef, useState, type ReactNode } from 'react';
+import { type LucideIcon } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { isNativeText, useLongPress } from './LongPressTrigger';
 import './menus.css';
 
 export interface MenuAction {
   label: string;
+  icon?: LucideIcon;
   run?: () => void;
   disabled?: boolean;
   danger?: boolean;
   checked?: boolean | 'indeterminate';
+  keepOpen?: boolean;
   children?: MenuAction[];
   separator?: boolean;
   swatch?: string;
+}
+
+function Icon({ icon: IconComponent, swatch }: Pick<MenuAction, 'icon' | 'swatch'>) {
+  if (swatch !== undefined)
+    return (
+      <span className="context-icon context-swatch" style={{ backgroundColor: swatch }} aria-hidden="true" />
+    );
+  return IconComponent ? (
+    <IconComponent className="context-icon" size={16} strokeWidth={1.8} aria-hidden="true" />
+  ) : null;
+}
+
+function readTransform(transform: string) {
+  const match = transform.match(/^matrix(3d)?\((.+)\)$/);
+  if (!match) return null;
+  const values = match[2]!.split(',').map(Number);
+  return match[1] ? { x: values[12] ?? 0, y: values[13] ?? 0 } : { x: values[4] ?? 0, y: values[5] ?? 0 };
+}
+
+function SubContent({ items }: { items: MenuAction[] }) {
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const content = contentRef.current;
+    const wrapper = content?.parentElement;
+    if (!content || !wrapper) return;
+
+    let frame: number | null = null;
+    const clamp = () => {
+      frame = null;
+      const rect = content.getBoundingClientRect();
+      const padding = 8;
+      const right = window.innerWidth - padding;
+      const shift = rect.left < padding ? padding - rect.left : rect.right > right ? right - rect.right : 0;
+      if (!shift) return;
+      const translation = readTransform(getComputedStyle(wrapper).transform);
+      if (!translation) return;
+      wrapper.style.transform = `translate3d(${translation.x + shift}px, ${translation.y}px, 0)`;
+    };
+    const schedule = () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(clamp);
+    };
+    const mutationObserver = new MutationObserver(schedule);
+    mutationObserver.observe(wrapper, { attributes: true, attributeFilter: ['style'] });
+    const resizeObserver = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(schedule);
+    resizeObserver?.observe(content);
+    window.addEventListener('resize', schedule);
+    schedule();
+    return () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      mutationObserver.disconnect();
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize', schedule);
+    };
+  }, []);
+
+  return (
+    <Menu.SubContent ref={contentRef} className="context-menu context-submenu" collisionPadding={8}>
+      <Items items={items} />
+    </Menu.SubContent>
+  );
 }
 
 function Items({ items }: { items: MenuAction[] }) {
@@ -22,15 +87,14 @@ function Items({ items }: { items: MenuAction[] }) {
       {item.children ? (
         <Menu.Sub>
           <Menu.SubTrigger className="context-item" disabled={item.disabled}>
+            <Icon icon={item.icon} swatch={item.swatch} />
             {item.label}
             <span className="context-arrow" aria-hidden>
               ›
             </span>
           </Menu.SubTrigger>
           <Menu.Portal>
-            <Menu.SubContent className="context-menu" collisionPadding={8}>
-              <Items items={item.children} />
-            </Menu.SubContent>
+            <SubContent items={item.children} />
           </Menu.Portal>
         </Menu.Sub>
       ) : item.checked !== undefined ? (
@@ -39,16 +103,11 @@ function Items({ items }: { items: MenuAction[] }) {
           checked={item.checked}
           disabled={item.disabled}
           onSelect={(e) => {
-            e.preventDefault();
+            if (item.keepOpen !== false) e.preventDefault();
             item.run?.();
           }}
         >
-          <span className="context-check" aria-hidden>
-            {item.checked === 'indeterminate' ? '▣' : item.checked ? '✓' : ''}
-          </span>
-          {item.swatch && (
-            <span className="context-swatch" style={{ backgroundColor: item.swatch }} aria-hidden />
-          )}
+          <Icon icon={item.icon} swatch={item.swatch} />
           {item.label}
         </Menu.CheckboxItem>
       ) : (
@@ -57,6 +116,7 @@ function Items({ items }: { items: MenuAction[] }) {
           disabled={item.disabled}
           onSelect={item.run}
         >
+          <Icon icon={item.icon} swatch={item.swatch} />
           {item.label}
         </Menu.Item>
       )}
@@ -72,10 +132,12 @@ export function ContextMenu({
   onPrepare,
   className = '',
   triggerLabel,
+  contextName = 'custom',
   acceptTarget = () => true,
 }: {
   triggerLabel?: string;
   className?: string;
+  contextName?: string;
   children: ReactNode;
   items: MenuAction[];
   allowText?: boolean;
@@ -100,6 +162,7 @@ export function ContextMenu({
     >
       <div
         className={`context-target ${className}`}
+        data-context-menu={contextName}
         onContextMenu={(e) => {
           if (e.defaultPrevented || (!items.length && !onPrepare) || !acceptTarget(e.target)) return;
           if ((!allowText || press.touch.current) && isNativeText(e.target)) return;

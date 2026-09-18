@@ -1,5 +1,20 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  Bold,
+  ClipboardPaste,
+  Code,
+  Copy,
+  Eraser,
+  Italic,
+  Link,
+  List,
+  Redo2,
+  Scissors,
+  Strikethrough,
+  Type,
+  Undo2,
+} from 'lucide-react';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
 
 /** Uses native text editing so selection, IME and browser undo remain intact. */
@@ -7,10 +22,16 @@ export function TextContextMenu({
   children,
   markdown = false,
   readOnly = false,
+  clearLabel,
+  clearDisabled = false,
+  onClear,
 }: {
   children: ReactNode;
   markdown?: boolean;
   readOnly?: boolean;
+  clearLabel?: string;
+  clearDisabled?: boolean;
+  onClear?: () => void;
 }) {
   const { t } = useTranslation();
   const root = useRef<HTMLDivElement>(null);
@@ -61,14 +82,16 @@ export function TextContextMenu({
     document.execCommand('insertText', false, `${left}${text}${right}`);
   };
   const items: MenuAction[] = [
-    ...(hasSelection
-      ? [
-          { label: t('context.cut'), disabled: readOnly, run: () => void copy(true) },
-          { label: t('context.copy'), run: () => void copy() },
-        ]
-      : []),
+    {
+      label: t('context.cut'),
+      icon: Scissors,
+      disabled: readOnly || !hasSelection,
+      run: () => void copy(true),
+    },
+    { label: t('context.copy'), icon: Copy, disabled: !hasSelection, run: () => void copy() },
     {
       label: t('context.paste'),
+      icon: ClipboardPaste,
       disabled: readOnly,
       run: () => {
         if (readOnly) return;
@@ -89,13 +112,21 @@ export function TextContextMenu({
           .catch(() => setError(true));
       },
     },
-    ...(!hasSelection
+    {
+      label: t('context.allText'),
+      icon: List,
+      separator: true,
+      run: () => {
+        restore()?.select();
+      },
+    },
+    ...(onClear
       ? [
           {
-            label: t('context.allText'),
-            run: () => {
-              restore()?.select();
-            },
+            label: clearLabel ?? t('context.clear'),
+            icon: Eraser,
+            disabled: clearDisabled,
+            run: onClear,
           },
         ]
       : []),
@@ -103,20 +134,26 @@ export function TextContextMenu({
       ? [
           {
             label: t('editor.formatMenu'),
+            icon: Type,
             separator: true,
             disabled: readOnly,
             children: [
-              { label: t('editor.bold'), run: () => wrap('**') },
-              { label: t('editor.italic'), run: () => wrap('*') },
-              { label: t('editor.strike'), run: () => wrap('~~') },
-              { label: t('editor.inlineCode'), run: () => wrap('`') },
-              { label: t('editor.link'), run: () => wrap('[', '](https://)') },
+              { label: t('editor.bold'), icon: Bold, run: () => wrap('**') },
+              { label: t('editor.italic'), icon: Italic, run: () => wrap('*') },
+              { label: t('editor.strike'), icon: Strikethrough, run: () => wrap('~~') },
+              { label: t('editor.inlineCode'), icon: Code, run: () => wrap('`') },
+              {
+                label: t('editor.menu.link', { defaultValue: t('editor.link') }),
+                icon: Link,
+                run: () => wrap('[', '](https://)'),
+              },
             ],
           },
         ]
       : []),
     {
       label: t('editor.undo'),
+      icon: Undo2,
       disabled: readOnly,
       separator: true,
       run: () => {
@@ -126,6 +163,7 @@ export function TextContextMenu({
     },
     {
       label: t('editor.redo'),
+      icon: Redo2,
       disabled: readOnly,
       run: () => {
         restore();
