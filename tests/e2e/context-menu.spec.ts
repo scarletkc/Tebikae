@@ -23,6 +23,7 @@ test('card menu, mixed bulk labels and filtered selection persist through sync',
   await mixed.click();
   await expect(mixed).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('Escape');
+  await expect(cards.first().locator('.note-open')).toBeFocused();
   await page.keyboard.press('Escape');
   await expect
     .poll(() =>
