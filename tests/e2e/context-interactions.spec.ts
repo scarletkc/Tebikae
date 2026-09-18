@@ -142,6 +142,41 @@ test('workspace controls expose their issue menus and suppress undefined native 
     return event.defaultPrevented;
   });
   expect(prevented).toBe(true);
+  const shiftAllowed = await page
+    .locator('.note-card')
+    .first()
+    .evaluate((element) => {
+      const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true, shiftKey: true });
+      element.dispatchEvent(event);
+      return event.defaultPrevented;
+    });
+  expect(shiftAllowed).toBe(false);
+  await expect(page.getByRole('menu')).toHaveCount(0);
+});
+
+test('navigation context menus clear note selection state', async ({ page, context }) => {
+  await mockGitHub(context);
+  await connect(page);
+  await page
+    .locator('.note-card')
+    .first()
+    .locator('.note-open')
+    .click({ modifiers: ['ControlOrMeta'] });
+  await expect(page.getByRole('toolbar', { name: 'Note selection' })).toBeVisible();
+
+  const openNavigation = async (href: string) => {
+    const link = page.locator(`a[href$="${href}"]`);
+    await link.click({ button: 'right' });
+    await page.getByRole('menuitem', { name: 'Open', exact: true }).click();
+  };
+  await openNavigation('#/archive');
+  await expect(page).toHaveURL(/#\/archive$/u);
+  await expect(page.getByRole('toolbar', { name: 'Note selection' })).toHaveCount(0);
+  await openNavigation('#/notes');
+  await expect(page).toHaveURL(/#\/notes$/u);
+  await expect(page.getByRole('toolbar', { name: 'Note selection' })).toHaveCount(0);
+  await page.locator('.note-card').first().locator('.note-open').click();
+  await expect(page.getByRole('dialog')).toBeVisible();
 });
 
 test('touch cancellation handles up cancel scrolling and motion outside target', async ({

@@ -67,7 +67,12 @@ function restoreFilters(scope: string): NoteFilters {
   return structuredClone(defaultFilters);
 }
 
-function preventUndefinedContextMenu(event: { target: EventTarget | null; preventDefault(): void }) {
+function preventUndefinedContextMenu(event: {
+  target: EventTarget | null;
+  shiftKey: boolean;
+  preventDefault(): void;
+}) {
+  if (event.shiftKey) return;
   const target = event.target;
   if (
     target instanceof Element &&
@@ -206,6 +211,13 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   }, [notes, activeFilters, labels]);
   const multi = useNoteSelection(result.notes.map((note) => note.localId));
   const selectedNotes = result.notes.filter((note) => multi.isSelected(note.localId));
+  const resetNavigationState = () => {
+    multi.clear();
+    setLabelSelectionMode(false);
+    setSelectedLabelIds([]);
+    setDrawer(false);
+    setLimit(100);
+  };
   async function mutateNotes(targets: LocalNote[], edit: (doc: NoteDocument) => void) {
     if (!session.writable || targets.some((note) => !canEditNote(note))) return;
     try {
@@ -330,12 +342,18 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     )
       return;
     setBusy(true);
+    let firstError: unknown;
     try {
-      for (const note of trashed) await session.engine.destroy(note.localId);
-    } catch (error) {
-      report(error);
+      for (const note of trashed) {
+        try {
+          await session.engine.destroy(note.localId);
+        } catch (error) {
+          firstError ??= error;
+        }
+      }
     } finally {
       setBusy(false);
+      if (firstError) report(firstError);
     }
   }
   async function refresh() {
@@ -513,8 +531,8 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
               label: t('action.open'),
               icon: FolderOpen,
               run: () => {
+                resetNavigationState();
                 navigate(`/${name}`);
-                setDrawer(false);
               },
             },
             ...(name === 'notes'
@@ -551,11 +569,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
               <NavLink
                 to={`/${name}`}
                 onClick={() => {
-                  multi.clear();
-                  setLabelSelectionMode(false);
-                  setSelectedLabelIds([]);
-                  setDrawer(false);
-                  setLimit(100);
+                  resetNavigationState();
                 }}
                 className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               >

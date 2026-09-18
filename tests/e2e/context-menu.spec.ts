@@ -18,6 +18,8 @@ test('card menu, mixed bulk labels and filtered selection persist through sync',
   await page.getByRole('menuitem', { name: 'Labels', exact: true }).hover();
   const mixed = page.getByRole('menuitemcheckbox', { name: 'Personal', exact: true });
   await expect(mixed).toHaveAttribute('aria-checked', 'mixed');
+  await expect(mixed).toHaveCSS('font-weight', '600');
+  await expect(mixed).toHaveCSS('text-decoration-style', 'dashed');
   await mixed.click();
   await expect(mixed).toHaveAttribute('aria-checked', 'true');
   await page.keyboard.press('Escape');
@@ -189,6 +191,24 @@ test('keyboard selection stays out of text fields and trash menus expose only re
   await expect(page.getByRole('menuitem', { name: 'Pin note', exact: true })).toHaveCount(0);
   await page.getByRole('menuitem', { name: 'Restore note', exact: true }).click();
   await expect(page.locator('.note-card')).toHaveCount(0);
+});
+
+test('clearing trash continues after an individual deletion fails', async ({ page, context }) => {
+  const remote = await mockGitHub(context, [
+    mockIssue(10, 'First trashed note', 'Deleted first', { trashedAt: '2026-09-17T00:00:00Z' }),
+    mockIssue(11, 'Second trashed note', 'Deleted second', { trashedAt: '2026-09-17T00:00:00Z' }),
+  ]);
+  await connect(page);
+  await page.locator('a[href$="#/trash"]').click();
+  await page.locator('a[href$="#/trash"]').click({ button: 'right' });
+  await expect(page.getByRole('menuitem', { name: 'Empty trash', exact: true })).toBeVisible();
+  remote.failNextDeleteIssue = true;
+  page.once('dialog', async (dialog) => {
+    expect(dialog.message()).toBe('Permanently delete 2 trashed notes? This cannot be undone.');
+    await dialog.accept();
+  });
+  await page.getByRole('menuitem', { name: 'Empty trash', exact: true }).click();
+  await expect.poll(() => remote.issues.length).toBe(1);
 });
 
 test('visual selection, title and table menus operate on the correct context', async ({ page, context }) => {

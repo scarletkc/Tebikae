@@ -343,7 +343,7 @@
     "rename": "重命名",
     "deleteLabel": "删除",
     "deleteLabelConfirm": "删除「{{name}}」标签？该标签会从 {{count}} 条笔记中移除，笔记本身不会被删除。",
-    "clearTrashConfirm": "永久删除回收站中的 {{count}} 条笔记？此操作无法撤销。",
+    "clearTrashConfirm_other": "永久删除回收站中的 {{count}} 条笔记？此操作无法撤销。",
     "removeLabel": "移除标签",
     "apply": "应用",
     "toggleFilter": "将「{{name}}」加入或移出组合筛选",

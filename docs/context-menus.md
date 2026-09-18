@@ -14,7 +14,7 @@
 - 标签普通状态只显示颜色、名称和数量，不显示 `＋`。右键或长按标签后选择“选择”进入组合筛选模式；触发标签自动选中，随后点击其他标签整行或 `＋ / ✓` 连续选择，点击“完成”一次性应用 AND 筛选。多选模式期间标签菜单只提供选择／取消选择，不提供标签管理操作。
 - 新建、笔记／归档／回收站导航、视图、仓库、刷新、语言、主题和设置控件均提供对应的右键／长按菜单；回收站清空必须确认。搜索框菜单保留剪切、复制、粘贴和原生快捷键，并提供全选与清空搜索。
 - 工作区未定义菜单的区域会阻止浏览器原生右键菜单；输入框、正文编辑器和移动端文字选择不使用全局 `user-select: none` 或禁用系统文字选择。
-- 自定义菜单项使用语义化 Lucide 图标和短标签；笔记颜色和标签选择子菜单直接显示对应颜色圆点；可选项保留 `aria-checked` 语义，选中项以加粗并加下划线突出显示，不再额外显示勾号。编辑器的“分割线”使用 `Minus` 图标。菜单控制在较窄宽度内，子菜单通过 Radix 碰撞定位并在横向越界时二次约束到视口内，避免窄屏下向左翻转后被裁切。
+- 自定义菜单项使用语义化 Lucide 图标和短标签；笔记颜色和标签选择子菜单直接显示对应颜色圆点；可选项保留 `aria-checked` 语义，选中项以加粗并加下划线突出显示，部分选中项使用半粗虚线下划线，不再额外显示勾号。编辑器的“分割线”使用 `Minus` 图标。菜单控制在较窄宽度内，子菜单通过 Radix 碰撞定位并在横向越界时二次约束到视口内，避免窄屏下向左翻转后被裁切。
 - 标签 Badge 的“从此笔记移除”与全局删除分组。全局删除确认显示本地笔记中受影响的数量，不删除笔记。标签管理需要在线且可写；笔记元数据仍通过本地 outbox 同步。
 
 ## 实现边界
@@ -31,7 +31,7 @@
 pnpm typecheck
 pnpm lint
 pnpm exec vitest run --maxWorkers=2 --testTimeout=20000
-pnpm exec playwright test tests/e2e/context-menu.spec.ts tests/e2e/editor.spec.ts tests/e2e/note-layout.spec.ts --project=chromium --workers=2
+pnpm exec playwright test tests/e2e/context-menu.spec.ts tests/e2e/context-interactions.spec.ts tests/e2e/editor.spec.ts tests/e2e/note-layout.spec.ts --project=chromium --workers=2
 pnpm build
 ```
 

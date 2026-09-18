@@ -120,6 +120,13 @@
   text-decoration-thickness: 1.5px;
   text-underline-offset: 3px;
 }
+.context-item[data-state='indeterminate'] {
+  font-weight: 600;
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
 .context-arrow {
   margin-left: auto;
 }
