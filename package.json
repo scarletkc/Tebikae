@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "test:pwa": "playwright test --config playwright.pwa.config.ts",
+    "screenshots": "playwright test --config playwright.screenshots.config.ts",
     "build": "pnpm typecheck && vite build",
     "preview": "vite preview --host 127.0.0.1"
   },

@@ -36,6 +36,12 @@ pnpm test:e2e tests/e2e/notes.spec.ts --project=chromium
 
 Vitest 使用真实 Markdown 解析、Milkdown、fake-indexeddb 和 MSW 验证逻辑与请求失败场景。Playwright 用测试响应替代 GitHub API，不写入远端仓库。历史验证结果及剩余手工项目见[验收记录](acceptance.md)。
 
+### UI 截图
+
+`pnpm screenshots` 自动启动本地应用并用模拟数据生成截图。按改动筛选场景、保存修改前后结果，以及修改或增加截图脚本的方法见 [UI 截图指南](screenshots.md)。现有场景不足时，应补充覆盖实际改动的页面和状态。
+
+### 品牌图标
+
 品牌图标统一使用 `public/icon.svg` 的折角纸张与 T 图形。连接页、侧栏、手机导航和 favicon 直接引用这份 SVG；PWA 的 192px／512px 图标由它生成。不同主题保留品牌图标自身的配色，功能按钮继续使用各自的操作图标。
 
 修改 SVG 后执行 `node scripts/generate-icons.mjs` 重新生成 PWA 图标，需要已安装 Playwright Chromium。

@@ -46,6 +46,8 @@ Mobile keyboards, input methods, and other device-specific behavior need verific
 - Inspect the screenshots for clipped text, overflow, overlap, alignment, and controls that are hard to see or reach. Describe the interactions you checked separately; a screenshot alone cannot verify keyboard navigation or that an action works.
 - Refresh the screenshots after follow-up commits change the UI they show. Use synthetic content and ensure screenshots contain no credentials or private data.
 
+Use `pnpm screenshots` to capture the built-in scenarios. If they do not cover your change, modify or add scenarios and mock data under `tests/screenshots/`; extend the shared helpers or configuration when needed. Passing the existing scenarios does not establish coverage of new UI or states. See the [screenshot guide](docs/screenshots.md) for focused commands, helper methods, and an example of adding a scenario.
+
 If you cannot capture the affected UI, explain the limitation and keep the PR in draft until screenshot verification is complete.
 
 ## Opening a pull request
