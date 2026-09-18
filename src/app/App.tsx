@@ -6,12 +6,17 @@ import * as Dialog from '@radix-ui/react-dialog';
 import {
   Archive,
   ArrowUpRight,
+  CheckSquare,
+  Copy,
   FileText,
+  FolderOpen,
   GitBranch,
   Grid2X2,
+  Link,
   List,
   Menu,
   NotebookPen,
+  Pencil,
   Plus,
   RefreshCw,
   Search,
@@ -35,6 +40,7 @@ import { ContextMenu, type MenuAction } from './ContextMenu';
 import { useNoteSelection } from '../features/notes/useNoteSelection';
 import { noteActions, canEditNote } from '../features/notes/actions';
 import { LabelContextMenu } from '../features/labels/LabelContextMenu';
+import { TextContextMenu } from '../features/editor/TextContextMenu';
 import { summarizeNoteStatuses } from './note-status';
 import { convertIssue, saveEditedNote } from '../application/commands';
 import { ApiError } from '../adapters/github/client';
@@ -60,12 +66,38 @@ function restoreFilters(scope: string): NoteFilters {
   }
   return structuredClone(defaultFilters);
 }
+
+function preventUndefinedContextMenu(event: {
+  target: EventTarget | null;
+  shiftKey: boolean;
+  preventDefault(): void;
+}) {
+  if (event.shiftKey) return;
+  const target = event.target;
+  if (
+    target instanceof Element &&
+    target.closest(
+      '[role="menu"], [role="dialog"], input, textarea, [contenteditable]:not([contenteditable="false"])',
+    )
+  )
+    return;
+  event.preventDefault();
+}
+
 export default function App() {
   const session = useSession();
   const { t } = useTranslation();
   const [offlineReady, setOfflineReady] = useState(false);
   const [updateReady, setUpdateReady] = useState(false);
   const update = useRef<(reload?: boolean) => Promise<void>>(async () => {});
+  useEffect(() => {
+    const handle = (event: MouseEvent) => {
+      if (event.defaultPrevented) return;
+      preventUndefinedContextMenu(event);
+    };
+    document.addEventListener('contextmenu', handle);
+    return () => document.removeEventListener('contextmenu', handle);
+  }, []);
   useEffect(() => {
     let active = true;
     update.current = registerSW({
@@ -149,6 +181,8 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [labelOpen, setLabelOpen] = useState(false);
+  const [labelSelectionMode, setLabelSelectionMode] = useState(false);
+  const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>([]);
   const [drawer, setDrawer] = useState(false);
   const [labelName, setLabelName] = useState('');
   const [labelColor, setLabelColor] = useState('#62836a');
@@ -177,6 +211,13 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   }, [notes, activeFilters, labels]);
   const multi = useNoteSelection(result.notes.map((note) => note.localId));
   const selectedNotes = result.notes.filter((note) => multi.isSelected(note.localId));
+  const resetNavigationState = () => {
+    multi.clear();
+    setLabelSelectionMode(false);
+    setSelectedLabelIds([]);
+    setDrawer(false);
+    setLimit(100);
+  };
   async function mutateNotes(targets: LocalNote[], edit: (doc: NoteDocument) => void) {
     if (!session.writable || targets.some((note) => !canEditNote(note))) return;
     try {
@@ -208,6 +249,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
         ...actions,
         {
           label: t('action.deleteForever'),
+          icon: Trash2,
           danger: true,
           separator: true,
           disabled: targets.length > 1 || !session.writable || !session.engine || !online || busy,
@@ -217,10 +259,11 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     if (targets.length > 1) return actions;
     const trash = actions.pop()!;
     return [
-      { label: t('action.edit'), run: () => openNote(note) },
+      { label: t('action.edit'), icon: Pencil, run: () => openNote(note) },
       ...actions,
       {
         label: t('context.copyContent'),
+        icon: Copy,
         separator: true,
         run: () => void navigator.clipboard.writeText(note.current.markdown).catch(report),
       },
@@ -228,11 +271,12 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
         ? [
             {
               label: t('context.copyNoteLink'),
+              icon: Link,
               run: () => void navigator.clipboard.writeText(note.base!.url).catch(report),
             },
           ]
         : []),
-      { label: t('context.select'), run: () => multi.select(note.localId) },
+      { label: t('context.select'), icon: CheckSquare, run: () => multi.select(note.localId) },
       trash,
     ];
   }
@@ -263,9 +307,9 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       window.removeEventListener('offline', update);
     };
   }, []);
-  function newNote() {
+  function newNote(kind: NoteKind = 'markdown') {
     setSelection({
-      kind: 'markdown',
+      kind,
       ids: [],
       labelIds: filters.unlabeledOnly
         ? []
@@ -284,6 +328,32 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       report(error);
     } finally {
       setBusy(false);
+    }
+  }
+  async function clearTrash() {
+    const trashed = notes.filter((note) => note.current.meta.trashedAt !== null);
+    if (
+      !trashed.length ||
+      !session.writable ||
+      !session.engine ||
+      !online ||
+      busy ||
+      !confirm(t('context.clearTrashConfirm', { count: trashed.length }))
+    )
+      return;
+    setBusy(true);
+    let firstError: unknown;
+    try {
+      for (const note of trashed) {
+        try {
+          await session.engine.destroy(note.localId);
+        } catch (error) {
+          firstError ??= error;
+        }
+      }
+    } finally {
+      setBusy(false);
+      if (firstError) report(firstError);
     }
   }
   async function refresh() {
@@ -317,6 +387,26 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   function openWithSequence(note: LocalNote) {
     session.engine?.setEditing(note.localId, true);
     setSelection((old) => ({ id: note.localId, ids: old?.ids || [], initial: note }));
+  }
+  function startLabelSelection(labelId: number) {
+    setLabelSelectionMode(true);
+    setSelectedLabelIds([labelId]);
+  }
+  function toggleLabelSelection(labelId: number) {
+    setSelectedLabelIds((current) =>
+      current.includes(labelId) ? current.filter((id) => id !== labelId) : [...current, labelId],
+    );
+  }
+  function finishLabelSelection() {
+    setFilters({
+      ...filters,
+      unlabeledOnly: false,
+      labelMatch: 'all',
+      labelIds: [...selectedLabelIds],
+    });
+    setLabelSelectionMode(false);
+    setSelectedLabelIds([]);
+    if (route === 'settings' || route === 'issues') navigate('/notes');
   }
   async function createLabel() {
     if (!session.engine || !labelName.trim()) return;
@@ -427,82 +517,152 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     ['archive', Archive],
     ['trash', Trash2],
   ] as const;
+  const repositoryName = `${connection.owner}/${connection.repo}`;
+  const repositoryUrl = safeHref(`https://github.com/${repositoryName}`);
   const nav = (
     <>
       <div className="sidebar-brand">
         <Brand />
       </div>
       <nav className="main-nav">
-        {navItems.map(([name, Icon]) => (
-          <NavLink
-            key={name}
-            to={`/${name}`}
-            onClick={() => {
-              multi.clear();
-              setDrawer(false);
-              setLimit(100);
-            }}
-            className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-          >
-            <Icon size={19} />
-            <span>{t(`nav.${name}`)}</span>
-            {name === 'notes' && (
-              <span className="nav-count">
-                {notes.filter((n) => !n.current.archived && !n.current.meta.trashedAt).length}
-              </span>
-            )}
-          </NavLink>
-        ))}
+        {navItems.map(([name, Icon]) => {
+          const items: MenuAction[] = [
+            {
+              label: t('action.open'),
+              icon: FolderOpen,
+              run: () => {
+                resetNavigationState();
+                navigate(`/${name}`);
+              },
+            },
+            ...(name === 'notes'
+              ? [
+                  {
+                    label: t('action.new'),
+                    icon: Plus,
+                    separator: true,
+                    disabled: !session.writable,
+                    run: () => newNote(),
+                  },
+                ]
+              : []),
+            ...(name === 'trash'
+              ? [
+                  {
+                    label: t('action.clearTrash'),
+                    icon: Trash2,
+                    separator: true,
+                    danger: true,
+                    disabled:
+                      !notes.some((note) => note.current.meta.trashedAt !== null) ||
+                      !session.writable ||
+                      !session.engine ||
+                      !online ||
+                      busy,
+                    run: () => void clearTrash(),
+                  },
+                ]
+              : []),
+          ];
+          return (
+            <ContextMenu key={name} contextName={`navigation-${name}`} items={items}>
+              <NavLink
+                to={`/${name}`}
+                onClick={() => {
+                  resetNavigationState();
+                }}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+              >
+                <Icon size={19} />
+                <span>{t(`nav.${name}`)}</span>
+                {name === 'notes' && (
+                  <span className="nav-count">
+                    {notes.filter((n) => !n.current.archived && !n.current.meta.trashedAt).length}
+                  </span>
+                )}
+              </NavLink>
+            </ContextMenu>
+          );
+        })}
       </nav>
       <div className="labels-heading">
         <h2>{t('nav.labels')}</h2>
-        <IconButton
-          label={t('label.new')}
-          disabled={!session.engine || !session.writable}
-          onClick={() => setLabelOpen(true)}
-        >
-          <Plus size={16} />
-        </IconButton>
+        {labelSelectionMode ? (
+          <button className="button secondary label-selection-done" onClick={finishLabelSelection}>
+            {t('label.done')}
+          </button>
+        ) : (
+          <IconButton
+            label={t('label.new')}
+            disabled={!session.engine || !session.writable}
+            onClick={() => setLabelOpen(true)}
+          >
+            <Plus size={16} />
+          </IconButton>
+        )}
       </div>
       <div className="label-nav">
-        <button
-          type="button"
-          className={`nav-item ${!filters.labelIds.length && !filters.unlabeledOnly ? 'selected' : ''}`}
-          aria-pressed={!filters.labelIds.length && !filters.unlabeledOnly}
-          onClick={() => {
-            setFilters({ ...filters, unlabeledOnly: false, labelIds: [] });
-            if (route === 'settings' || route === 'issues') navigate('/notes');
-            setDrawer(false);
-          }}
-        >
-          <Tags size={16} />
-          <span>{t('label.all')}</span>
-        </button>
-        <button
-          type="button"
-          className={`nav-item ${filters.unlabeledOnly ? 'selected' : ''}`}
-          aria-pressed={filters.unlabeledOnly}
-          onClick={() => {
-            setFilters({ ...filters, unlabeledOnly: true, labelIds: [] });
-            if (route === 'settings' || route === 'issues') navigate('/notes');
-            if (!filters.unlabeledOnly) setDrawer(false);
-          }}
-        >
-          <Tag size={15} />
-          <span>{t('label.unlabeled')}</span>
-        </button>
+        {!labelSelectionMode && (
+          <>
+            <button
+              type="button"
+              className={`nav-item ${!filters.labelIds.length && !filters.unlabeledOnly ? 'selected' : ''}`}
+              aria-pressed={!filters.labelIds.length && !filters.unlabeledOnly}
+              onClick={() => {
+                setFilters({ ...filters, unlabeledOnly: false, labelIds: [] });
+                if (route === 'settings' || route === 'issues') navigate('/notes');
+                setDrawer(false);
+              }}
+            >
+              <Tags size={16} />
+              <span>{t('label.all')}</span>
+            </button>
+            <button
+              type="button"
+              className={`nav-item ${filters.unlabeledOnly ? 'selected' : ''}`}
+              aria-pressed={filters.unlabeledOnly}
+              onClick={() => {
+                setFilters({ ...filters, unlabeledOnly: true, labelIds: [] });
+                if (route === 'settings' || route === 'issues') navigate('/notes');
+                if (!filters.unlabeledOnly) setDrawer(false);
+              }}
+            >
+              <Tag size={15} />
+              <span>{t('label.unlabeled')}</span>
+            </button>
+          </>
+        )}
         {labels.length ? (
           sidebarLabelList.map((label) => {
-            const selected = filters.labelIds.includes(label.id);
+            const selected = labelSelectionMode
+              ? selectedLabelIds.includes(label.id)
+              : filters.labelIds.includes(label.id);
             return (
-              <LabelContextMenu key={label.id} label={label}>
-                <div className={`label-nav-row ${selected ? 'selected' : ''}`}>
+              <LabelContextMenu
+                key={label.id}
+                label={label}
+                onSelect={() => startLabelSelection(label.id)}
+                selectionMode={labelSelectionMode}
+                selectedForSelection={selected}
+                onToggleSelection={() => toggleLabelSelection(label.id)}
+              >
+                <div
+                  className={`label-nav-row ${selected ? 'selected' : ''} ${labelSelectionMode ? 'selection-mode' : ''}`}
+                  onClick={() => {
+                    if (labelSelectionMode) toggleLabelSelection(label.id);
+                  }}
+                >
                   <button
                     type="button"
                     className={`nav-item label-main ${selected ? 'selected' : ''}`}
                     aria-label={`${label.name} ${counts[label.id] || 0}`}
                     aria-pressed={selected}
                     onClick={(event) => {
+                      if (labelSelectionMode) {
+                        event.stopPropagation();
+                        toggleLabelSelection(label.id);
+                        return;
+                      }
                       setFilters({
                         ...filters,
                         unlabeledOnly: false,
@@ -524,24 +684,20 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                     </span>
                   </button>
                   <span className="nav-count label-count">{counts[label.id] || 0}</span>
-                  <button
-                    className="icon-button label-filter-toggle"
-                    aria-label={t('context.toggleFilter', { name: label.name })}
-                    aria-pressed={selected}
-                    onClick={() => {
-                      setFilters({
-                        ...filters,
-                        unlabeledOnly: false,
-                        labelMatch: 'all',
-                        labelIds: selected
-                          ? filters.labelIds.filter((id) => id !== label.id)
-                          : [...filters.labelIds, label.id],
-                      });
-                      if (route === 'settings' || route === 'issues') navigate('/notes');
-                    }}
-                  >
-                    {selected ? '✓' : '＋'}
-                  </button>
+                  {labelSelectionMode && (
+                    <button
+                      type="button"
+                      className="icon-button label-filter-toggle"
+                      aria-label={t('label.toggleSelection', { name: label.name })}
+                      aria-pressed={selected}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggleLabelSelection(label.id);
+                      }}
+                    >
+                      {selected ? '✓' : '＋'}
+                    </button>
+                  )}
                 </div>
               </LabelContextMenu>
             );
@@ -552,32 +708,79 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       </div>
       <div className="sidebar-bottom">
         <div className="workspace-preferences">
-          <IconButton
-            label={t('action.refresh')}
-            disabled={!session.engine || busy}
-            onClick={() => void refresh()}
+          <ContextMenu
+            contextName="refresh"
+            items={[
+              {
+                label: t('action.refresh'),
+                icon: RefreshCw,
+                disabled: !session.engine || busy,
+                run: () => void refresh(),
+              },
+            ]}
           >
-            <RefreshCw size={18} className={busy ? 'spin' : ''} />
-          </IconButton>
+            <IconButton
+              label={t('action.refresh')}
+              disabled={!session.engine || busy}
+              onClick={() => void refresh()}
+            >
+              <RefreshCw size={18} className={busy ? 'spin' : ''} />
+            </IconButton>
+          </ContextMenu>
           <PreferencesControls compact />
-          <NavLink
-            to="/settings"
-            onClick={() => setDrawer(false)}
-            title={t('nav.settings')}
-            aria-label={t('nav.settings')}
-            className={({ isActive }) => `icon-button ${isActive ? 'selected' : ''}`}
+          <ContextMenu
+            contextName="settings"
+            items={[
+              {
+                label: t('action.openSettings'),
+                icon: SettingsIcon,
+                run: () => {
+                  navigate('/settings');
+                  setDrawer(false);
+                },
+              },
+            ]}
           >
-            <SettingsIcon size={18} />
-          </NavLink>
+            <NavLink
+              to="/settings"
+              onClick={() => setDrawer(false)}
+              title={t('nav.settings')}
+              aria-label={t('nav.settings')}
+              className={({ isActive }) => `icon-button ${isActive ? 'selected' : ''}`}
+            >
+              <SettingsIcon size={18} />
+            </NavLink>
+          </ContextMenu>
         </div>
-        <button className="repository-pill" onClick={() => setConnectOpen(true)}>
-          <span className={`connection-dot ${session.connected ? 'connected' : ''}`} />
-          <span>
-            <strong>{connection.repo}</strong>
-            <small>{connection.owner}</small>
-          </span>
-          <ArrowUpRight size={15} />
-        </button>
+        <ContextMenu
+          contextName="repository"
+          items={[
+            { label: t('action.reconnect'), icon: RefreshCw, run: () => setConnectOpen(true) },
+            {
+              label: t('action.openGithub'),
+              icon: ArrowUpRight,
+              separator: true,
+              disabled: !repositoryUrl,
+              run: () => {
+                if (repositoryUrl) window.open(repositoryUrl, '_blank', 'noopener,noreferrer');
+              },
+            },
+            {
+              label: t('context.copyRepository'),
+              icon: Copy,
+              run: () => void navigator.clipboard.writeText(repositoryName).catch(report),
+            },
+          ]}
+        >
+          <button className="repository-pill" onClick={() => setConnectOpen(true)}>
+            <span className={`connection-dot ${session.connected ? 'connected' : ''}`} />
+            <span>
+              <strong>{connection.repo}</strong>
+              <small>{connection.owner}</small>
+            </span>
+            <ArrowUpRight size={15} />
+          </button>
+        </ContextMenu>
       </div>
     </>
   );
@@ -621,7 +824,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     </NotesGrid>
   );
   return (
-    <div className="workspace">
+    <div className="workspace" onContextMenu={preventUndefinedContextMenu}>
       <aside className="sidebar">{nav}</aside>
       <Dialog.Root open={drawer} onOpenChange={setDrawer}>
         <Dialog.Portal>
@@ -642,12 +845,18 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           </IconButton>
           <div className="search-box">
             <Search size={19} />
-            <input
-              aria-label={t('home.search')}
-              placeholder={t('home.search')}
-              value={filters.query}
-              onChange={(e) => setFilters({ ...filters, query: e.target.value })}
-            />
+            <TextContextMenu
+              clearLabel={t('context.clearSearch')}
+              clearDisabled={!filters.query}
+              onClear={() => setFilters({ ...filters, query: '' })}
+            >
+              <input
+                aria-label={t('home.search')}
+                placeholder={t('home.search')}
+                value={filters.query}
+                onChange={(e) => setFilters({ ...filters, query: e.target.value })}
+              />
+            </TextContextMenu>
             {route !== 'settings' && route !== 'issues' && (
               <IconButton
                 label={t('action.filter')}
@@ -682,7 +891,26 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                   </option>
                 ))}
               </select>
-              <span className="view-toggle">
+              <ContextMenu
+                contextName="view"
+                className="view-toggle"
+                items={[
+                  {
+                    label: t('action.grid'),
+                    icon: Grid2X2,
+                    checked: prefs.layout === 'grid',
+                    keepOpen: false,
+                    run: () => prefs.setLayout('grid'),
+                  },
+                  {
+                    label: t('action.list'),
+                    icon: List,
+                    checked: prefs.layout === 'list',
+                    keepOpen: false,
+                    run: () => prefs.setLayout('list'),
+                  },
+                ]}
+              >
                 <IconButton
                   className={prefs.layout === 'grid' ? 'selected' : ''}
                   label={t('action.grid')}
@@ -697,26 +925,41 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                 >
                   <List size={18} />
                 </IconButton>
-              </span>
+              </ContextMenu>
               {statusControl}
               {route !== 'trash' && view !== 'archive' && (
-                <button
-                  className="button primary new-note-button"
-                  disabled={!session.writable}
-                  onClick={newNote}
+                <ContextMenu
+                  contextName="new-note"
+                  items={[
+                    { label: t('action.new'), icon: Plus, disabled: !session.writable, run: () => newNote() },
+                    {
+                      label: t('action.newChecklist'),
+                      icon: CheckSquare,
+                      separator: true,
+                      disabled: !session.writable,
+                      run: () => newNote('checklist'),
+                    },
+                  ]}
                 >
-                  <Plus size={18} />
-                  {t('action.new')}
-                </button>
+                  <button
+                    className="button primary new-note-button"
+                    disabled={!session.writable}
+                    onClick={() => newNote()}
+                  >
+                    <Plus size={18} />
+                    {t('action.new')}
+                  </button>
+                </ContextMenu>
               )}
             </div>
           )}
           {(route === 'settings' || route === 'issues') && statusControl}
         </header>
         <ContextMenu
+          contextName="main"
           items={
             route !== 'settings' && route !== 'issues'
-              ? [{ label: t('action.new'), disabled: !session.writable, run: newNote }]
+              ? [{ label: t('action.new'), icon: Plus, disabled: !session.writable, run: () => newNote() }]
               : []
           }
           acceptTarget={(target) =>
@@ -831,7 +1074,11 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                         <h2>{t(notes.length ? 'home.noResults' : 'home.empty')}</h2>
                         <p>{t(notes.length ? 'home.noResultsDescription' : 'home.emptyDescription')}</p>
                         {!notes.length && view === 'notes' && (
-                          <button className="button secondary" disabled={!session.writable} onClick={newNote}>
+                          <button
+                            className="button secondary"
+                            disabled={!session.writable}
+                            onClick={() => newNote()}
+                          >
                             <Plus size={17} />
                             {t('action.new')}
                           </button>

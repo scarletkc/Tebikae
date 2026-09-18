@@ -830,6 +830,9 @@ hr {
   background: var(--surface);
   color: var(--muted);
 }
+.search-box > .text-context-target {
+  display: contents;
+}
 .search-box input:not([type='checkbox']) {
   border: 0;
   padding: 12px 0;
