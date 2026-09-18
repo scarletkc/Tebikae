@@ -7,6 +7,7 @@ import { TextSelection } from '@milkdown/kit/prose/state';
 import { redo, undo } from '@milkdown/kit/prose/history';
 import { createMarkdownEditor } from '../src/features/editor/engine';
 import { MarkdownSession } from '../src/features/editor/session';
+import { convertList } from '../src/features/editor/list-commands';
 import { MarkdownEditor } from '../src/features/editor/MarkdownEditor';
 import { MarkdownPreview } from '../src/features/editor/MarkdownPreview';
 import english from '../src/i18n/editor-en.json';
@@ -185,6 +186,44 @@ describe('real Milkdown Markdown engine', () => {
     expect(session.value).toContain('[x] Complete');
     expect(session.value).toMatch(/\[ \]/);
   });
+
+  it('converts between list kinds in place instead of toggling off', async () => {
+    const { editor, session } = await realEditor('- alpha\n- beta');
+    const convert = (ordered: boolean) =>
+      editor.action((ctx) => {
+        const view = ctx.get(editorViewCtx);
+        convertList(ordered, true)(view.state, view.dispatch, view);
+      });
+    convert(true);
+    await session.flush();
+    expect(session.value).toContain('1. alpha');
+    convert(false);
+    await session.flush();
+    const restored = editor.action((ctx) => ctx.get(parserCtx)('- alpha\n- beta')?.toJSON());
+    expect(editor.action((ctx) => ctx.get(editorViewCtx).state.doc.toJSON())).toEqual(restored);
+  });
+
+  it('accepts arbitrary fenced languages through the shared cleaned picker contract', async () => {
+    const { root, session } = await realEditor('```text\nstart\n```');
+    const language = root.querySelector<HTMLInputElement>('.code-block-header input')!;
+    expect(language.getAttribute('list')).toBeTruthy();
+    const suggestions = Array.from(root.querySelectorAll('datalist option')).map((option) =>
+      option.getAttribute('value'),
+    );
+    expect(suggestions).toContain('python');
+    for (const [value, expected] of [
+      ['gdscript', 'gdscript'],
+      ['  jsx ', 'jsx'],
+      ['c#', 'c#'],
+      ['obj\nect', 'object'],
+      ['te`xt', 'text'],
+    ]) {
+      language.value = value;
+      language.dispatchEvent(new Event('change'));
+      await session.flush();
+      expect(session.value).toContain(`\`\`\`${expected}`);
+    }
+  });
 });
 
 describe('editor lifecycle and safe preview', () => {
@@ -351,7 +390,7 @@ describe('editor lifecycle and safe preview', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: english.showVisual }));
     await waitFor(() => expect(screen.queryByRole('textbox', { name: english.sourceBody })).toBeNull());
-    fireEvent.change(screen.getByRole('textbox', { name: english.codeLanguage }), {
+    fireEvent.change(screen.getByRole('combobox', { name: english.codeLanguage }), {
       target: { value: 'typescript' },
     });
     fireEvent.click(screen.getByRole('button', { name: english.codeBlock }));

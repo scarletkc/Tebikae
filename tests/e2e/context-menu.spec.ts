@@ -73,6 +73,7 @@ test('editor source formatting and code language keep document content', async (
   await page.getByRole('button', { name: 'Edit note: Menu editing' }).click();
   const language = page.locator('.code-block-header input');
   await expect(language).toHaveValue('javascript');
+  await expect(language).toHaveAttribute('list', /.+/);
   await language.fill('gdscript');
   await language.press('Tab');
   await page.getByRole('button', { name: 'Edit Markdown', exact: true }).click();
@@ -81,6 +82,7 @@ test('editor source formatting and code language keep document content', async (
   await source.focus();
   await source.evaluate((el: HTMLTextAreaElement) => el.setSelectionRange(0, 5));
   await source.press('Shift+F10');
+  await page.getByRole('menuitem', { name: 'Format' }).hover();
   await page.getByRole('menuitem', { name: 'Bold', exact: true }).click();
   await expect(source).toHaveValue(/^\*\*Hello\*\* world/);
   await closeDialog(page);
@@ -156,12 +158,16 @@ test('visual selection, title and table menus operate on the correct context', a
   await editor.locator('p').first().click();
   await page.keyboard.press('Home');
   await page.keyboard.press('Shift+End');
+  // ProseMirror flushes DOM selection changes on the next frame; typed keys can outrun it.
+  await editor.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
   await page.keyboard.press('Shift+F10');
+  await page.getByRole('menuitem', { name: 'Format' }).hover();
   await page.getByRole('menuitem', { name: 'Bold', exact: true }).click();
   await expect(editor.locator('strong')).toContainText('Hello world');
   await editor.locator('td').first().click({ button: 'right' });
-  await expect(page.getByRole('menuitem', { name: 'Add row below' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Table' })).toBeVisible();
   await page.screenshot({ path: '.artifacts/context-editor-table.png' });
+  await page.getByRole('menuitem', { name: 'Table' }).hover();
   await page.getByRole('menuitem', { name: 'Add row below' }).click();
   await expect(editor.locator('tr')).toHaveCount(3);
 });

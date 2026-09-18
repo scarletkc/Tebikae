@@ -287,6 +287,8 @@
     "offlinePreparing": "Preparing offline app files…",
     "update": "An update is ready",
     "updateAction": "Save drafts and update",
+    "forceUpdate": "Update TebiKae",
+    "forceUpdateHelp": "Clears cached app files and reloads to pick up the latest version. Your saved login and notes are not affected.",
     "persist": "Request persistent storage",
     "persistGranted": "Persistent storage granted.",
     "persistDenied": "The browser did not grant persistent storage. Keep a separate export of important drafts.",

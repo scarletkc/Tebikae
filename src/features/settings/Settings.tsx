@@ -1,9 +1,20 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
-import { Download, ExternalLink, GitBranch, HardDrive, LogOut, Trash2, Upload, WifiOff } from 'lucide-react';
+import {
+  Download,
+  ExternalLink,
+  GitBranch,
+  HardDrive,
+  LogOut,
+  RefreshCw,
+  Trash2,
+  Upload,
+  WifiOff,
+} from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { usePreferences, type Theme } from '../../app/preferences';
+import { usePwaUpdate } from '../../app/pwa';
 import { useSession, flushAllDrafts } from '../../app/session';
 import { download, LanguageControl } from '../../app/ui';
 import { exportScope, clearScope } from '../../application/commands';
@@ -17,9 +28,11 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
   const { t } = useTranslation();
   const prefs = usePreferences();
   const session = useSession();
+  const pwa = usePwaUpdate();
   const connection = session.connection!;
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [preparingExport, setPreparingExport] = useState(false);
   const [markdownExport, setMarkdownExport] = useState<MarkdownExportSnapshot>();
   const [importOpen, setImportOpen] = useState(false);
@@ -62,6 +75,21 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
       setNotice(t('markdownExport.failed'));
     } finally {
       setPreparingExport(false);
+    }
+  }
+  async function forceUpdate() {
+    // Reloaded offline without a service worker, the app could not come back at all.
+    if (!navigator.onLine) {
+      setNotice(t('home.offline'));
+      return;
+    }
+    setUpdating(true);
+    setNotice('');
+    try {
+      await pwa.forceUpdate();
+    } catch {
+      setUpdating(false);
+      setNotice(t('error.generic'));
     }
   }
   return (
@@ -193,6 +221,11 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
           <WifiOff size={15} />
           {t(offlineReady ? 'settings.offlineReady' : 'settings.offlinePreparing')}
         </p>
+        <button className="button secondary" disabled={updating} onClick={() => void forceUpdate()}>
+          <RefreshCw size={16} className={updating ? 'spin' : ''} />
+          {t('settings.forceUpdate')}
+        </button>
+        <p className="field-help">{t('settings.forceUpdateHelp')}</p>
         <a href="https://github.com/scarletkc/Tebikae" target="_blank" rel="noopener noreferrer">
           {t('settings.githubLink')} <ExternalLink size={14} />
         </a>

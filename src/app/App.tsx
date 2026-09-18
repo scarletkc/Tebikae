@@ -25,7 +25,7 @@ import {
 import { registerSW } from 'virtual:pwa-register';
 import { useSession, flushAllDrafts } from './session';
 import { usePreferences } from './preferences';
-import { PwaUpdateContext } from './pwa';
+import { PwaUpdateContext, clearAppCaches, reloadFresh } from './pwa';
 import { Brand, IconButton, Modal, PreferencesControls, download } from './ui';
 import { db } from '../storage/db';
 import { defaultFilters, filterNotes, labelCounts } from '../domain/filters';
@@ -101,8 +101,14 @@ export default function App() {
     session.engine?.stop();
     await update.current(true);
   };
+  const forceUpdate = async () => {
+    await flushAllDrafts();
+    session.engine?.stop();
+    await clearAppCaches();
+    reloadFresh();
+  };
   return (
-    <PwaUpdateContext.Provider value={{ available: updateReady, update: applyUpdate }}>
+    <PwaUpdateContext.Provider value={{ available: updateReady, update: applyUpdate, forceUpdate }}>
       {session.restoring ? (
         <main className="loading-notice" role="status">
           {t('connect.restoring')}
@@ -488,11 +494,12 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           labels.map((label) => {
             const selected = filters.labelIds.includes(label.id);
             return (
-              <div key={label.id} className="label-nav-row">
-                <LabelContextMenu label={label} explicit>
+              <LabelContextMenu key={label.id} label={label}>
+                <div className={`label-nav-row ${selected ? 'selected' : ''}`}>
                   <button
                     type="button"
-                    className={`nav-item ${selected ? 'selected' : ''}`}
+                    className={`nav-item label-main ${selected ? 'selected' : ''}`}
+                    aria-label={`${label.name} ${counts[label.id] || 0}`}
                     aria-pressed={selected}
                     onClick={(event) => {
                       setFilters({
@@ -511,29 +518,31 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                     }}
                   >
                     <LabelDot color={label.color} />
-                    <span>{label.name}</span>
-                    <span className="nav-count">{counts[label.id] || 0}</span>
+                    <span className="label-name" title={label.name}>
+                      {label.name}
+                    </span>
                   </button>
-                </LabelContextMenu>
-                <button
-                  className="icon-button label-filter-toggle"
-                  aria-label={t('context.toggleFilter', { name: label.name })}
-                  aria-pressed={selected}
-                  onClick={() => {
-                    setFilters({
-                      ...filters,
-                      unlabeledOnly: false,
-                      labelMatch: 'all',
-                      labelIds: selected
-                        ? filters.labelIds.filter((id) => id !== label.id)
-                        : [...filters.labelIds, label.id],
-                    });
-                    if (route === 'settings' || route === 'issues') navigate('/notes');
-                  }}
-                >
-                  {selected ? '✓' : '+'}
-                </button>
-              </div>
+                  <span className="nav-count label-count">{counts[label.id] || 0}</span>
+                  <button
+                    className="icon-button label-filter-toggle"
+                    aria-label={t('context.toggleFilter', { name: label.name })}
+                    aria-pressed={selected}
+                    onClick={() => {
+                      setFilters({
+                        ...filters,
+                        unlabeledOnly: false,
+                        labelMatch: 'all',
+                        labelIds: selected
+                          ? filters.labelIds.filter((id) => id !== label.id)
+                          : [...filters.labelIds, label.id],
+                      });
+                      if (route === 'settings' || route === 'issues') navigate('/notes');
+                    }}
+                  >
+                    {selected ? '✓' : '＋'}
+                  </button>
+                </div>
+              </LabelContextMenu>
             );
           })
         ) : (
@@ -703,140 +712,157 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           )}
           {(route === 'settings' || route === 'issues') && statusControl}
         </header>
-        <main
-          className="main-content"
-          tabIndex={-1}
-          onKeyDown={(event) => {
-            if ((event.target as Element).closest('input, textarea, [contenteditable="true"], [role="menu"]'))
-              return;
-            if (event.key === 'Escape') multi.clear();
-            if (
-              (event.ctrlKey || event.metaKey) &&
-              event.key.toLowerCase() === 'a' &&
-              route !== 'settings' &&
-              route !== 'issues'
-            ) {
-              event.preventDefault();
-              multi.selectAll();
-            }
-          }}
+        <ContextMenu
+          items={
+            route !== 'settings' && route !== 'issues'
+              ? [{ label: t('action.new'), disabled: !session.writable, run: newNote }]
+              : []
+          }
+          acceptTarget={(target) =>
+            target instanceof Element &&
+            !target.closest(
+              '.context-card, button, a, input, textarea, [contenteditable], [role="menu"], .selection-toolbar',
+            )
+          }
         >
-          {!!multi.selectedCount && (
-            <div className="selection-toolbar" role="toolbar" aria-label={t('context.selection')}>
-              <button className="icon-button" aria-label={t('action.close')} onClick={multi.clear}>
-                ×
-              </button>
-              <strong>{t('context.selectedCount', { count: multi.selectedCount })}</strong>
-              <button className="button secondary" onClick={multi.selectAll}>
-                {t('context.selectAll')}
-              </button>
-              {noteActions(
-                selectedNotes,
-                labels,
-                session.writable,
-                t,
-                (edit) => void mutateNotes(selectedNotes, edit),
-              ).map((action) =>
-                action.children ? (
-                  <ContextMenu
-                    key={action.label}
-                    explicit
-                    triggerLabel={action.label}
-                    items={action.children.map((child) => ({
-                      ...child,
-                      disabled: action.disabled || child.disabled,
-                    }))}
-                  >
-                    <span />
-                  </ContextMenu>
-                ) : (
-                  <button
-                    key={action.label}
-                    className={`button secondary ${action.danger ? 'danger' : ''}`}
-                    disabled={action.disabled}
-                    onClick={action.run}
-                  >
-                    {action.label}
-                  </button>
-                ),
-              )}
-            </div>
-          )}
-          {route === 'settings' ? (
-            <Settings onConnect={() => setConnectOpen(true)} offlineReady={offlineReady} />
-          ) : (
-            <>
-              <h1 className="sr-only">{t(`nav.${route}`)}</h1>
-              {route === 'issues' ? (
-                <div className={`notes-grid ${prefs.layout === 'list' ? 'notes-list' : ''}`}>
-                  {issues
-                    .filter((row) =>
-                      `${row.snapshot.title}\n${row.snapshot.body}\n${row.snapshot.labels.map((l) => l.name).join(' ')}`
-                        .toLowerCase()
-                        .includes(filters.query.toLowerCase()),
-                    )
-                    .slice(0, limit)
-                    .map((row) => (
-                      <article key={row.issueId} className="note-card">
-                        <button className="note-open" onClick={() => setIssue(row)}>
-                          <span className="issue-number">#{row.snapshot.number}</span>
-                          <h3>{row.snapshot.title}</h3>
-                          <p className="card-preview">{row.snapshot.body.slice(0, 220)}</p>
-                          {row.status !== 'unmanaged' && <p className="danger">{t(`home.${row.status}`)}</p>}
-                        </button>
-                      </article>
-                    ))}
-                  {!issues.length && (
-                    <div className="empty-state">
-                      <GitBranch size={35} />
-                      <h2>{t('home.noResults')}</h2>
-                      <p>{t('home.issuesDescription')}</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <>
-                  <FilterChips filters={activeFilters} setFilters={setFilters} labels={labels} />
-                  {empty ? (
-                    <div className="empty-state">
-                      <div className="empty-illustration">
-                        <NotebookPen size={38} strokeWidth={1.3} />
-                      </div>
-                      <h2>{t(notes.length ? 'home.noResults' : 'home.empty')}</h2>
-                      <p>{t(notes.length ? 'home.noResultsDescription' : 'home.emptyDescription')}</p>
-                      {!notes.length && view === 'notes' && (
-                        <button className="button secondary" disabled={!session.writable} onClick={newNote}>
-                          <Plus size={17} />
-                          {t('action.new')}
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      {pinned.length > 0 && (
-                        <section className="note-group">
-                          <h2>{t('home.pinned')}</h2>
-                          {renderCards(pinned)}
-                        </section>
-                      )}
-                      {others.length > 0 && (
-                        <section className="note-group">
-                          {pinned.length > 0 && <h2>{t('home.other')}</h2>}
-                          {renderCards(others)}
-                        </section>
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-              {(route === 'issues' ? issues.length : result.notes.length) > limit && (
-                <button className="button secondary load-more" onClick={() => setLimit((n) => n + 100)}>
-                  {t('action.more')}
+          <main
+            className="main-content"
+            tabIndex={-1}
+            onKeyDown={(event) => {
+              if (
+                (event.target as Element).closest('input, textarea, [contenteditable="true"], [role="menu"]')
+              )
+                return;
+              if (event.key === 'Escape') multi.clear();
+              if (
+                (event.ctrlKey || event.metaKey) &&
+                event.key.toLowerCase() === 'a' &&
+                route !== 'settings' &&
+                route !== 'issues'
+              ) {
+                event.preventDefault();
+                multi.selectAll();
+              }
+            }}
+          >
+            {!!multi.selectedCount && (
+              <div className="selection-toolbar" role="toolbar" aria-label={t('context.selection')}>
+                <button className="icon-button" aria-label={t('action.close')} onClick={multi.clear}>
+                  ×
                 </button>
-              )}
-            </>
-          )}
-        </main>
+                <strong>{t('context.selectedCount', { count: multi.selectedCount })}</strong>
+                <button className="button secondary" onClick={multi.selectAll}>
+                  {t('context.selectAll')}
+                </button>
+                {noteActions(
+                  selectedNotes,
+                  labels,
+                  session.writable,
+                  t,
+                  (edit) => void mutateNotes(selectedNotes, edit),
+                ).map((action) =>
+                  action.children ? (
+                    <ContextMenu
+                      key={action.label}
+                      triggerLabel={action.label}
+                      items={action.children.map((child) => ({
+                        ...child,
+                        disabled: action.disabled || child.disabled,
+                      }))}
+                    >
+                      <span />
+                    </ContextMenu>
+                  ) : (
+                    <button
+                      key={action.label}
+                      className={`button secondary ${action.danger ? 'danger' : ''}`}
+                      disabled={action.disabled}
+                      onClick={action.run}
+                    >
+                      {action.label}
+                    </button>
+                  ),
+                )}
+              </div>
+            )}
+            {route === 'settings' ? (
+              <Settings onConnect={() => setConnectOpen(true)} offlineReady={offlineReady} />
+            ) : (
+              <>
+                <h1 className="sr-only">{t(`nav.${route}`)}</h1>
+                {route === 'issues' ? (
+                  <div className={`notes-grid ${prefs.layout === 'list' ? 'notes-list' : ''}`}>
+                    {issues
+                      .filter((row) =>
+                        `${row.snapshot.title}\n${row.snapshot.body}\n${row.snapshot.labels.map((l) => l.name).join(' ')}`
+                          .toLowerCase()
+                          .includes(filters.query.toLowerCase()),
+                      )
+                      .slice(0, limit)
+                      .map((row) => (
+                        <article key={row.issueId} className="note-card">
+                          <button className="note-open" onClick={() => setIssue(row)}>
+                            <span className="issue-number">#{row.snapshot.number}</span>
+                            <h3>{row.snapshot.title}</h3>
+                            <p className="card-preview">{row.snapshot.body.slice(0, 220)}</p>
+                            {row.status !== 'unmanaged' && (
+                              <p className="danger">{t(`home.${row.status}`)}</p>
+                            )}
+                          </button>
+                        </article>
+                      ))}
+                    {!issues.length && (
+                      <div className="empty-state">
+                        <GitBranch size={35} />
+                        <h2>{t('home.noResults')}</h2>
+                        <p>{t('home.issuesDescription')}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <FilterChips filters={activeFilters} setFilters={setFilters} labels={labels} />
+                    {empty ? (
+                      <div className="empty-state">
+                        <div className="empty-illustration">
+                          <NotebookPen size={38} strokeWidth={1.3} />
+                        </div>
+                        <h2>{t(notes.length ? 'home.noResults' : 'home.empty')}</h2>
+                        <p>{t(notes.length ? 'home.noResultsDescription' : 'home.emptyDescription')}</p>
+                        {!notes.length && view === 'notes' && (
+                          <button className="button secondary" disabled={!session.writable} onClick={newNote}>
+                            <Plus size={17} />
+                            {t('action.new')}
+                          </button>
+                        )}
+                      </div>
+                    ) : (
+                      <>
+                        {pinned.length > 0 && (
+                          <section className="note-group">
+                            <h2>{t('home.pinned')}</h2>
+                            {renderCards(pinned)}
+                          </section>
+                        )}
+                        {others.length > 0 && (
+                          <section className="note-group">
+                            {pinned.length > 0 && <h2>{t('home.other')}</h2>}
+                            {renderCards(others)}
+                          </section>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
+                {(route === 'issues' ? issues.length : result.notes.length) > limit && (
+                  <button className="button secondary load-more" onClick={() => setLimit((n) => n + 100)}>
+                    {t('action.more')}
+                  </button>
+                )}
+              </>
+            )}
+          </main>
+        </ContextMenu>
         <footer className="workspace-footer">
           <span>Tebikae</span>
           <span>{t('tagline')}</span>

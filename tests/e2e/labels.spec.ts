@@ -73,7 +73,8 @@ for (const entry of ['topbar', 'empty']) {
         );
       }, unlabeledOnly);
       await page.reload();
-      await expect(page.locator('.sidebar .label-nav button')).toHaveCount(4);
+      // Each label renders a navigation row; invalid filter ids must not add rows.
+      await expect(page.locator('.sidebar .label-nav .label-nav-row')).toHaveCount(2);
       const create = page
         .locator(entry === 'topbar' ? '.app-topbar' : '.empty-state')
         .getByRole('button', { name: 'New note', exact: true });

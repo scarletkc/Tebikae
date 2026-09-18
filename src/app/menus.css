@@ -147,30 +147,44 @@
   display: block;
   position: relative;
 }
-.context-card > .context-more {
-  z-index: 3;
-  position: absolute;
-  right: 5px;
-  bottom: 6px;
-}
-.note-card .card-footer {
-  padding-right: 24px;
-}
 .label-nav-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   align-items: center;
-}
-.label-nav-row > .nav-item {
-  flex: 1;
+  gap: 8px;
+  width: 100%;
   min-width: 0;
+  overflow: hidden;
+  border-radius: 8px;
+}
+.label-nav-row.selected {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.label-nav-row > .label-main {
+  min-width: 0;
+  overflow: hidden;
+  gap: 8px;
+  padding-right: 0;
+}
+.label-main > svg,
+.label-main > .label-dot {
+  flex-shrink: 0;
+}
+.label-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.label-count,
+.label-filter-toggle {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .label-filter-toggle {
-  opacity: 0;
-}
-.label-nav-row:hover .label-filter-toggle,
-.label-nav-row:focus-within .label-filter-toggle,
-.label-filter-toggle[aria-pressed='true'] {
-  opacity: 1;
+  justify-self: end;
 }
 .selection-toolbar {
   position: sticky;

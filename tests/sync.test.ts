@@ -776,22 +776,27 @@ describe('durable synchronization', () => {
     expect(await database.outbox.count()).toBe(0);
   });
 
-  it('recovers a lost POST response by UUID across every page without another POST', async () => {
-    client.issues = Array.from({ length: 110 }, (_, index) => raw(doc(), index + 1));
-    const draft = await createNote(connection.scopeId, doc(), database);
-    client.failCreateAfterWrite = true;
-    await engine.flush(true);
-    expect((await database.notes.get([connection.scopeId, draft.localId]))?.syncStatus).toBe('uncertain');
-    await engine.flush(true);
-    expect(client.creates).toBe(1);
-    engine.stop();
-    engine = new SyncEngine(database, client, connection);
-    await engine.pull(true);
-    expect((await database.notes.get([connection.scopeId, draft.localId]))?.issueNumber).toBe(111);
-    await engine.flush(true);
-    expect(client.creates).toBe(1);
-    expect(await database.outbox.count()).toBe(0);
-  });
+  // Paged scans of 110 issues sit close to the default limit once the suite runs in parallel.
+  it(
+    'recovers a lost POST response by UUID across every page without another POST',
+    { timeout: 12_000 },
+    async () => {
+      client.issues = Array.from({ length: 110 }, (_, index) => raw(doc(), index + 1));
+      const draft = await createNote(connection.scopeId, doc(), database);
+      client.failCreateAfterWrite = true;
+      await engine.flush(true);
+      expect((await database.notes.get([connection.scopeId, draft.localId]))?.syncStatus).toBe('uncertain');
+      await engine.flush(true);
+      expect(client.creates).toBe(1);
+      engine.stop();
+      engine = new SyncEngine(database, client, connection);
+      await engine.pull(true);
+      expect((await database.notes.get([connection.scopeId, draft.localId]))?.issueNumber).toBe(111);
+      await engine.flush(true);
+      expect(client.creates).toBe(1);
+      expect(await database.outbox.count()).toBe(0);
+    },
+  );
 
   it('keeps a newer input revision when the old PATCH response arrives', async () => {
     client.issues = [raw(doc())];

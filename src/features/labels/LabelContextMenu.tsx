@@ -11,12 +11,10 @@ export function LabelContextMenu({
   label,
   children,
   onRemove,
-  explicit = false,
 }: {
   label: Label;
   children: ReactNode;
   onRemove?: () => void;
-  explicit?: boolean;
 }) {
   const { t } = useTranslation();
   const session = useSession();
@@ -90,9 +88,7 @@ export function LabelContextMenu({
   ];
   return (
     <>
-      <ContextMenu items={items} explicit={explicit}>
-        {children}
-      </ContextMenu>
+      <ContextMenu items={items}>{children}</ContextMenu>
       {error && (
         <Modal title={t('error.generic')} onClose={() => setError(false)}>
           <p role="alert">{t('error.generic')}</p>

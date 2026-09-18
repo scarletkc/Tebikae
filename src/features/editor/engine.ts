@@ -14,6 +14,7 @@ import type { EditorView, NodeView } from '@milkdown/kit/prose/view';
 import { splitListItem } from '@milkdown/kit/prose/schema-list';
 import { $prose } from '@milkdown/kit/utils';
 import { safeHref } from '../../security/urls';
+import { cleanCodeLanguage, codeLanguages, openCodeLanguagePicker } from './code-language';
 
 export interface EditorEvents {
   changed: () => void;
@@ -132,24 +133,17 @@ function codeBlockView(
   bar.contentEditable = 'false';
   const language = document.createElement('input');
   language.setAttribute('aria-label', events.label('codeLanguage'));
-  language.placeholder = 'Plain Text';
-  language.maxLength = 40;
+  language.placeholder = events.label('plainText');
+  language.autocomplete = 'off';
+  language.spellcheck = false;
+  const languageLabel = document.createElement('label');
+  const languageCaption = document.createElement('span');
+  languageCaption.textContent = events.label('codeLanguage');
+  languageLabel.append(languageCaption, language);
   const list = document.createElement('datalist');
   list.id = `languages-${crypto.randomUUID()}`;
   language.setAttribute('list', list.id);
-  for (const value of [
-    'javascript',
-    'typescript',
-    'python',
-    'rust',
-    'c',
-    'cpp',
-    'json',
-    'bash',
-    'tsx',
-    'toml',
-    'nginx',
-  ]) {
+  for (const value of codeLanguages) {
     const option = document.createElement('option');
     option.value = value;
     list.append(option);
@@ -172,17 +166,30 @@ function codeBlockView(
     pre.dataset.language = language.value;
     language.disabled = events.readOnly();
   };
+  language.addEventListener('click', () => openCodeLanguagePicker(language));
+  language.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      language.dispatchEvent(new Event('change'));
+      view.focus();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      update();
+      view.focus();
+    }
+  });
   language.addEventListener('change', () => {
     const pos = getPos();
     if (events.readOnly() || pos === undefined) return update();
     view.dispatch(
       view.state.tr.setNodeMarkup(pos, undefined, {
         ...node.attrs,
-        language: language.value.replace(/[\r\n`]/g, '').trim(),
+        language: cleanCodeLanguage(language.value),
       }),
     );
   });
-  bar.append(language, list, copy, status);
+  bar.append(languageLabel, list, copy, status);
   dom.append(bar, pre);
   update();
   return {

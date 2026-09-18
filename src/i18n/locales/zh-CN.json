@@ -287,6 +287,8 @@
     "offlinePreparing": "正在准备离线应用文件…",
     "update": "新版本已就绪",
     "updateAction": "保存草稿并更新",
+    "forceUpdate": "更新 TebiKae",
+    "forceUpdateHelp": "清理应用缓存文件并重新加载，以获取最新版本。已保存的登录状态和笔记不受影响。",
     "persist": "申请持久保存本地数据",
     "persistGranted": "浏览器已允许持久存储。",
     "persistDenied": "浏览器未允许持久存储，请另外导出重要草稿。",

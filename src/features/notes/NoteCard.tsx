@@ -92,13 +92,12 @@ export default function NoteCard({
   const updated =
     note.syncStatus === 'synced' ? note.base?.updatedAt || note.localModifiedAt : note.localModifiedAt;
   return (
-    <ContextMenu items={menuItems} explicit={!!menuItems.length} className="context-card">
+    <ContextMenu items={menuItems} className="context-card">
       <article
         className={`note-card note-${document.meta.color} ${selected ? 'is-selected' : ''}`}
         tabIndex={0}
         onClickCapture={(e) => {
-          if ((e.target as Element).closest('.card-actions, .context-more, .label-badge, [role="menu"]'))
-            return;
+          if ((e.target as Element).closest('.card-actions, .label-badge, [role="menu"]')) return;
           if (onSelect?.(e)) {
             e.preventDefault();
             e.stopPropagation();
