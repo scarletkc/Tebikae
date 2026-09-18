@@ -86,10 +86,11 @@ export function standardIssues(): MockIssue[] {
 export async function mockGitHub(
   context: BrowserContext,
   seed: MockIssue[] = standardIssues(),
+  extraLabels: MockLabel[] = [],
 ): Promise<MockGitHubState> {
   const state: MockGitHubState = {
     issues: structuredClone(seed),
-    labels: structuredClone(mockLabels),
+    labels: [...structuredClone(mockLabels), ...structuredClone(extraLabels)],
     writes: [],
     requests: [],
     dropNextCreateResponse: false,

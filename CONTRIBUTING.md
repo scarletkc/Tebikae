@@ -52,6 +52,8 @@ If you cannot capture the affected UI, explain the limitation and keep the PR in
 
 Use a descriptive Conventional Commit title, such as `fix(editor): preserve unsaved text` or `feat(export): add Markdown download`.
 
+Use Conventional Commit types in branch names as `<type>/<short-description>`, such as `feat/markdown-export` or `fix/editor-unsaved-text`.
+
 Include:
 
 - The problem, the resulting behavior, and any relevant issue link.

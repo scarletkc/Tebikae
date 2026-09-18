@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { closeDialog, connect, mockGitHub } from './fixtures';
+import { closeDialog, connect, mockGitHub, mockIssue } from './fixtures';
 
 test('sidebar labels select exclusively with All and Unlabeled shortcuts', async ({ page, context }) => {
   await mockGitHub(context);
@@ -32,6 +32,40 @@ test('sidebar labels select exclusively with All and Unlabeled shortcuts', async
   await expect(page.locator('.filter-chips .chip')).toHaveCount(0);
 });
 
+test('sidebar shows only labels used by non-trashed notes', async ({ page, context }) => {
+  await mockGitHub(
+    context,
+    [
+      mockIssue(
+        1,
+        'Labeled note',
+        'A note that uses Ideas.',
+        {},
+        { labels: [{ id: 11, name: 'Ideas', color: 'b1c6b0', description: null }] },
+      ),
+      mockIssue(
+        2,
+        'Trashed note',
+        'Only this trashed note uses Personal.',
+        { trashedAt: '2026-09-15T00:00:00Z' },
+        { labels: [{ id: 12, name: 'Personal', color: 'dec8a7', description: null }] },
+      ),
+    ],
+    [
+      { id: 201, name: 'bug', color: 'd73a4a', description: null },
+      { id: 202, name: 'enhancement', color: 'a2eeef', description: null },
+    ],
+  );
+  await connect(page);
+  const nav = page.locator('.sidebar .label-nav');
+  await expect(nav.getByRole('button', { name: /^Ideas/ })).toBeVisible();
+  await expect(nav.getByRole('button', { name: /^Personal/ })).toHaveCount(0);
+  await expect(nav.getByRole('button', { name: /^bug/ })).toHaveCount(0);
+  await expect(nav.getByRole('button', { name: /^enhancement/ })).toHaveCount(0);
+  await expect(nav.locator('.label-nav-row')).toHaveCount(1);
+  await expect(nav.getByRole('button')).toHaveCount(4);
+});
+
 async function storedNoteLabels(page: Page) {
   return page.evaluate(async () => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -60,21 +94,29 @@ for (const entry of ['topbar', 'empty']) {
     }) => {
       const remote = await mockGitHub(context, []);
       await connect(page);
-      await page
-        .locator('.sidebar .label-nav')
-        .getByRole('button', { name: /^Ideas/ })
-        .click();
+      await page.locator('a[href$="#/notes"]').click();
+      await page.getByRole('button', { name: 'Filters', exact: true }).click();
+      const filtersDialog = page.getByRole('dialog');
+      await filtersDialog.getByLabel('Ideas', { exact: true }).check();
+      await filtersDialog.getByLabel('Personal', { exact: true }).check();
+      await closeDialog(page);
       await page.evaluate((unlabeledOnly) => {
         const key = Object.keys(sessionStorage).find((key) => key.startsWith('tebikae.filters.'))!;
         const filters = JSON.parse(sessionStorage.getItem(key)!);
         sessionStorage.setItem(
           key,
-          JSON.stringify({ ...filters, labelIds: [11, 12, 999, 11], unlabeledOnly }),
+          JSON.stringify({ ...filters, labelIds: [...filters.labelIds, 999, 11], unlabeledOnly }),
         );
       }, unlabeledOnly);
       await page.reload();
-      // Each label renders a navigation row; invalid filter ids must not add rows.
-      await expect(page.locator('.sidebar .label-nav .label-nav-row')).toHaveCount(2);
+      // Labels used by no note stay out of the sidebar, but the active filters survive intact.
+      await expect(page.locator('.sidebar .label-nav .label-nav-row')).toHaveCount(0);
+      await expect(page.locator('.sidebar .label-nav button')).toHaveCount(2);
+      await page.getByRole('button', { name: 'Filters', exact: true }).click();
+      const restored = page.getByRole('dialog');
+      await expect(restored.getByLabel('Ideas', { exact: true })).toBeChecked();
+      await expect(restored.getByLabel('Personal', { exact: true })).toBeChecked();
+      await closeDialog(page);
       const create = page
         .locator(entry === 'topbar' ? '.app-topbar' : '.empty-state')
         .getByRole('button', { name: 'New note', exact: true });

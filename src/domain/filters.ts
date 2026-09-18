@@ -114,3 +114,11 @@ export function labelCounts(
   }
   return counts;
 }
+export function sidebarLabels(notes: LocalNote[], labels: Label[]): Label[] {
+  const used = new Set<number>();
+  for (const note of notes) {
+    if (note.current.meta.trashedAt) continue;
+    for (const id of note.current.labelIds) used.add(id);
+  }
+  return labels.filter((label) => used.has(label.id));
+}
