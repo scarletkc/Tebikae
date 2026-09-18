@@ -24,25 +24,41 @@ export function TextContextMenu({
     el?.setSelectionRange(range.current.start, range.current.end);
     return el;
   };
-  const insert = (value: string) => {
-    if (readOnly) return;
-    const el = restore();
-    if (!el) return;
-    document.execCommand('insertText', false, value);
+  const restoreRange = (el: HTMLInputElement | HTMLTextAreaElement, sel: { start: number; end: number }) => {
+    el.focus();
+    el.setSelectionRange(sel.start, sel.end);
+    return el;
   };
   const copy = async (cut = false) => {
     const el = input();
     if (!el) return;
+    const initialTarget = el;
+    const initialValue = el.value;
+    const initialRange = { ...range.current };
+    const textToCopy = initialValue.slice(initialRange.start, initialRange.end);
     try {
-      await navigator.clipboard.writeText(el.value.slice(range.current.start, range.current.end));
-      if (cut) insert('');
+      await navigator.clipboard.writeText(textToCopy);
+      if (cut) {
+        if (readOnly) return;
+        const currentEl = input();
+        // Only delete if the target element is unchanged and its content was not edited while waiting
+        if (currentEl === initialTarget && currentEl.value === initialValue) {
+          restoreRange(currentEl, initialRange);
+          document.execCommand('insertText', false, '');
+        }
+      }
     } catch {
       setError(true);
     }
   };
   const wrap = (left: string, right = left) => {
+    if (readOnly) return;
     const el = input();
-    if (el) insert(`${left}${el.value.slice(range.current.start, range.current.end)}${right}`);
+    if (!el) return;
+    const initialRange = { ...range.current };
+    restoreRange(el, initialRange);
+    const text = el.value.slice(initialRange.start, initialRange.end);
+    document.execCommand('insertText', false, `${left}${text}${right}`);
   };
   const items: MenuAction[] = [
     ...(hasSelection
@@ -55,9 +71,21 @@ export function TextContextMenu({
       label: t('context.paste'),
       disabled: readOnly,
       run: () => {
+        if (readOnly) return;
+        const el = input();
+        if (!el) return;
+        const initialTarget = el;
+        const initialValue = el.value;
+        const initialRange = { ...range.current };
         void navigator.clipboard
           .readText()
-          .then(insert)
+          .then((text) => {
+            const currentEl = input();
+            if (currentEl === initialTarget && currentEl.value === initialValue) {
+              restoreRange(currentEl, initialRange);
+              document.execCommand('insertText', false, text);
+            }
+          })
           .catch(() => setError(true));
       },
     },

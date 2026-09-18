@@ -356,8 +356,15 @@ function EditorBody({
       )
         view.dispatch(view.state.tr.setSelection(Selection.near(view.state.doc.resolve(hit.pos))));
       const { selection, schema } = view.state;
+      let item: ReturnType<typeof selection.$from.node> | undefined;
+      for (let d = selection.$from.depth; d > 0; d--) {
+        const node = selection.$from.node(d);
+        if (node.type.name === 'list_item') {
+          item = node;
+          break;
+        }
+      }
       const nodes = Array.from({ length: selection.$from.depth }, (_, i) => selection.$from.node(i + 1));
-      const item = nodes.find((n) => n.type.name === 'list_item');
       setContext({
         selected: !selection.empty,
         table: isInTable(view.state),

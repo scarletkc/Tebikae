@@ -206,3 +206,47 @@ test('Chinese dark menus fit narrow screens and mobile filter toggles retain the
   expect(menu!.x).toBeGreaterThanOrEqual(0);
   expect(menu!.x + menu!.width).toBeLessThanOrEqual(390);
 });
+
+test('nested task list reads and toggles innermost task state', async ({ page, context }) => {
+  await mockGitHub(context, [
+    mockIssue(
+      32,
+      'Nested tasks',
+      '- [ ] Parent task\n  - [x] Child task\n\n- Normal list parent\n  - [ ] Child task 2\n\n- [x] Task parent 2\n  - Normal child',
+    ),
+  ]);
+  await connect(page);
+  await page.getByRole('button', { name: 'Edit note: Nested tasks' }).click();
+  const editor = page.locator('.ProseMirror');
+
+  // Case 1: Child task is checked [x], but parent is unchecked [ ]
+  const child = editor.getByText('Child task', { exact: true });
+  await child.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Paragraph' }).hover();
+  const incompleteItem = page.getByRole('menuitem', { name: 'Mark incomplete' });
+  await expect(incompleteItem).toBeVisible();
+  await incompleteItem.click();
+  await page.getByRole('button', { name: 'Edit Markdown', exact: true }).click();
+  const source = page.getByRole('textbox', { name: 'Markdown source body' });
+  await expect(source).toHaveValue(/[*+-] \[ \] Parent task\s+[*+-] \[ \] Child task/);
+  await page.getByRole('button', { name: 'Visual editor', exact: true }).click();
+
+  // Case 2: Normal list parent with unchecked child task [ ]
+  const child2 = editor.getByText('Child task 2', { exact: true });
+  await child2.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Paragraph' }).hover();
+  const completeItem = page.getByRole('menuitem', { name: 'Mark complete' });
+  await expect(completeItem).toBeVisible();
+  await completeItem.click();
+  await page.getByRole('button', { name: 'Edit Markdown', exact: true }).click();
+  await expect(source).toHaveValue(/[*+-] Normal list parent\s+[*+-] \[x\] Child task 2/);
+  await page.getByRole('button', { name: 'Visual editor', exact: true }).click();
+
+  // Case 3: Task parent with normal child
+  const normalChild = editor.getByText('Normal child', { exact: true });
+  await normalChild.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Paragraph' }).hover();
+  await expect(page.getByRole('menuitem', { name: 'Mark complete' })).toHaveCount(0);
+  await expect(page.getByRole('menuitem', { name: 'Mark incomplete' })).toHaveCount(0);
+  await closeDialog(page);
+});
