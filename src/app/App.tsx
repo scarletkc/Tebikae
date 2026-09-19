@@ -48,6 +48,7 @@ import ConnectPage, { ConnectForm } from '../features/connect/Connect';
 import NoteCard from '../features/notes/NoteCard';
 import { LabelDot } from '../features/labels';
 import NotesGrid from '../features/notes/NotesGrid';
+import { useIssueFeed } from '../features/notes/useIssueFeed';
 import NoteDialog from '../features/notes/NoteDialog';
 import { FilterChips, FiltersDialog, filterCount } from '../features/filters/Filters';
 import Settings from '../features/settings/Settings';
@@ -188,6 +189,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     ['notes', 'all', 'archive', 'trash'].includes(route) ? route : 'notes'
   ) as NoteFilters['view'];
   const [filters, updateFilters] = useState<NoteFilters>(() => restoreFilters(scope));
+  const [searchInput, setSearchInput] = useState(filters.query);
   const activeFilters = useMemo(() => ({ ...filters, view }), [filters, view]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
@@ -243,7 +245,8 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   const [labelColor, setLabelColor] = useState('#62836a');
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
-  const [limit, setLimit] = useState(100);
+  const [limit, setLimit] = useState(25);
+  const autoRevealPending = useRef(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [selection, setSelection] = useState<{
     id?: string;
@@ -258,13 +261,100 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   const labels = useLiveQuery(() => db.labels.where('scopeId').equals(scope).toArray(), [scope], []);
   const issues = useLiveQuery(() => db.unmanagedIssues.where('scopeId').equals(scope).toArray(), [scope], []);
   const sync = useLiveQuery(() => db.syncState.get(scope), [scope]);
+  const feed = useIssueFeed(
+    session.engine,
+    session.client,
+    connection,
+    filters.query.trim(),
+    JSON.stringify(activeFilters),
+    online && route !== 'settings',
+  );
   const result = useMemo(() => {
     try {
+      if (feed.remote && activeFilters.query) {
+        const localMatches = new Set(
+          filterNotes(
+            notes.filter((note) => !note.issueId || note.syncStatus !== 'synced'),
+            activeFilters,
+            labels,
+          ).map((note) => note.localId),
+        );
+        const candidates = notes.filter(
+          (note) => (note.issueId && feed.ids.has(note.issueId)) || localMatches.has(note.localId),
+        );
+        return { notes: filterNotes(candidates, { ...activeFilters, query: '' }, labels), error: false };
+      }
       return { notes: filterNotes(notes, activeFilters, labels), error: false };
     } catch {
       return { notes: [], error: true };
     }
-  }, [notes, activeFilters, labels]);
+  }, [notes, activeFilters, labels, feed.remote, feed.ids]);
+  const availableCount = route === 'issues' ? issues.length : result.notes.length;
+  const cachedIds = new Set([...notes.map((note) => note.issueId), ...issues.map((issue) => issue.issueId)]);
+  const feedCacheReady = [...feed.ids].every((id) => cachedIds.has(id));
+  useEffect(() => {
+    const area = notesAreaRef.current;
+    if (!area || route === 'settings') return;
+    let frame = 0;
+    const check = () => {
+      const { scrollTop, scrollHeight, clientHeight } = area;
+      const remaining = scrollHeight - scrollTop - clientHeight;
+      const approaching =
+        scrollTop > 0 &&
+        (remaining <= clientHeight * 2.5 || (scrollTop + clientHeight) / scrollHeight >= 0.65);
+      const needsMatches = !!filters.query && feed.started && feedCacheReady && availableCount < 25;
+      if (
+        (approaching || needsMatches) &&
+        availableCount - limit <= 100 &&
+        feed.hasMore &&
+        !feed.loading &&
+        !feed.error
+      )
+        void feed.load?.();
+      if (
+        scrollTop > 0 &&
+        remaining <= clientHeight &&
+        availableCount > limit &&
+        !autoRevealPending.current
+      ) {
+        autoRevealPending.current = true;
+        setLimit((count) => Math.min(count + 25, availableCount));
+      }
+    };
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(check);
+    };
+    const onScroll = () => {
+      schedule();
+    };
+    const unlockReveal = () => {
+      autoRevealPending.current = false;
+    };
+    area.addEventListener('scroll', onScroll, { passive: true });
+    area.addEventListener('wheel', unlockReveal, { passive: true });
+    area.addEventListener('touchmove', unlockReveal, { passive: true });
+    area.addEventListener('keydown', unlockReveal);
+    schedule();
+    return () => {
+      area.removeEventListener('scroll', onScroll);
+      area.removeEventListener('wheel', unlockReveal);
+      area.removeEventListener('touchmove', unlockReveal);
+      area.removeEventListener('keydown', unlockReveal);
+      cancelAnimationFrame(frame);
+    };
+  }, [
+    availableCount,
+    limit,
+    feed.started,
+    feedCacheReady,
+    feed.hasMore,
+    feed.loading,
+    feed.error,
+    feed.load,
+    filters.query,
+    route,
+  ]);
   const multi = useNoteSelection(result.notes.map((note) => note.localId));
   const selectedNotes = result.notes.filter((note) => multi.isSelected(note.localId));
   const resetNavigationState = () => {
@@ -272,7 +362,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     setLabelSelectionMode(false);
     setSelectedLabelIds([]);
     setDrawer(false);
-    setLimit(100);
+    setLimit(25);
   };
   async function mutateNotes(targets: LocalNote[], edit: (doc: NoteDocument) => void) {
     if (!session.writable || targets.some((note) => !canEditNote(note))) return;
@@ -345,9 +435,12 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   }, [notes, activeFilters, labels]);
   const sidebarLabelList = useMemo(() => sidebarLabels(notes, labels), [notes, labels]);
   function setFilters(next: NoteFilters) {
+    setSearchInput(next.query);
+    if (JSON.stringify(next) === JSON.stringify(filters)) return;
     multi.clear();
     updateFilters(next);
-    setLimit(100);
+    setLimit(25);
+    notesAreaRef.current?.scrollTo({ top: 0 });
     try {
       sessionStorage.setItem(`tebikae.filters.${scope}`, JSON.stringify(next));
     } catch {
@@ -390,7 +483,8 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
         isCreatingNoteRef.current = true;
         void (async () => {
           try {
-            await flushAllDrafts();
+            await flushAllDrafts({ finalizeEmptyTitle: true });
+            void session.engine?.flush(false).catch(report);
             newNote();
           } catch {
             /* Keep active editor open on save failure */
@@ -583,7 +677,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       message: `${t(`error.${sync.error.code}`)}${sync.error.retryAt ? ` ${t('error.retryAt', { time: new Date(sync.error.retryAt).toLocaleString() })}` : ''}`,
       action: sync.error.code === 'AUTH_REQUIRED' ? reconnect : undefined,
     });
-  if (sync?.loading || (!sync?.initialLoadComplete && session.connected))
+  if (sync?.loading || (!sync?.initialPageLoaded && !sync?.initialLoadComplete && session.connected))
     statusNotices.push({
       id: 'loading',
       severity: 'progress',
@@ -990,22 +1084,31 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
             </IconButton>
             <TextContextMenu
               clearLabel={t('context.clearSearch')}
-              clearDisabled={!filters.query}
+              clearDisabled={!searchInput}
               onClear={() => setFilters({ ...filters, query: '' })}
             >
               <input
                 ref={searchRef}
                 aria-label={t('home.search')}
                 placeholder={`${t('home.search')} (Ctrl+K)`}
-                value={filters.query}
-                onChange={(e) => setFilters({ ...filters, query: e.target.value })}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                onBlur={(e) => {
+                  const query = e.currentTarget.value.trim();
+                  setSearchInput(query);
+                  if (query !== filters.query) setFilters({ ...filters, query });
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.nativeEvent.isComposing) e.currentTarget.blur();
+                }}
               />
             </TextContextMenu>
-            {(filters.query || filterCount(filters) > 0) && (
+            {(searchInput || filters.query || filterCount(filters) > 0) && (
               <IconButton
                 label={t('action.clearSearchFilters')}
                 className="search-clear-button"
                 onClick={() => {
+                  setSearchInput('');
                   setFilters({ ...defaultFilters, view, sort: filters.sort });
                 }}
               >
@@ -1259,7 +1362,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                 ) : (
                   <>
                     <FilterChips filters={activeFilters} setFilters={setFilters} labels={labels} />
-                    {empty ? (
+                    {empty && !feed.loading && !feed.hasMore ? (
                       <div className="empty-state">
                         <div className="empty-illustration">
                           <NotebookPen size={38} strokeWidth={1.3} />
@@ -1295,8 +1398,31 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                     )}
                   </>
                 )}
-                {(route === 'issues' ? issues.length : result.notes.length) > limit && (
-                  <button className="button secondary load-more" onClick={() => setLimit((n) => n + 100)}>
+                {feed.loading && availableCount <= limit && (
+                  <div className="feed-skeletons" role="status" aria-label={t('home.loading')}>
+                    {[0, 1, 2].map((key) => (
+                      <div className="feed-skeleton" key={key} />
+                    ))}
+                  </div>
+                )}
+                {feed.error && (
+                  <p role="alert">
+                    {t(
+                      feed.error.detail === 'SEARCH_RANGE_TOO_DENSE'
+                        ? 'home.searchTooDense'
+                        : `error.${feed.error.code}`,
+                    )}
+                  </p>
+                )}
+                {(availableCount > limit || feed.hasMore) && (
+                  <button
+                    className="button secondary load-more"
+                    disabled={feed.loading && availableCount <= limit}
+                    onClick={() => {
+                      if (availableCount > limit) setLimit((n) => n + 25);
+                      else void feed.load?.();
+                    }}
+                  >
                     {t('action.more')}
                   </button>
                 )}

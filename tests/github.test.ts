@@ -43,6 +43,59 @@ function client(options: ConstructorParameters<typeof GitHubClient>[1] = {}) {
 }
 
 describe('GitHub adapter', () => {
+  it('loads one newest Issue page of 100 without following the next link', async () => {
+    const seen: string[] = [];
+    server.use(
+      http.get(`${origin}${issuePath}`, ({ request }) => {
+        const url = new URL(request.url);
+        seen.push(request.url);
+        expect(url.searchParams.get('per_page')).toBe('100');
+        expect(url.searchParams.get('direction')).toBe('desc');
+        return HttpResponse.json([issue(1), { ...issue(2), pull_request: {} }], {
+          headers: { link: `<${origin}${issuePath}?page=2&per_page=100&direction=desc>; rel="next"` },
+        });
+      }),
+    );
+    const api = client().api;
+    const first = await api.listIssuesPage(connection);
+    expect(first.issues.map((row) => row.number)).toEqual([1]);
+    expect(seen).toHaveLength(1);
+    await api.listIssuesPage(connection, first.next);
+    expect(seen).toHaveLength(2);
+    await expect(api.listIssuesPage(connection, 'https://evil.example/issues')).rejects.toThrow(
+      'SERVER_ERROR',
+    );
+  });
+
+  it('scopes Search API text, created bounds and pagination to the connected repository', async () => {
+    server.use(
+      http.get(`${origin}/search/issues`, ({ request }) => {
+        const params = new URL(request.url).searchParams;
+        expect(params.get('q')).toBe(
+          '"tea" "repo:other/private" repo:scarletkc/Tebikae-dev is:issue in:title,body created:1970-01-01T00:00:00Z..1970-01-01T00:00:10Z',
+        );
+        expect(params.get('per_page')).toBe('100');
+        expect(params.get('page')).toBe('2');
+        expect(params.get('sort')).toBe('created');
+        return HttpResponse.json({ total_count: 123, incomplete_results: false, items: [issue()] });
+      }),
+    );
+    expect(
+      await client().api.searchIssuesPage(connection, 'tea repo:other/private', { from: 0, to: 10, page: 2 }),
+    ).toMatchObject({ total: 123, issues: [{ number: 1 }] });
+  });
+
+  it('rejects incomplete search results instead of skipping missing matches', async () => {
+    server.use(
+      http.get(`${origin}/search/issues`, () =>
+        HttpResponse.json({ total_count: 5, incomplete_results: true, items: [issue()] }),
+      ),
+    );
+    await expect(
+      client().api.searchIssuesPage(connection, 'tea', { from: 0, to: 10, page: 1 }),
+    ).rejects.toThrow('SERVER_ERROR');
+  });
+
   it('deletes an Issue through GraphQL using its node ID, never REST DELETE or close', async () => {
     const requests: unknown[] = [];
     server.use(

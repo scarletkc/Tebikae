@@ -95,7 +95,8 @@ test('label rename and deletion affect labels, not notes', async ({ page, contex
     .click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
   const labelConfirm = page.getByRole('alertdialog');
-  await expect(labelConfirm).toContainText('2 notes');
+  await expect(labelConfirm).toContainText('GitHub repository and every note using it');
+  await expect(labelConfirm).toContainText('notes themselves will not be deleted');
   await labelConfirm.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.locator('.sidebar .label-nav-row')).toHaveCount(1);
   await expect(page.locator('.note-card')).toHaveCount(2);
