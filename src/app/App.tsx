@@ -1203,10 +1203,6 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
             )}
           </main>
         </ContextMenu>
-        <footer className="workspace-footer">
-          <span>Tebikae</span>
-          <span>{t('tagline')}</span>
-        </footer>
       </div>
       {filtersOpen && (
         <FiltersDialog

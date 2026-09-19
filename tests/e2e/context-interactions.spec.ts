@@ -136,7 +136,7 @@ test('workspace controls expose their issue menus and suppress undefined native 
   await expect(page.getByRole('menuitem', { name: 'Copy', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
 
-  const prevented = await page.locator('.workspace-footer').evaluate((element) => {
+  const prevented = await page.locator('.workspace-body').evaluate((element) => {
     const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     element.dispatchEvent(event);
     return event.defaultPrevented;

@@ -1253,18 +1253,6 @@ mark {
 .empty-state .button {
   margin-top: 24px;
 }
-.workspace-footer {
-  display: flex;
-  justify-content: space-between;
-  font-size: 10px;
-  color: var(--muted);
-  border-top: 1px solid var(--border);
-  margin: 0 42px;
-  padding: 22px 0;
-}
-.workspace-footer > span:first-child {
-  font-weight: 650;
-}
 .loading-notice {
   font-size: 11px;
   color: var(--muted);
@@ -1828,9 +1816,6 @@ mark {
   .main-content {
     padding: 32px 26px 55px;
   }
-  .workspace-footer {
-    margin: 0 26px;
-  }
   .topbar-actions {
     gap: 4px;
   }
@@ -2016,10 +2001,6 @@ mark {
   .notes-list .note-card {
     grid-template-columns: minmax(180px, 1fr) minmax(100px, 0.6fr);
   }
-  .workspace-footer {
-    margin: 0 22px;
-    font-size: 9px;
-  }
   .mobile-drawer {
     position: fixed;
     inset: 0 auto 0 0;
@@ -2183,10 +2164,6 @@ mark {
   .view-toggle .icon-button {
     padding: 5px;
     min-width: 27px;
-  }
-  .workspace-footer {
-    margin: 0 16px;
-    gap: 10px;
   }
   .note-save-row {
     flex-wrap: wrap;
