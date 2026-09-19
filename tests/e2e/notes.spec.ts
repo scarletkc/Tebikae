@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { closeDialog, connect, mockGitHub } from './fixtures';
+import { closeDialog, confirmPrompt, connect, mockGitHub } from './fixtures';
 
 test(
   'connect and unchanged reading keep existing Issues intact',
@@ -87,14 +87,14 @@ test('trash then delete forever removes the Issue through GraphQL and does not r
   await page.locator('a[href$="#/trash"]').click();
   await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  page.once('dialog', (confirmation) => void confirmation.dismiss());
   await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await confirmPrompt(page, false);
   await expect
     .poll(() => remote.writes.filter((write) => write.path === '/graphql').length, { timeout: 5_000 })
     .toBe(0);
   expect(remote.issues.find((issue) => issue.number === 1)).toBeDefined();
-  page.on('dialog', (confirmation) => confirmation.accept());
   await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await confirmPrompt(page, true, 'Delete forever');
   await expect
     .poll(() => remote.writes.filter((write) => write.path === '/graphql').length, { timeout: 10_000 })
     .toBe(1);
@@ -122,8 +122,8 @@ test('a failed forever deletion keeps the note in the trash', async ({ page, con
   await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
   remote.failNextDeleteIssue = true;
   const dialog = page.getByRole('dialog');
-  page.once('dialog', (confirmation) => void confirmation.accept());
   await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await confirmPrompt(page, true, 'Delete forever');
   await expect(dialog.getByRole('alert')).toBeVisible();
   await closeDialog(page);
   await page.locator('a[href$="#/trash"]').click();
@@ -171,7 +171,9 @@ test('archive survives trash and restore, and JSON export contains no credential
   await page.locator('a[href$="#/trash"]').click();
   await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
   await expect(page.getByRole('dialog').getByLabel('Title', { exact: true })).toHaveAttribute('readonly', '');
-  await page.getByRole('button', { name: 'Restore note', exact: true }).click();
+  // The editor is open here; scope to it because the card behind keeps its own
+  // restore control in the accessibility tree.
+  await page.getByRole('dialog').getByRole('button', { name: 'Restore note', exact: true }).click();
   await closeDialog(page);
   await page.locator('a[href$="#/archive"]').click();
   await expect(
@@ -300,4 +302,117 @@ test('closing with only the title cleared persists Untitled note', async ({ page
   await expect(page.getByRole('button', { name: 'Edit note: Untitled note', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true })).toHaveCount(0);
   await expect.poll(() => remote.issues[0]!.title).toBe('Untitled note');
+});
+
+test('Ctrl/Cmd+N flushes pending draft before opening a new note', async ({ page, context }) => {
+  await mockGitHub(context);
+  await connect(page);
+  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const title = dialog.getByLabel('Title', { exact: true });
+  await title.fill('Weekend ideas edited');
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await page.keyboard.press(`${modifier}+n`);
+  await expect(dialog.getByLabel('Title', { exact: true })).toHaveValue('');
+  await closeDialog(page);
+  await expect(
+    page.getByRole('button', { name: 'Edit note: Weekend ideas edited', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true })).toHaveCount(0);
+});
+
+test('clearing an existing title before Ctrl/Cmd+N persists Untitled note', async ({ page, context }) => {
+  const remote = await mockGitHub(context);
+  await connect(page);
+  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const title = dialog.getByLabel('Title', { exact: true });
+  await title.fill('');
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await page.keyboard.press(`${modifier}+n`);
+  await expect(dialog.getByLabel('Title', { exact: true })).toHaveValue('');
+  await closeDialog(page);
+  await expect(page.getByRole('button', { name: 'Edit note: Untitled note', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true })).toHaveCount(0);
+  await expect.poll(() => remote.issues[0]!.title).toBe('Untitled note');
+});
+
+test('Ctrl/Cmd+N keeps current editor open if draft persistence fails', async ({ page, context }) => {
+  await mockGitHub(context);
+  await connect(page);
+  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const title = dialog.getByLabel('Title', { exact: true });
+  const invalidTitle = 'a'.repeat(125);
+  await title.fill(invalidTitle);
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await page.keyboard.press(`${modifier}+n`);
+  await expect(dialog).toBeVisible();
+  await expect(title).toHaveValue(invalidTitle);
+  await expect(dialog.locator('.note-save-row').getByRole('status')).toHaveClass(/danger/);
+});
+
+test('standalone confirmation dialog traps Tab/Shift+Tab and restores focus upon dismissal', async ({
+  page,
+  context,
+}) => {
+  await mockGitHub(context);
+  await connect(page);
+  await page.locator('a[href$="#/settings"]').click();
+  const clearButton = page.getByRole('button', { name: 'Clear this device’s data', exact: true });
+  await clearButton.focus();
+  await page.keyboard.press('Enter');
+
+  const confirmDialog = page.getByRole('alertdialog');
+  await expect(confirmDialog).toBeVisible();
+  const confirmBtn = confirmDialog.getByRole('button', { name: 'Clear this device’s data', exact: true });
+  const cancelBtn = confirmDialog.getByRole('button', { name: 'Cancel', exact: true });
+
+  await expect(confirmBtn).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(cancelBtn).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(confirmBtn).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(cancelBtn).toBeFocused();
+
+  await page.keyboard.press('Escape');
+  await expect(confirmDialog).toHaveCount(0);
+  await expect(clearButton).toBeFocused();
+});
+
+test('nested confirmation dialog in note editor traps Tab/Shift+Tab and restores focus without leaking to editor', async ({
+  page,
+  context,
+}) => {
+  await mockGitHub(context);
+  await connect(page);
+  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('button', { name: 'Move to trash', exact: true }).click();
+  await closeDialog(page);
+
+  await page.locator('a[href$="#/trash"]').click();
+  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+  const deleteBtn = page.getByRole('dialog').getByRole('button', { name: 'Delete forever', exact: true });
+  await deleteBtn.focus();
+  await page.keyboard.press('Enter');
+
+  const confirmDialog = page.getByRole('alertdialog');
+  await expect(confirmDialog).toBeVisible();
+  const confirmBtn = confirmDialog.getByRole('button', { name: 'Delete forever', exact: true });
+  const cancelBtn = confirmDialog.getByRole('button', { name: 'Cancel', exact: true });
+
+  await expect(confirmBtn).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(cancelBtn).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(confirmBtn).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(cancelBtn).toBeFocused();
+
+  await page.keyboard.press('Escape');
+  await expect(confirmDialog).toHaveCount(0);
+  await expect(dialog).toBeVisible();
+  await expect(deleteBtn).toBeFocused();
 });

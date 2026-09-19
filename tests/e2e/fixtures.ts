@@ -256,7 +256,9 @@ export async function connect(page: Page, remember = true): Promise<void> {
   await expect(
     page
       .getByRole('searchbox', { name: 'Search your notes' })
-      .or(page.getByLabel('Search your notes', { exact: true })),
+      .or(page.getByLabel('Search your notes', { exact: true }))
+      .or(page.getByRole('searchbox', { name: '搜索笔记' }))
+      .or(page.getByLabel('搜索笔记', { exact: true })),
   ).toBeVisible();
   await expect(page.locator('.workspace-status')).toHaveAttribute('data-loading', 'false', {
     timeout: 20_000,
@@ -265,4 +267,14 @@ export async function connect(page: Page, remember = true): Promise<void> {
 export async function closeDialog(page: Page): Promise<void> {
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).last().click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+}
+/**
+ * Answers the in-app confirmation dialog that replaced window.confirm(). Returns the
+ * dialog so callers can assert on its message before deciding.
+ */
+export async function confirmPrompt(page: Page, accept = true, label?: string): Promise<void> {
+  const dialog = page.getByRole('alertdialog');
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: label ?? (accept ? 'Confirm' : 'Cancel'), exact: true }).click();
+  await expect(dialog).toHaveCount(0);
 }

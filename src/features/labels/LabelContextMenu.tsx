@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Palette, Pencil, Tag, Trash2 } from 'lucide-react';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
 import { Modal } from '../../app/ui';
+import { confirmDialog } from '../../app/confirm';
 import { useSession } from '../../app/session';
 import { db } from '../../storage/db';
 import type { Label } from '../../domain/types';
@@ -114,8 +115,13 @@ export function LabelContextMenu({
           danger: true,
           separator: true,
           run: () => {
-            if (confirm(t('context.deleteLabelConfirm', { name: label.name, count })))
-              void perform(() => session.engine!.deleteLabel(label.id));
+            void confirmDialog({
+              title: t('context.deleteLabelConfirm', { name: label.name, count }),
+              confirmLabel: t('context.deleteLabel'),
+              danger: true,
+            }).then((ok) => {
+              if (ok) void perform(() => session.engine!.deleteLabel(label.id));
+            });
           },
         },
       ];

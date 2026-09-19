@@ -61,7 +61,8 @@
     "checkAgain": "重新核对 GitHub",
     "retryCreate": "再次创建",
     "discard": "丢弃本地草稿",
-    "takeLock": "启用编辑"
+    "takeLock": "启用编辑",
+    "back": "返回"
   },
   "connect": {
     "eyebrow": "你的笔记，你的仓库",
