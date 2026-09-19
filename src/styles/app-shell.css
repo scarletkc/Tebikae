@@ -12,6 +12,98 @@ body {
   overscroll-behavior: none;
 }
 
+.app-loading {
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.app-loading-sidebar {
+  display: flex;
+  flex: 0 0 238px;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 22px;
+  border-right: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.app-loading-workspace {
+  min-width: 0;
+  flex: 1;
+  padding: 28px 36px;
+}
+
+.app-loading-shimmer {
+  background: linear-gradient(
+    100deg,
+    color-mix(in srgb, var(--surface) 70%, var(--border)) 20%,
+    color-mix(in srgb, var(--surface) 88%, var(--text)) 45%,
+    color-mix(in srgb, var(--surface) 70%, var(--border)) 70%
+  );
+  background-size: 220% 100%;
+  animation: app-loading-shimmer 1.6s ease-in-out infinite;
+}
+
+.app-loading-brand {
+  width: 132px;
+  height: 28px;
+  margin-bottom: 22px;
+  border-radius: 8px;
+}
+
+.app-loading-nav {
+  width: 100%;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.app-loading-nav-short {
+  width: 76%;
+}
+
+.app-loading-toolbar {
+  width: min(520px, 60%);
+  height: 38px;
+  margin-bottom: 28px;
+  border-radius: 10px;
+}
+
+.app-loading-grid {
+  columns: 3 220px;
+  column-gap: 18px;
+}
+
+.app-loading-card {
+  width: 100%;
+  min-height: 148px;
+  margin: 0 0 18px;
+  break-inside: avoid;
+  border-radius: 14px;
+}
+
+.app-loading-card-1 {
+  min-height: 214px;
+}
+
+.app-loading-card-2 {
+  min-height: 178px;
+}
+
+@keyframes app-loading-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
+}
+
 .workspace {
   --sidebar-width: 238px;
   display: flex;
@@ -375,6 +467,19 @@ body {
 }
 
 @media (max-width: 760px) {
+  .app-loading-sidebar {
+    display: none;
+  }
+
+  .app-loading-workspace {
+    padding: 20px 16px;
+  }
+
+  .app-loading-grid {
+    columns: 2;
+    column-gap: 10px;
+  }
+
   .workspace {
     --sidebar-width: 0px;
   }
@@ -437,6 +542,12 @@ body {
   }
 }
 
+@media (max-width: 340px) {
+  .app-loading-grid {
+    columns: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .workspace-body,
   .note-card {
@@ -447,5 +558,9 @@ body {
   .note-card:focus-within,
   .note-card:active {
     transform: none;
+  }
+
+  .app-loading-shimmer {
+    animation: none;
   }
 }

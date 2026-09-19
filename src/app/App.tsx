@@ -91,6 +91,28 @@ function preventUndefinedContextMenu(event: {
   event.preventDefault();
 }
 
+function AppLoadingSkeleton({ label }: { label: string }) {
+  return (
+    <main className="loading-notice app-loading" role="status" aria-busy="true">
+      <span className="sr-only">{label}</span>
+      <div className="app-loading-sidebar" aria-hidden="true">
+        <div className="app-loading-brand app-loading-shimmer" />
+        <div className="app-loading-nav app-loading-shimmer" />
+        <div className="app-loading-nav app-loading-nav-short app-loading-shimmer" />
+        <div className="app-loading-nav app-loading-nav-short app-loading-shimmer" />
+      </div>
+      <div className="app-loading-workspace" aria-hidden="true">
+        <div className="app-loading-toolbar app-loading-shimmer" />
+        <div className="app-loading-grid">
+          {[0, 1, 2, 3, 4, 5].map((item) => (
+            <div key={item} className={`app-loading-card app-loading-card-${item % 3} app-loading-shimmer`} />
+          ))}
+        </div>
+      </div>
+    </main>
+  );
+}
+
 export default function App() {
   const session = useSession();
   const { t } = useTranslation();
@@ -151,9 +173,7 @@ export default function App() {
       <PwaUpdateContext.Provider value={{ available: updateReady, update: applyUpdate, forceUpdate }}>
         <TooltipProvider delayDuration={350}>
           {session.restoring ? (
-            <main className="loading-notice" role="status">
-              {t('connect.restoring')}
-            </main>
+            <AppLoadingSkeleton label={t('connect.restoring')} />
           ) : session.connection ? (
             <Workspace key={session.connection.scopeId} offlineReady={offlineReady} />
           ) : (
@@ -205,6 +225,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   });
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [confirmPurge, setConfirmPurge] = useState<LocalNote | null>(null);
+  const [confirmClearTrash, setConfirmClearTrash] = useState(false);
   const [labelName, setLabelName] = useState('');
   const [labelColor, setLabelColor] = useState('#62836a');
   const [busy, setBusy] = useState(false);
@@ -403,17 +424,15 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       setBusy(false);
     }
   }
+  function requestClearTrash() {
+    const trashedCount = notes.filter((note) => note.current.meta.trashedAt !== null).length;
+    if (!trashedCount || !session.writable || !session.engine || !online || busy) return;
+    setConfirmClearTrash(true);
+  }
   async function clearTrash() {
+    setConfirmClearTrash(false);
     const trashed = notes.filter((note) => note.current.meta.trashedAt !== null);
-    if (
-      !trashed.length ||
-      !session.writable ||
-      !session.engine ||
-      !online ||
-      busy ||
-      !confirm(t('context.clearTrashConfirm', { count: trashed.length }))
-    )
-      return;
+    if (!trashed.length || !session.writable || !session.engine || !online || busy) return;
     setBusy(true);
     let firstError: unknown;
     try {
@@ -666,7 +685,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                       !session.engine ||
                       !online ||
                       busy,
-                    run: () => void clearTrash(),
+                    run: requestClearTrash,
                   },
                 ]
               : []),
@@ -1303,6 +1322,18 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
         onConfirm={() => {
           if (confirmPurge) void purge(confirmPurge);
         }}
+      />
+      <ConfirmDialog
+        open={confirmClearTrash}
+        title={t('action.clearTrash')}
+        description={t('context.clearTrashConfirm', {
+          count: notes.filter((note) => note.current.meta.trashedAt !== null).length,
+        })}
+        confirmLabel={t('action.clearTrash')}
+        cancelLabel={t('action.cancel')}
+        danger
+        onOpenChange={setConfirmClearTrash}
+        onConfirm={() => void clearTrash()}
       />
       {issue && (
         <Modal title={t('home.readIssue')} onClose={() => setIssue(null)} className="issue-dialog">

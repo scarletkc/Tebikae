@@ -203,11 +203,10 @@ test('clearing trash continues after an individual deletion fails', async ({ pag
   await page.locator('a[href$="#/trash"]').click({ button: 'right' });
   await expect(page.getByRole('menuitem', { name: 'Empty trash', exact: true })).toBeVisible();
   remote.failNextDeleteIssue = true;
-  page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toBe('Permanently delete 2 trashed notes? This cannot be undone.');
-    await dialog.accept();
-  });
   await page.getByRole('menuitem', { name: 'Empty trash', exact: true }).click();
+  const confirmation = page.getByRole('alertdialog');
+  await expect(confirmation).toContainText('Permanently delete 2 trashed notes? This cannot be undone.');
+  await confirmation.getByRole('button', { name: 'Empty trash', exact: true }).click();
   await expect.poll(() => remote.issues.length).toBe(1);
 });
 
