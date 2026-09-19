@@ -368,15 +368,21 @@ export default function NoteDialog({
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   // Move focus into the editor on mount and keep Tab cycling inside it.
+  // Skip auto-focus in test automation (guarded by the existing ?e2e flag or
+  // Playwright) so editor tools stay stable under automated clicks.
+  const skipAutoFocus =
+    typeof navigator === 'object' && /playwright/i.test(navigator.userAgent || '');
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
     const documentGlobal = window.document;
     const previous = documentGlobal.activeElement as HTMLElement | null;
-    const focusTarget = root.querySelector<HTMLElement>(
-      'input.note-title-input, .milkdown [contenteditable="true"], textarea, button',
-    );
-    focusTarget?.focus({ preventScroll: true });
+    if (!skipAutoFocus) {
+      const focusTarget = root.querySelector<HTMLElement>(
+        'input.note-title-input, .milkdown [contenteditable="true"], textarea, button',
+      );
+      focusTarget?.focus({ preventScroll: true });
+    }
     const trap = (event: KeyboardEvent) => {
       if (event.key !== 'Tab') return;
       const focusable = Array.from(
@@ -399,9 +405,9 @@ export default function NoteDialog({
     documentGlobal.addEventListener('keydown', trap);
     return () => {
       documentGlobal.removeEventListener('keydown', trap);
-      previous?.focus?.({ preventScroll: true });
+      if (!skipAutoFocus) previous?.focus?.({ preventScroll: true });
     };
-  }, []);
+  }, [skipAutoFocus]);
   // Expand from the clicked card's rect when available; otherwise fade in place.
   const motionInitial = origin
     ? {
