@@ -54,7 +54,7 @@ import Settings from '../features/settings/Settings';
 import MarkdownPreview from '../features/editor/MarkdownPreview';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useToast } from './toast';
-import { confirmDialog } from './confirm';
+import { confirmDialog, isConfirmDialogOpen } from './confirm';
 import { useIsMobile } from './useMediaQuery';
 
 function restoreFilters(scope: string): NoteFilters {
@@ -370,6 +370,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       /* Preferences are optional. */
     }
   }, [sidebarCollapsed]);
+  const isCreatingNoteRef = useRef(false);
   // Global app shortcuts: Cmd/Ctrl+K focuses search, Cmd/Ctrl+N creates a note.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -381,13 +382,27 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
         searchRef.current?.focus();
         searchRef.current?.select();
       } else if (key === 'n' && route !== 'settings' && route !== 'issues') {
+        if (!session.writable) return;
+        if (connectOpen || filtersOpen || issue || isConfirmDialogOpen()) return;
+        if (window.document.querySelector('.confirm-overlay, .confirm-dialog, [role="alertdialog"]')) return;
+        if (isCreatingNoteRef.current) return;
         event.preventDefault();
-        if (session.writable) newNote();
+        isCreatingNoteRef.current = true;
+        void (async () => {
+          try {
+            await flushAllDrafts();
+            newNote();
+          } catch {
+            /* Keep active editor open on save failure */
+          } finally {
+            isCreatingNoteRef.current = false;
+          }
+        })();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [route, session.writable, filters, labels]);
+  }, [route, session.writable, filters, labels, connectOpen, filtersOpen, issue]);
   function newNote(kind: NoteKind = 'markdown') {
     setSelection({
       kind,

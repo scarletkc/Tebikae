@@ -36,7 +36,7 @@ import { IconButton, download } from '../../app/ui';
 import { db } from '../../storage/db';
 import { safeHref } from '../../security/urls';
 import { usePwaUpdate } from '../../app/pwa';
-import { confirmDialog } from '../../app/confirm';
+import { confirmDialog, isConfirmDialogOpen } from '../../app/confirm';
 import { useIsMobile } from '../../app/useMediaQuery';
 import { motion } from 'motion/react';
 import { LabelBadge } from '../labels';
@@ -364,7 +364,12 @@ export default function NoteDialog({
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return;
       const target = event.target as Element | null;
-      if (target?.closest('[role="menu"], [role="listbox"], [role="alertdialog"]')) return;
+      if (target?.closest('[role="menu"], [role="listbox"], [role="alertdialog"], .confirm-dialog')) return;
+      if (
+        isConfirmDialogOpen() ||
+        window.document.querySelector('.confirm-overlay, .confirm-dialog, [role="alertdialog"]')
+      )
+        return;
       event.preventDefault();
       void closeRef.current();
     };
@@ -387,7 +392,17 @@ export default function NoteDialog({
       focusTarget?.focus({ preventScroll: true });
     }
     const trap = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
+      if (event.key !== 'Tab' || event.defaultPrevented) return;
+      if (
+        isConfirmDialogOpen() ||
+        documentGlobal.querySelector('.confirm-overlay, .confirm-dialog, [role="alertdialog"]')
+      ) {
+        return;
+      }
+      const active = documentGlobal.activeElement;
+      if (active?.closest('.confirm-dialog, [role="alertdialog"], .confirm-overlay')) {
+        return;
+      }
       const focusable = Array.from(
         root.querySelectorAll<HTMLElement>(
           'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
@@ -396,7 +411,6 @@ export default function NoteDialog({
       if (!focusable.length) return;
       const first = focusable[0]!;
       const last = focusable[focusable.length - 1]!;
-      const active = documentGlobal.activeElement;
       if (event.shiftKey && (active === first || !root.contains(active))) {
         event.preventDefault();
         last.focus();
