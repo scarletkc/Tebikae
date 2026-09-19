@@ -390,7 +390,8 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
         isCreatingNoteRef.current = true;
         void (async () => {
           try {
-            await flushAllDrafts();
+            await flushAllDrafts({ finalizeEmptyTitle: true });
+            void session.engine?.flush(false).catch(report);
             newNote();
           } catch {
             /* Keep active editor open on save failure */

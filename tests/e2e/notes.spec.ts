@@ -321,6 +321,22 @@ test('Ctrl/Cmd+N flushes pending draft before opening a new note', async ({ page
   await expect(page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true })).toHaveCount(0);
 });
 
+test('clearing an existing title before Ctrl/Cmd+N persists Untitled note', async ({ page, context }) => {
+  const remote = await mockGitHub(context);
+  await connect(page);
+  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  const title = dialog.getByLabel('Title', { exact: true });
+  await title.fill('');
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await page.keyboard.press(`${modifier}+n`);
+  await expect(dialog.getByLabel('Title', { exact: true })).toHaveValue('');
+  await closeDialog(page);
+  await expect(page.getByRole('button', { name: 'Edit note: Untitled note', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true })).toHaveCount(0);
+  await expect.poll(() => remote.issues[0]!.title).toBe('Untitled note');
+});
+
 test('Ctrl/Cmd+N keeps current editor open if draft persistence fails', async ({ page, context }) => {
   await mockGitHub(context);
   await connect(page);

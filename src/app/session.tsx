@@ -310,13 +310,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 }
 export const useSession = () => useContext(Context);
 
-const pendingEditors = new Set<() => Promise<void>>();
-export function registerDraftFlusher(flush: () => Promise<void>) {
+type DraftFlushOptions = { finalizeEmptyTitle?: boolean };
+const pendingEditors = new Set<(options?: DraftFlushOptions) => Promise<void>>();
+export function registerDraftFlusher(flush: (options?: DraftFlushOptions) => Promise<void>) {
   pendingEditors.add(flush);
   return () => {
     pendingEditors.delete(flush);
   };
 }
-export async function flushAllDrafts() {
-  for (const flush of pendingEditors) await flush();
+export async function flushAllDrafts(options?: DraftFlushOptions) {
+  for (const flush of pendingEditors) await flush(options);
 }

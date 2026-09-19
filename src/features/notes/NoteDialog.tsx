@@ -211,13 +211,19 @@ export default function NoteDialog({
     },
     [scope, t, engine],
   );
-  const flush = useCallback(async () => {
-    await editorFlush.current();
-    await persist();
-  }, [persist]);
+  const flush = useCallback(
+    async (options?: { finalizeEmptyTitle?: boolean }) => {
+      await editorFlush.current();
+      await persist(options);
+      if (options?.finalizeEmptyTitle && idRef.current) {
+        engine?.setEditing(idRef.current, false);
+      }
+    },
+    [persist, engine],
+  );
   const flushRef = useRef(flush);
   flushRef.current = flush;
-  useEffect(() => registerDraftFlusher(() => flushRef.current()), []);
+  useEffect(() => registerDraftFlusher((options) => flushRef.current(options)), []);
   useEffect(() => {
     if (localId) engine?.setEditing(localId, true);
     return () => {
