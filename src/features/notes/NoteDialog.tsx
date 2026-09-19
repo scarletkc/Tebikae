@@ -256,7 +256,11 @@ export default function NoteDialog({
       !online ||
       !idRef.current ||
       docRef.current.meta.trashedAt === null ||
-      !(await confirmDialog({ title: t('note.deleteConfirm'), confirmLabel: t('action.deleteForever'), danger: true }))
+      !(await confirmDialog({
+        title: t('note.deleteConfirm'),
+        confirmLabel: t('action.deleteForever'),
+        danger: true,
+      }))
     )
       return;
     purging.current = true;
@@ -370,8 +374,7 @@ export default function NoteDialog({
   // Move focus into the editor on mount and keep Tab cycling inside it.
   // Skip auto-focus in test automation (guarded by the existing ?e2e flag or
   // Playwright) so editor tools stay stable under automated clicks.
-  const skipAutoFocus =
-    typeof navigator === 'object' && /playwright/i.test(navigator.userAgent || '');
+  const skipAutoFocus = typeof navigator === 'object' && /playwright/i.test(navigator.userAgent || '');
   useEffect(() => {
     const root = rootRef.current;
     if (!root) return;
@@ -721,6 +724,7 @@ export default function NoteDialog({
             <>
               <IconButton
                 label={t(document.meta.pinned ? 'action.unpin' : 'action.pin')}
+                className={document.meta.pinned ? 'is-pinned' : undefined}
                 disabled={readOnly}
                 onClick={() => change((d) => ({ ...d, meta: { ...d.meta, pinned: !d.meta.pinned } }))}
               >

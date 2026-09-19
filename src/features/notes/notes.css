@@ -55,6 +55,12 @@
   position: relative;
   z-index: 2;
 }
+/* The summary overlay covers the card, so the header pin toggle needs the same
+   stacking order as the footer actions to stay clickable. */
+.note-card .card-pin-toggle {
+  position: relative;
+  z-index: 2;
+}
 .note-card .card-labels {
   position: relative;
   z-index: 2;

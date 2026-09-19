@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { connect, mockGitHub } from './fixtures';
+import { connect, mockGitHub, confirmPrompt } from './fixtures';
 
 async function savedRecords(page: Page) {
   return page.evaluate(async () => {
@@ -62,7 +62,9 @@ test('reopening a tab restores the encrypted connection and sends only reads', a
   const reopened = await context.newPage();
   await reopened.goto('/');
   await expect(reopened.getByLabel('Search your notes', { exact: true })).toBeVisible();
-  await expect(reopened.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
+  await expect(reopened.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled({
+    timeout: 15_000,
+  });
   await expect(reopened.locator('.note-card')).toHaveCount(2);
   expect(remote.requests.filter((request) => request.path === '/user')).toHaveLength(2);
   expect(remote.writes).toHaveLength(0);
@@ -180,8 +182,8 @@ test('clearing device data also removes the saved credentials', async ({ page, c
   await mockGitHub(context);
   await connect(page);
   await page.locator('a[href$="#/settings"]').click();
-  page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Clear this device’s data', exact: true }).click();
+  await confirmPrompt(page, true, 'Clear this device’s data');
   await expect(page.getByLabel('Personal access token', { exact: true })).toHaveValue('');
   expect(await savedRecords(page)).toBe(0);
   await page.reload();

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
@@ -19,7 +19,6 @@ import {
   Pencil,
   Plus,
   RefreshCw,
-  Search,
   Settings as SettingsIcon,
   SlidersHorizontal,
   Tag,
@@ -31,7 +30,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { useSession, flushAllDrafts } from './session';
 import { usePreferences } from './preferences';
 import { PwaUpdateContext, clearAppCaches, reloadFresh } from './pwa';
-import { Brand, IconButton, Modal, PreferencesControls, download } from './ui';
+import { Brand, IconButton, Modal, PreferencesControls, SortControl, download } from './ui';
 import { db } from '../storage/db';
 import { defaultFilters, filterNotes, labelCounts, sidebarLabels } from '../domain/filters';
 import WorkspaceStatus, { type WorkspaceNotice } from './WorkspaceStatus';
@@ -70,6 +69,14 @@ function restoreFilters(scope: string): NoteFilters {
   }
   return structuredClone(defaultFilters);
 }
+
+// The masonry grid uses minmax(232px, 1fr) columns with an 18px gap. Below this
+// content width two columns no longer fit, so the notes area is forced into
+// list layout and the grid/list toggle is hidden.
+const MIN_GRID_CARD_WIDTH = 232;
+const GRID_GAP = 18;
+const MIN_TWO_COLUMN_WIDTH = MIN_GRID_CARD_WIDTH * 2 + GRID_GAP;
+const MIN_WIDE_TOPBAR_WIDTH = 720;
 
 function preventUndefinedContextMenu(event: {
   target: EventTarget | null;
@@ -199,6 +206,39 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   const reduceMotion = useReducedMotion();
   const { toast } = useToast();
   const searchRef = useRef<HTMLInputElement>(null);
+  const topbarRef = useRef<HTMLElement>(null);
+  const notesAreaRef = useRef<HTMLElement>(null);
+  const [topbarWidth, setTopbarWidth] = useState<number | null>(null);
+  // Track the notes area's own width so the grid/list layout reacts to the
+  // panel width (sidebar collapse, window resize) instead of the viewport.
+  const [notesAreaWidth, setNotesAreaWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const topbar = topbarRef.current;
+    const area = notesAreaRef.current;
+    if (typeof ResizeObserver === 'undefined') return;
+    const updateTopbar = () => {
+      if (topbar) setTopbarWidth(topbar.clientWidth);
+    };
+    const updateArea = () => {
+      if (!area) return;
+      const styles = getComputedStyle(area);
+      const paddingX = parseFloat(styles.paddingLeft) + parseFloat(styles.paddingRight);
+      setNotesAreaWidth(area.clientWidth - paddingX);
+    };
+    updateTopbar();
+    updateArea();
+    const observer = new ResizeObserver(() => {
+      updateTopbar();
+      updateArea();
+    });
+    if (topbar) observer.observe(topbar);
+    if (area) observer.observe(area);
+    return () => observer.disconnect();
+  }, []);
+  const isCompactTopbar = topbarWidth !== null && topbarWidth < MIN_WIDE_TOPBAR_WIDTH;
+  // Narrow panels cannot fit two grid columns: hide the view toggle and force list.
+  const singleColumnOnly = notesAreaWidth !== null && notesAreaWidth < MIN_TWO_COLUMN_WIDTH;
+  const effectiveLayout = singleColumnOnly ? 'list' : prefs.layout;
   const [labelName, setLabelName] = useState('');
   const [labelColor, setLabelColor] = useState('#62836a');
   const [busy, setBusy] = useState(false);
@@ -855,7 +895,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   const pinned = view === 'notes' ? resultNotes.filter((n) => n.current.meta.pinned) : [];
   const others = view === 'notes' ? resultNotes.filter((n) => !n.current.meta.pinned) : resultNotes;
   const renderCards = (items: LocalNote[]) => (
-    <NotesGrid list={prefs.layout === 'list'}>
+    <NotesGrid list={effectiveLayout === 'list'}>
       {items.map((note) => (
         <NoteCard
           key={note.localId}
@@ -917,25 +957,22 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-      <div
-        className="workspace-body"
-        style={{ marginLeft: isMobile ? 0 : sidebarCollapsed ? 62 : 238 }}
-      >
-        <header className="app-topbar">
-          <IconButton className="mobile-menu" label={t('nav.menu')} onClick={() => setDrawer(true)}>
-            <Menu size={21} />
-          </IconButton>
-          {!isMobile && (
+      <div className="workspace-body" style={{ marginLeft: isMobile ? 0 : sidebarCollapsed ? 62 : 238 }}>
+        <header ref={topbarRef} className="app-topbar">
+          <div className="search-box">
             <IconButton
-              className="sidebar-toggle"
-              label={sidebarCollapsed ? t('nav.menu') : t('nav.close')}
-              onClick={() => setSidebarCollapsed((value) => !value)}
+              className={isMobile ? 'mobile-menu nav-toggle-btn' : 'sidebar-toggle nav-toggle-btn'}
+              label={isMobile ? t('nav.menu') : sidebarCollapsed ? t('nav.menu') : t('nav.close')}
+              onClick={() => {
+                if (isMobile) {
+                  setDrawer(true);
+                } else {
+                  setSidebarCollapsed((value) => !value);
+                }
+              }}
             >
               <Menu size={18} />
             </IconButton>
-          )}
-          <div className="search-box">
-            <Search size={19} />
             <TextContextMenu
               clearLabel={t('context.clearSearch')}
               clearDisabled={!filters.query}
@@ -949,15 +986,6 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                 onChange={(e) => setFilters({ ...filters, query: e.target.value })}
               />
             </TextContextMenu>
-            {route !== 'settings' && route !== 'issues' && (
-              <IconButton
-                label={t('action.filter')}
-                className={`filter-open-button ${filterCount(filters) ? 'is-active' : ''}`}
-                onClick={() => setFiltersOpen(true)}
-              >
-                <SlidersHorizontal size={16} />
-              </IconButton>
-            )}
             {(filters.query || filterCount(filters) > 0) && (
               <IconButton
                 label={t('action.clearSearchFilters')}
@@ -969,55 +997,112 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
                 <X size={15} />
               </IconButton>
             )}
+            {isCompactTopbar ? (
+              route !== 'settings' && route !== 'issues' ? (
+                <div className="topbar-note-actions search-actions">
+                  {statusControl}
+                  <SortControl
+                    value={filters.sort}
+                    onChange={(sort) => setFilters({ ...filters, sort })}
+                    mode="icon"
+                  />
+                  {!singleColumnOnly && (
+                    <ContextMenu
+                      contextName="view"
+                      items={[
+                        {
+                          label: t('action.grid'),
+                          icon: Grid2X2,
+                          checked: effectiveLayout === 'grid',
+                          keepOpen: false,
+                          run: () => prefs.setLayout('grid'),
+                        },
+                        {
+                          label: t('action.list'),
+                          icon: List,
+                          checked: effectiveLayout === 'list',
+                          keepOpen: false,
+                          run: () => prefs.setLayout('list'),
+                        },
+                      ]}
+                    >
+                      <IconButton
+                        className={`view-toggle-button ${prefs.layout === 'grid' ? 'is-grid' : 'is-list'}`}
+                        label={t(`action.${prefs.layout}`)}
+                        onClick={() => prefs.setLayout(prefs.layout === 'grid' ? 'list' : 'grid')}
+                      >
+                        {prefs.layout === 'grid' ? <Grid2X2 size={17} /> : <List size={18} />}
+                      </IconButton>
+                    </ContextMenu>
+                  )}
+                  <IconButton
+                    label={t('action.filter')}
+                    className={`filter-open-button ${filterCount(filters) ? 'is-active' : ''}`}
+                    onClick={() => setFiltersOpen(true)}
+                  >
+                    <SlidersHorizontal size={16} />
+                  </IconButton>
+                </div>
+              ) : (
+                statusControl
+              )
+            ) : (
+              route !== 'settings' &&
+              route !== 'issues' && (
+                <IconButton
+                  label={t('action.filter')}
+                  className={`filter-open-button ${filterCount(filters) ? 'is-active' : ''}`}
+                  onClick={() => setFiltersOpen(true)}
+                >
+                  <SlidersHorizontal size={16} />
+                </IconButton>
+              )
+            )}
           </div>
-          {route !== 'settings' && route !== 'issues' && (
+          {!isCompactTopbar && route !== 'settings' && route !== 'issues' && (
             <div className="topbar-note-actions">
-              <select
-                aria-label={t('filter.sort')}
+              <SortControl
                 value={filters.sort}
-                onChange={(e) => setFilters({ ...filters, sort: e.target.value as NoteFilters['sort'] })}
-              >
-                {(['updated-desc', 'updated-asc', 'created-desc', 'title'] as const).map((sort) => (
-                  <option key={sort} value={sort}>
-                    {t(`filter.${sort}`)}
-                  </option>
-                ))}
-              </select>
-              <ContextMenu
-                contextName="view"
-                className="view-toggle"
-                items={[
-                  {
-                    label: t('action.grid'),
-                    icon: Grid2X2,
-                    checked: prefs.layout === 'grid',
-                    keepOpen: false,
-                    run: () => prefs.setLayout('grid'),
-                  },
-                  {
-                    label: t('action.list'),
-                    icon: List,
-                    checked: prefs.layout === 'list',
-                    keepOpen: false,
-                    run: () => prefs.setLayout('list'),
-                  },
-                ]}
-              >
-                <IconButton
-                  className={prefs.layout === 'grid' ? 'selected' : ''}
-                  label={t('action.grid')}
-                  onClick={() => prefs.setLayout('grid')}
+                onChange={(sort) => setFilters({ ...filters, sort })}
+                mode="text"
+              />
+              {!singleColumnOnly && (
+                <ContextMenu
+                  contextName="view"
+                  className="view-toggle"
+                  items={[
+                    {
+                      label: t('action.grid'),
+                      icon: Grid2X2,
+                      checked: effectiveLayout === 'grid',
+                      keepOpen: false,
+                      run: () => prefs.setLayout('grid'),
+                    },
+                    {
+                      label: t('action.list'),
+                      icon: List,
+                      checked: effectiveLayout === 'list',
+                      keepOpen: false,
+                      run: () => prefs.setLayout('list'),
+                    },
+                  ]}
                 >
-                  <Grid2X2 size={17} />
-                </IconButton>
-                <IconButton
-                  className={prefs.layout === 'list' ? 'selected' : ''}
-                  label={t('action.list')}
-                  onClick={() => prefs.setLayout('list')}
-                >
-                  <List size={18} />
-                </IconButton>
-              </ContextMenu>
+                  <IconButton
+                    className={prefs.layout === 'grid' ? 'selected' : ''}
+                    label={t('action.grid')}
+                    onClick={() => prefs.setLayout('grid')}
+                  >
+                    <Grid2X2 size={17} />
+                  </IconButton>
+                  <IconButton
+                    className={prefs.layout === 'list' ? 'selected' : ''}
+                    label={t('action.list')}
+                    onClick={() => prefs.setLayout('list')}
+                  >
+                    <List size={18} />
+                  </IconButton>
+                </ContextMenu>
+              )}
               {statusControl}
               {route !== 'trash' && view !== 'archive' && (
                 <ContextMenu
@@ -1045,7 +1130,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
               )}
             </div>
           )}
-          {(route === 'settings' || route === 'issues') && statusControl}
+          {!isCompactTopbar && (route === 'settings' || route === 'issues') && statusControl}
         </header>
         <ContextMenu
           contextName="main"
@@ -1062,6 +1147,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           }
         >
           <main
+            ref={notesAreaRef}
             className="main-content"
             tabIndex={-1}
             onKeyDown={(event) => {
@@ -1127,7 +1213,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
               <>
                 <h1 className="sr-only">{t(`nav.${route}`)}</h1>
                 {route === 'issues' ? (
-                  <div className={`notes-grid ${prefs.layout === 'list' ? 'notes-list' : ''}`}>
+                  <div className={`notes-grid ${effectiveLayout === 'list' ? 'notes-list' : ''}`}>
                     {issues
                       .filter((row) =>
                         `${row.snapshot.title}\n${row.snapshot.body}\n${row.snapshot.labels.map((l) => l.name).join(' ')}`
@@ -1203,6 +1289,35 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
             )}
           </main>
         </ContextMenu>
+        {isCompactTopbar &&
+          route !== 'trash' &&
+          view !== 'archive' &&
+          route !== 'settings' &&
+          route !== 'issues' && (
+            <ContextMenu
+              contextName="new-note-fab"
+              items={[
+                { label: t('action.new'), icon: Plus, disabled: !session.writable, run: () => newNote() },
+                {
+                  label: t('action.newChecklist'),
+                  icon: CheckSquare,
+                  separator: true,
+                  disabled: !session.writable,
+                  run: () => newNote('checklist'),
+                },
+              ]}
+            >
+              <button
+                className="button primary new-note-button fab-new-note"
+                aria-label={t('action.new')}
+                title={t('action.new')}
+                disabled={!session.writable}
+                onClick={() => newNote()}
+              >
+                <Pencil size={22} />
+              </button>
+            </ContextMenu>
+          )}
       </div>
       {filtersOpen && (
         <FiltersDialog

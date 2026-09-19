@@ -97,7 +97,8 @@ export default function NoteCard({
         className={`note-card note-${document.meta.color} ${selected ? 'is-selected' : ''}`}
         tabIndex={0}
         onClickCapture={(e) => {
-          if ((e.target as Element).closest('.card-actions, .label-badge, [role="menu"]')) return;
+          if ((e.target as Element).closest('.card-actions, .card-pin-toggle, .label-badge, [role="menu"]'))
+            return;
           if (onSelect?.(e)) {
             e.preventDefault();
             e.stopPropagation();
@@ -120,7 +121,16 @@ export default function NoteCard({
                 <Highlight query={query} text={document.title} />
               </button>
             </h3>
-            {document.meta.pinned && <Pin size={14} />}
+            {!trashed && document.meta.pinned && (
+              <IconButton
+                label={t('action.unpin')}
+                className="card-pin-toggle"
+                onClick={() => onChange('pin')}
+                disabled={!editable}
+              >
+                <Pin size={14} />
+              </IconButton>
+            )}
           </div>
           {!checklist.length && (
             <MarkdownPreview value={preview || t('note.blank')} compact className="card-rich-preview" />
@@ -213,13 +223,11 @@ export default function NoteCard({
               </>
             ) : (
               <>
-                <IconButton
-                  label={t(document.meta.pinned ? 'action.unpin' : 'action.pin')}
-                  onClick={() => onChange('pin')}
-                  disabled={!editable}
-                >
-                  <Pin size={16} />
-                </IconButton>
+                {document.meta.pinned ? null : (
+                  <IconButton label={t('action.pin')} onClick={() => onChange('pin')} disabled={!editable}>
+                    <Pin size={16} />
+                  </IconButton>
+                )}
                 <IconButton
                   label={t(document.archived ? 'action.unarchive' : 'action.archive')}
                   onClick={() => onChange('archive')}

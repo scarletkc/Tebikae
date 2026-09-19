@@ -93,11 +93,10 @@ test('label rename and deletion affect labels, not notes', async ({ page, contex
     .getByRole('button')
     .first()
     .click({ button: 'right' });
-  page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toContain('2 notes');
-    await dialog.accept();
-  });
   await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+  const labelConfirm = page.getByRole('alertdialog');
+  await expect(labelConfirm).toContainText('2 notes');
+  await labelConfirm.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.locator('.sidebar .label-nav-row')).toHaveCount(1);
   await expect(page.locator('.note-card')).toHaveCount(2);
   expect(remote.issues.filter((n) => n.number <= 2).every((n) => !n.labels.some((l) => l.id === 11))).toBe(
@@ -204,11 +203,10 @@ test('clearing trash continues after an individual deletion fails', async ({ pag
   await page.locator('a[href$="#/trash"]').click({ button: 'right' });
   await expect(page.getByRole('menuitem', { name: 'Empty trash', exact: true })).toBeVisible();
   remote.failNextDeleteIssue = true;
-  page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toBe('Permanently delete 2 trashed notes? This cannot be undone.');
-    await dialog.accept();
-  });
   await page.getByRole('menuitem', { name: 'Empty trash', exact: true }).click();
+  const trashConfirm = page.getByRole('alertdialog');
+  await expect(trashConfirm).toContainText('Permanently delete 2 trashed notes? This cannot be undone.');
+  await trashConfirm.getByRole('button', { name: 'Empty trash', exact: true }).click();
   await expect.poll(() => remote.issues.length).toBe(1);
 });
 

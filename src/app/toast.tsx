@@ -1,12 +1,4 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
 
@@ -49,7 +41,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (message: string, kind: ToastKind = 'info') => {
       const id = nextId++;
       setToasts((current) => [...current.slice(-3), { id, kind, message }]);
-      timers.current.set(id, setTimeout(() => dismiss(id), 3600));
+      timers.current.set(
+        id,
+        setTimeout(() => dismiss(id), 3600),
+      );
     },
     [dismiss],
   );

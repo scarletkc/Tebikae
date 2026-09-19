@@ -17,6 +17,7 @@ import { usePreferences, type Theme } from '../../app/preferences';
 import { usePwaUpdate } from '../../app/pwa';
 import { useSession, flushAllDrafts } from '../../app/session';
 import { download, LanguageControl } from '../../app/ui';
+import { confirmDialog } from '../../app/confirm';
 import { exportScope, clearScope } from '../../application/commands';
 import { db } from '../../storage/db';
 import packageJson from '../../../package.json';
@@ -53,7 +54,14 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
       .equals(connection.scopeId)
       .filter((n) => n.syncStatus !== 'synced')
       .count();
-    if (!confirm(t('settings.clearConfirm', { count: pending }))) return;
+    if (
+      !(await confirmDialog({
+        title: t('settings.clearConfirm', { count: pending }),
+        confirmLabel: t('settings.clear'),
+        danger: true,
+      }))
+    )
+      return;
     setBusy(true);
     try {
       await session.disconnect();

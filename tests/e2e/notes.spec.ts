@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { closeDialog, connect, mockGitHub } from './fixtures';
+import { closeDialog, confirmPrompt, connect, mockGitHub } from './fixtures';
 
 test(
   'connect and unchanged reading keep existing Issues intact',
@@ -87,14 +87,14 @@ test('trash then delete forever removes the Issue through GraphQL and does not r
   await page.locator('a[href$="#/trash"]').click();
   await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  page.once('dialog', (confirmation) => void confirmation.dismiss());
   await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await confirmPrompt(page, false);
   await expect
     .poll(() => remote.writes.filter((write) => write.path === '/graphql').length, { timeout: 5_000 })
     .toBe(0);
   expect(remote.issues.find((issue) => issue.number === 1)).toBeDefined();
-  page.on('dialog', (confirmation) => confirmation.accept());
   await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await confirmPrompt(page, true, 'Delete forever');
   await expect
     .poll(() => remote.writes.filter((write) => write.path === '/graphql').length, { timeout: 10_000 })
     .toBe(1);
@@ -122,8 +122,8 @@ test('a failed forever deletion keeps the note in the trash', async ({ page, con
   await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
   remote.failNextDeleteIssue = true;
   const dialog = page.getByRole('dialog');
-  page.once('dialog', (confirmation) => void confirmation.accept());
   await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await confirmPrompt(page, true, 'Delete forever');
   await expect(dialog.getByRole('alert')).toBeVisible();
   await closeDialog(page);
   await page.locator('a[href$="#/trash"]').click();
@@ -171,7 +171,9 @@ test('archive survives trash and restore, and JSON export contains no credential
   await page.locator('a[href$="#/trash"]').click();
   await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
   await expect(page.getByRole('dialog').getByLabel('Title', { exact: true })).toHaveAttribute('readonly', '');
-  await page.getByRole('button', { name: 'Restore note', exact: true }).click();
+  // The editor is open here; scope to it because the card behind keeps its own
+  // restore control in the accessibility tree.
+  await page.getByRole('dialog').getByRole('button', { name: 'Restore note', exact: true }).click();
   await closeDialog(page);
   await page.locator('a[href$="#/archive"]').click();
   await expect(

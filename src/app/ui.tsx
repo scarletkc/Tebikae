@@ -1,6 +1,6 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { X, Sun, Moon, Monitor, Languages, Check, ChevronDown } from 'lucide-react';
+import { X, Sun, Moon, Monitor, Languages, Check, ChevronDown, ArrowUpDown } from 'lucide-react';
 import './menus.css';
 import { useTranslation } from 'react-i18next';
 import { type ReactNode } from 'react';
@@ -78,7 +78,6 @@ export function LanguageControl({
       contextName="language"
       items={LANGUAGES.map((language) => ({
         label: language.label,
-        icon: Languages,
         checked: value === language.value,
         keepOpen: false,
         run: () => onChange(language.value),
@@ -100,7 +99,6 @@ export function LanguageControl({
                       <Check size={15} aria-hidden="true" />
                     </DropdownMenu.ItemIndicator>
                   </span>
-                  <Languages size={15} className="language-menu-icon" aria-hidden="true" />
                   {language.label}
                 </DropdownMenu.RadioItem>
               ))}
@@ -108,6 +106,87 @@ export function LanguageControl({
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
+    </ContextMenu>
+  );
+}
+
+export const SORT_OPTIONS = ['updated-desc', 'updated-asc', 'created-desc', 'title'] as const;
+export type SortOption = (typeof SORT_OPTIONS)[number];
+
+export function SortControl({
+  value,
+  onChange,
+  mode = 'text',
+}: {
+  value: SortOption;
+  onChange(value: SortOption): void;
+  mode?: 'text' | 'icon';
+}) {
+  const { t } = useTranslation();
+  const trigger = (
+    <DropdownMenu.Trigger
+      className={mode === 'icon' ? 'icon-button sort-icon-button' : 'sort-menu-trigger'}
+      title={t('filter.sort')}
+      aria-label={t('filter.sort')}
+    >
+      {mode === 'icon' ? (
+        <ArrowUpDown size={17} aria-hidden="true" />
+      ) : (
+        <>
+          <span>{t(`filter.${value}`)}</span>
+          <ChevronDown size={14} aria-hidden="true" />
+        </>
+      )}
+    </DropdownMenu.Trigger>
+  );
+
+  return (
+    <ContextMenu
+      contextName="sort"
+      items={SORT_OPTIONS.map((sort) => ({
+        label: t(`filter.${sort}`),
+        checked: value === sort,
+        keepOpen: false,
+        run: () => onChange(sort),
+      }))}
+    >
+      <div
+        className={`sort-control-container ${mode === 'icon' ? 'sort-control-icon-mode' : 'sort-control-text-mode'}`}
+      >
+        <select
+          aria-label={t('filter.sort')}
+          value={value}
+          onChange={(e) => onChange(e.target.value as SortOption)}
+          tabIndex={-1}
+          aria-hidden="true"
+          className="sort-hidden-select"
+        >
+          {SORT_OPTIONS.map((sort) => (
+            <option key={sort} value={sort}>
+              {t(`filter.${sort}`)}
+            </option>
+          ))}
+        </select>
+        <DropdownMenu.Root>
+          {trigger}
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content className="sort-menu-content" align="start" sideOffset={6} loop>
+              <DropdownMenu.RadioGroup value={value} onValueChange={(next) => onChange(next as SortOption)}>
+                {SORT_OPTIONS.map((sort) => (
+                  <DropdownMenu.RadioItem key={sort} value={sort} className="sort-menu-item">
+                    <span className="sort-menu-check">
+                      <DropdownMenu.ItemIndicator>
+                        <Check size={15} aria-hidden="true" />
+                      </DropdownMenu.ItemIndicator>
+                    </span>
+                    <span>{t(`filter.${sort}`)}</span>
+                  </DropdownMenu.RadioItem>
+                ))}
+              </DropdownMenu.RadioGroup>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
+      </div>
     </ContextMenu>
   );
 }
