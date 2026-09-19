@@ -61,7 +61,8 @@
     "checkAgain": "Check GitHub again",
     "retryCreate": "Create again",
     "discard": "Discard local draft",
-    "takeLock": "Enable editing"
+    "takeLock": "Enable editing",
+    "back": "Back"
   },
   "connect": {
     "eyebrow": "YOUR NOTES, YOUR REPOSITORY",

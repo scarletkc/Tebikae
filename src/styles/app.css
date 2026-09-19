@@ -584,7 +584,8 @@ hr {
 }
 .workspace {
   display: flex;
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 .sidebar {
   position: fixed;
@@ -596,6 +597,60 @@ hr {
   flex-direction: column;
   padding: 32px 18px 18px;
   z-index: 10;
+  overflow: hidden;
+}
+.sidebar-collapsed {
+  padding-left: 10px;
+  padding-right: 10px;
+}
+.sidebar-collapsed .sidebar-brand {
+  padding: 0 0 24px;
+}
+.sidebar-collapsed .brand > span:last-child,
+.sidebar-collapsed .nav-item > span:not(.nav-count),
+.sidebar-collapsed .nav-count,
+.sidebar-collapsed .labels-heading h2,
+.sidebar-collapsed .empty-labels,
+.sidebar-collapsed .repository-pill > span:nth-child(2),
+.sidebar-collapsed .label-selection-done {
+  display: none;
+}
+.sidebar-collapsed .nav-item {
+  justify-content: center;
+  gap: 0;
+  padding-left: 0;
+  padding-right: 0;
+}
+.sidebar-collapsed .labels-heading {
+  justify-content: center;
+  margin: 20px 0 6px;
+}
+.sidebar-collapsed .label-nav .nav-item .label-dot {
+  margin: 0;
+}
+.sidebar-collapsed .repository-pill {
+  justify-content: center;
+  padding: 10px;
+}
+.sidebar-collapsed .workspace-preferences {
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.workspace-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
+  transition: margin-left 0.2s ease;
+}
+.main-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 .sidebar-brand {
   padding: 0 14px 39px;
@@ -730,13 +785,6 @@ hr {
   background: #6d9568;
   box-shadow: 0 0 0 3px #799f7420;
 }
-.workspace-body {
-  margin-left: 238px;
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
 .app-topbar {
   position: sticky;
   top: 0;
@@ -864,7 +912,6 @@ hr {
 }
 .main-content {
   padding: 42px 42px 70px;
-  flex: 1;
   max-width: 1600px;
   width: 100%;
   margin: 0 auto;
@@ -1397,13 +1444,66 @@ mark {
 .markdown-export-counts > div:last-child {
   font-weight: 600;
 }
-.note-dialog {
-  width: min(94vw, 890px);
+.floating-editor.note-dialog {
+  width: min(900px, calc(100vw - 80px));
+  height: min(800px, calc(100dvh - 80px));
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  outline: none;
+}
+.floating-editor-mobile {
+  width: 100% !important;
+  height: 100dvh !important;
+  border-radius: 0;
+  border: 0;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.floating-editor-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.floating-editor-heading {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.floating-editor-close {
+  margin-left: auto;
+}
+.editor-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.editor-layer-dim {
+  background: rgb(0 0 0 / 0.15);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
 .note-dialog-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 20px 30px 26px;
-  min-height: 150px;
   overscroll-behavior: contain;
 }
 .note-title-input:not([type='checkbox']) {
@@ -1708,12 +1808,8 @@ mark {
 }
 @media (max-width: 1100px) {
   .sidebar {
-    width: 208px;
     padding-left: 12px;
     padding-right: 12px;
-  }
-  .workspace-body {
-    margin-left: 208px;
   }
   .app-topbar {
     padding: 12px 20px;
@@ -1810,9 +1906,6 @@ mark {
   }
   .sidebar {
     display: none;
-  }
-  .workspace-body {
-    margin-left: 0;
   }
   .mobile-menu {
     display: inline-flex;
@@ -1952,18 +2045,16 @@ mark {
   .settings-section .button {
     font-size: 11px;
   }
-  .note-dialog {
-    inset: 0;
-    transform: none;
+  .floating-editor.note-dialog {
     width: 100%;
     height: 100dvh;
-    max-height: 100dvh;
     border-radius: 0;
     border: 0;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
   .note-dialog-scroll {
     padding: 18px 20px;
-    flex: 1;
   }
   .note-title-input:not([type='checkbox']) {
     font-size: 26px;
@@ -2118,6 +2209,99 @@ mark {
   .welcome-footer span {
     max-width: 230px;
   }
+}
+.toast-layer {
+  position: fixed;
+  bottom: calc(20px + env(safe-area-inset-bottom));
+  right: 20px;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  max-width: calc(100vw - 32px);
+}
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 11px 14px;
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  max-width: min(360px, calc(100vw - 32px));
+}
+.toast-message {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.toast-success > svg {
+  color: #5d8a5a;
+}
+.toast-error > svg {
+  color: var(--danger);
+}
+.toast-info > svg {
+  color: var(--muted);
+}
+.toast-close {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 3px;
+  display: inline-flex;
+  border-radius: 6px;
+}
+.toast-close:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: rgb(0 0 0 / 0.24);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.confirm-dialog {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  width: min(92vw, 400px);
+  outline: none;
+}
+.confirm-title {
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.confirm-description {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}
+.note-card {
+  transform-origin: center;
+}
+.note-card:active {
+  transform: scale(0.985);
+  transition: transform 0.1s ease;
 }
 @media (prefers-reduced-motion: reduce) {
   *,

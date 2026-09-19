@@ -53,6 +53,10 @@ import NoteDialog from '../features/notes/NoteDialog';
 import { FilterChips, FiltersDialog, filterCount } from '../features/filters/Filters';
 import Settings from '../features/settings/Settings';
 import MarkdownPreview from '../features/editor/MarkdownPreview';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useToast } from './toast';
+import { confirmDialog } from './confirm';
+import { useIsMobile } from './useMediaQuery';
 
 function restoreFilters(scope: string): NoteFilters {
   try {
@@ -184,6 +188,17 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   const [labelSelectionMode, setLabelSelectionMode] = useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>([]);
   const [drawer, setDrawer] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('tebikae.sidebarCollapsed') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const isMobile = useIsMobile();
+  const reduceMotion = useReducedMotion();
+  const { toast } = useToast();
+  const searchRef = useRef<HTMLInputElement>(null);
   const [labelName, setLabelName] = useState('');
   const [labelColor, setLabelColor] = useState('#62836a');
   const [busy, setBusy] = useState(false);
@@ -196,6 +211,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     ids: string[];
     initial?: LocalNote;
     labelIds?: number[];
+    origin?: { x: number; y: number; width: number; height: number } | null;
   } | null>(null);
   const [issue, setIssue] = useState<UnmanagedIssue | null>(null);
   const notes = useLiveQuery(() => db.notes.where('scopeId').equals(scope).toArray(), [scope], []);
@@ -307,6 +323,31 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       window.removeEventListener('offline', update);
     };
   }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem('tebikae.sidebarCollapsed', sidebarCollapsed ? '1' : '0');
+    } catch {
+      /* Preferences are optional. */
+    }
+  }, [sidebarCollapsed]);
+  // Global app shortcuts: Cmd/Ctrl+K focuses search, Cmd/Ctrl+N creates a note.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const mod = event.ctrlKey || event.metaKey;
+      if (!mod) return;
+      const key = event.key.toLowerCase();
+      if (key === 'k') {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      } else if (key === 'n' && route !== 'settings' && route !== 'issues') {
+        event.preventDefault();
+        if (session.writable) newNote();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [route, session.writable, filters, labels]);
   function newNote(kind: NoteKind = 'markdown') {
     setSelection({
       kind,
@@ -314,13 +355,25 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       labelIds: filters.unlabeledOnly
         ? []
         : [...new Set(filters.labelIds)].filter((id) => labels.some((label) => label.id === id)),
+      origin: null,
     });
   }
   function report(error: unknown) {
     setNotice(error instanceof ApiError ? t(`error.${error.code}`) : t('error.generic'));
   }
   async function purge(note: LocalNote) {
-    if (!session.writable || !session.engine || !online || busy || !confirm(t('note.deleteConfirm'))) return;
+    if (
+      !session.writable ||
+      !session.engine ||
+      !online ||
+      busy ||
+      !(await confirmDialog({
+        title: t('note.deleteConfirm'),
+        confirmLabel: t('action.deleteForever'),
+        danger: true,
+      }))
+    )
+      return;
     setBusy(true);
     try {
       await session.engine.destroy(note.localId);
@@ -338,7 +391,11 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       !session.engine ||
       !online ||
       busy ||
-      !confirm(t('context.clearTrashConfirm', { count: trashed.length }))
+      !(await confirmDialog({
+        title: t('context.clearTrashConfirm', { count: trashed.length }),
+        confirmLabel: t('action.clearTrash'),
+        danger: true,
+      }))
     )
       return;
     setBusy(true);
@@ -373,10 +430,18 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       else if (action === 'archive') current.archived = !current.archived;
       else current.meta.trashedAt = action === 'trash' ? new Date().toISOString() : null;
     });
+    const messages: Record<typeof action, string> = {
+      pin: note.current.meta.pinned ? t('action.unpin') : t('action.pin'),
+      archive: note.current.archived ? t('action.unarchive') : t('action.archive'),
+      trash: t('action.trash'),
+      restore: t('action.restore'),
+    };
+    toast(messages[action], 'success');
   }
-  function openNote(note: LocalNote) {
+  type EditorOrigin = { x: number; y: number; width: number; height: number };
+  function openNote(note: LocalNote, origin: EditorOrigin | null = null) {
     session.engine?.setEditing(note.localId, true);
-    setSelection({ id: note.localId, ids: result.notes.map((n) => n.localId), initial: note });
+    setSelection({ id: note.localId, ids: result.notes.map((n) => n.localId), initial: note, origin });
   }
   function navigateNote(direction: -1 | 1) {
     if (!selection) return;
@@ -386,7 +451,8 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   }
   function openWithSequence(note: LocalNote) {
     session.engine?.setEditing(note.localId, true);
-    setSelection((old) => ({ id: note.localId, ids: old?.ids || [], initial: note }));
+    // Prev/next navigation fades in place instead of expanding from a card.
+    setSelection((old) => ({ id: note.localId, ids: old?.ids || [], initial: note, origin: null }));
   }
   function startLabelSelection(labelId: number) {
     setLabelSelectionMode(true);
@@ -799,7 +865,13 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           writable={session.writable}
           canPurge={session.writable && !!session.engine && online && !busy}
           onPurge={() => void purge(note)}
-          onOpen={() => openNote(note)}
+          onOpen={() => {
+            // Record the card rect so the floating editor can expand from the card.
+            const target = document.activeElement?.closest?.('.note-open') as HTMLElement | null;
+            const card = target?.closest?.('.note-card') as HTMLElement | null;
+            const rect = card?.getBoundingClientRect();
+            openNote(note, rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null);
+          }}
           onChange={(action) => void change(note, action)}
           menuItems={menuFor(note)}
           selected={multi.isSelected(note.localId)}
@@ -825,7 +897,14 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   );
   return (
     <div className="workspace" onContextMenu={preventUndefinedContextMenu}>
-      <aside className="sidebar">{nav}</aside>
+      <motion.aside
+        className={`sidebar ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+        animate={{ width: sidebarCollapsed ? 62 : 238 }}
+        initial={false}
+        transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 44 }}
+      >
+        {nav}
+      </motion.aside>
       <Dialog.Root open={drawer} onOpenChange={setDrawer}>
         <Dialog.Portal>
           <Dialog.Overlay className="dialog-overlay" />
@@ -838,11 +917,23 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-      <div className="workspace-body">
+      <div
+        className="workspace-body"
+        style={{ marginLeft: isMobile ? 0 : sidebarCollapsed ? 62 : 238 }}
+      >
         <header className="app-topbar">
           <IconButton className="mobile-menu" label={t('nav.menu')} onClick={() => setDrawer(true)}>
             <Menu size={21} />
           </IconButton>
+          {!isMobile && (
+            <IconButton
+              className="sidebar-toggle"
+              label={sidebarCollapsed ? t('nav.menu') : t('nav.close')}
+              onClick={() => setSidebarCollapsed((value) => !value)}
+            >
+              <Menu size={18} />
+            </IconButton>
+          )}
           <div className="search-box">
             <Search size={19} />
             <TextContextMenu
@@ -851,8 +942,9 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
               onClear={() => setFilters({ ...filters, query: '' })}
             >
               <input
+                ref={searchRef}
                 aria-label={t('home.search')}
-                placeholder={t('home.search')}
+                placeholder={`${t('home.search')} (Ctrl+K)`}
                 value={filters.query}
                 onChange={(e) => setFilters({ ...filters, query: e.target.value })}
               />
@@ -1159,19 +1251,31 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           </form>
         </Modal>
       )}
-      {selection && (
-        <NoteDialog
-          key={selection.id || 'new'}
-          initialNote={selection.initial}
-          kind={selection.kind}
-          labels={labels}
-          initialLabelIds={selection.labelIds}
-          onClose={() => setSelection(null)}
-          onNavigate={navigateNote}
-          canPrevious={!!selection.id && selection.ids.indexOf(selection.id) > 0}
-          canNext={!!selection.id && selection.ids.indexOf(selection.id) < selection.ids.length - 1}
-        />
-      )}
+      <AnimatePresence>
+        {selection && (
+          <motion.div
+            key="editor-layer"
+            className={`editor-layer ${selection.id ? 'editor-layer-dim' : ''}`}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0, scale: reduceMotion ? 1 : 0.98 }}
+            transition={{ duration: reduceMotion ? 0 : 0.16, ease: 'easeOut' }}
+          >
+            <NoteDialog
+              key={selection.id || 'new'}
+              initialNote={selection.initial}
+              kind={selection.kind}
+              labels={labels}
+              initialLabelIds={selection.labelIds}
+              origin={selection.origin ?? null}
+              onClose={() => setSelection(null)}
+              onNavigate={navigateNote}
+              canPrevious={!!selection.id && selection.ids.indexOf(selection.id) > 0}
+              canNext={!!selection.id && selection.ids.indexOf(selection.id) < selection.ids.length - 1}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
       {issue && (
         <Modal title={t('home.readIssue')} onClose={() => setIssue(null)} className="issue-dialog">
           <div className="issue-content">

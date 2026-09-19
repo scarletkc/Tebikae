@@ -12,6 +12,7 @@ import {
   Trash2,
   RefreshCw,
   LoaderCircle,
+  X,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -31,10 +32,13 @@ import {
   exportMarkdown,
 } from '../../application/commands';
 import { useSession, registerDraftFlusher } from '../../app/session';
-import { Modal, IconButton, download } from '../../app/ui';
+import { IconButton, download } from '../../app/ui';
 import { db } from '../../storage/db';
 import { safeHref } from '../../security/urls';
 import { usePwaUpdate } from '../../app/pwa';
+import { confirmDialog } from '../../app/confirm';
+import { useIsMobile } from '../../app/useMediaQuery';
+import { motion } from 'motion/react';
 import { LabelBadge } from '../labels';
 import { TextContextMenu } from '../editor/TextContextMenu';
 import { LabelContextMenu } from '../labels/LabelContextMenu';
@@ -56,6 +60,8 @@ const MarkdownEditor = lazy(async () => {
   throw lastError;
 });
 
+export type EditorOrigin = { x: number; y: number; width: number; height: number } | null;
+
 export default function NoteDialog({
   initialNote,
   kind = 'markdown',
@@ -65,6 +71,7 @@ export default function NoteDialog({
   onNavigate,
   canPrevious,
   canNext,
+  origin = null,
 }: {
   initialNote?: LocalNote;
   kind?: NoteKind;
@@ -74,6 +81,8 @@ export default function NoteDialog({
   onNavigate(direction: -1 | 1): void;
   canPrevious: boolean;
   canNext: boolean;
+  /** Bounding rect of the card the editor expands from; null fades in place (new notes). */
+  origin?: EditorOrigin;
 }) {
   const { t } = useTranslation();
   const { connection, engine, writable, connected } = useSession();
@@ -247,7 +256,7 @@ export default function NoteDialog({
       !online ||
       !idRef.current ||
       docRef.current.meta.trashedAt === null ||
-      !confirm(t('note.deleteConfirm'))
+      !(await confirmDialog({ title: t('note.deleteConfirm'), confirmLabel: t('action.deleteForever'), danger: true }))
     )
       return;
     purging.current = true;
@@ -341,12 +350,94 @@ export default function NoteDialog({
   }
   const issueUrl = latest?.base?.url || latest?.lastSeenRemote?.url;
   const remote = latest?.lastSeenRemote && snapshotToDocument(latest.lastSeenRemote);
+  const isMobile = useIsMobile();
+  const dialogTitle = initialNote ? t('action.edit') : t('home.newTitle');
+  const rootRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(close);
+  closeRef.current = close;
+  // Global Escape closes the editor (menus and nested dialogs handle their own keys first).
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      const target = event.target as Element | null;
+      if (target?.closest('[role="menu"], [role="listbox"], [role="alertdialog"]')) return;
+      event.preventDefault();
+      void closeRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  // Move focus into the editor on mount and keep Tab cycling inside it.
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+    const documentGlobal = window.document;
+    const previous = documentGlobal.activeElement as HTMLElement | null;
+    const focusTarget = root.querySelector<HTMLElement>(
+      'input.note-title-input, .milkdown [contenteditable="true"], textarea, button',
+    );
+    focusTarget?.focus({ preventScroll: true });
+    const trap = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const focusable = Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.offsetParent !== null || element === documentGlobal.activeElement);
+      if (!focusable.length) return;
+      const first = focusable[0]!;
+      const last = focusable[focusable.length - 1]!;
+      const active = documentGlobal.activeElement;
+      if (event.shiftKey && (active === first || !root.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !root.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    documentGlobal.addEventListener('keydown', trap);
+    return () => {
+      documentGlobal.removeEventListener('keydown', trap);
+      previous?.focus?.({ preventScroll: true });
+    };
+  }, []);
+  // Expand from the clicked card's rect when available; otherwise fade in place.
+  const motionInitial = origin
+    ? {
+        opacity: 0,
+        scale: 0.7,
+        x: origin.x + origin.width / 2 - window.innerWidth / 2,
+        y: origin.y + origin.height / 2 - window.innerHeight / 2,
+      }
+    : { opacity: 0, scale: isMobile ? 1 : 0.96, y: isMobile ? 24 : 10 };
   return (
-    <Modal
-      title={initialNote ? t('action.edit') : t('home.newTitle')}
-      onClose={() => void close()}
-      className={`note-dialog note-${document.meta.color}`}
+    <motion.div
+      ref={rootRef}
+      className={`floating-editor note-dialog note-${document.meta.color} ${isMobile ? 'floating-editor-mobile' : ''}`}
+      role="dialog"
+      aria-modal="true"
+      aria-label={dialogTitle}
+      initial={motionInitial}
+      animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
+      exit={
+        origin
+          ? { opacity: 0, scale: 0.82, x: origin.x + origin.width / 2 - window.innerWidth / 2, y: 0 }
+          : { opacity: 0, scale: isMobile ? 1 : 0.97, y: isMobile ? 24 : 8 }
+      }
+      transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 1 }}
     >
+      <header className="floating-editor-header">
+        {isMobile && (
+          <IconButton label={t('action.back')} onClick={() => void close()}>
+            <ChevronLeft size={20} />
+          </IconButton>
+        )}
+        <h2 className="floating-editor-heading">{dialogTitle}</h2>
+        <IconButton label={t('action.close')} className="floating-editor-close" onClick={() => void close()}>
+          <X size={18} />
+        </IconButton>
+      </header>
       <div className="note-dialog-scroll">
         <TextContextMenu readOnly={readOnly}>
           <input
@@ -415,8 +506,12 @@ export default function NoteDialog({
                   disabled={!engine}
                   className="text-button"
                   onClick={() => {
-                    if (confirm(t('note.retryWarning')))
-                      void engine?.retry(localId!, true).catch(() => setSaveError('generic'));
+                    void confirmDialog({
+                      title: t('note.retryWarning'),
+                      confirmLabel: t('action.retryCreate'),
+                    }).then((ok) => {
+                      if (ok) void engine?.retry(localId!, true).catch(() => setSaveError('generic'));
+                    });
                   }}
                 >
                   {t('action.retryCreate')}
@@ -705,6 +800,6 @@ export default function NoteDialog({
           </button>
         </div>
       </footer>
-    </Modal>
+    </motion.div>
   );
 }
