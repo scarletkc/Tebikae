@@ -16,7 +16,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { usePreferences, type Theme } from '../../app/preferences';
 import { usePwaUpdate } from '../../app/pwa';
 import { useSession, flushAllDrafts } from '../../app/session';
-import { download, LanguageControl } from '../../app/ui';
+import { ConfirmDialog, download, LanguageControl } from '../../app/ui';
 import { exportScope, clearScope } from '../../application/commands';
 import { db } from '../../storage/db';
 import packageJson from '../../../package.json';
@@ -36,6 +36,8 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
   const [preparingExport, setPreparingExport] = useState(false);
   const [markdownExport, setMarkdownExport] = useState<MarkdownExportSnapshot>();
   const [importOpen, setImportOpen] = useState(false);
+  const [clearConfirmOpen, setClearConfirmOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const state = useLiveQuery(() => db.syncState.get(connection.scopeId), [connection.scopeId]);
   async function exportData() {
     await flushAllDrafts();
@@ -47,13 +49,17 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
       'application/json',
     );
   }
-  async function clear() {
+  async function requestClear() {
     const pending = await db.notes
       .where('scopeId')
       .equals(connection.scopeId)
       .filter((n) => n.syncStatus !== 'synced')
       .count();
-    if (!confirm(t('settings.clearConfirm', { count: pending }))) return;
+    setPendingCount(pending);
+    setClearConfirmOpen(true);
+  }
+  async function clear() {
+    setClearConfirmOpen(false);
     setBusy(true);
     try {
       await session.disconnect();
@@ -207,7 +213,7 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
         <button
           className="button danger-button"
           disabled={busy || !session.writable}
-          onClick={() => void clear()}
+          onClick={() => void requestClear()}
         >
           <Trash2 size={16} />
           {t('settings.clear')}
@@ -235,6 +241,16 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
           {notice}
         </p>
       )}
+      <ConfirmDialog
+        open={clearConfirmOpen}
+        title={t('settings.clear')}
+        description={t('settings.clearConfirm', { count: pendingCount })}
+        confirmLabel={t('settings.clear')}
+        cancelLabel={t('action.cancel')}
+        danger
+        onOpenChange={setClearConfirmOpen}
+        onConfirm={() => void clear()}
+      />
       {markdownExport && (
         <MarkdownExportDialog snapshot={markdownExport} onClose={() => setMarkdownExport(undefined)} />
       )}

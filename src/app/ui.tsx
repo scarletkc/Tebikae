@@ -1,11 +1,23 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { X, Sun, Moon, Monitor, Languages, Check, ChevronDown } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
 import './menus.css';
+import '../components/ui/ui.css';
 import { useTranslation } from 'react-i18next';
 import { type ReactNode } from 'react';
 import { usePreferences } from './preferences';
 import { ContextMenu, type MenuAction } from './ContextMenu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 export function Brand() {
   return (
     <div className="brand">
@@ -155,13 +167,40 @@ export function Modal({
   children,
   onClose,
   className = '',
+  layoutId,
+  mobileCloseIcon,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
   className?: string;
+  layoutId?: string;
+  mobileCloseIcon?: ReactNode;
 }) {
   const { t } = useTranslation();
+  const reducedMotion = useReducedMotion();
+  const content = (
+    <>
+      <div className="dialog-header">
+        <Dialog.Title>{title}</Dialog.Title>
+        <IconButton label={t('action.close')} onClick={onClose}>
+          {mobileCloseIcon ? (
+            <>
+              <span className="dialog-close-desktop" aria-hidden="true">
+                <X size={19} />
+              </span>
+              <span className="dialog-close-mobile" aria-hidden="true">
+                {mobileCloseIcon}
+              </span>
+            </>
+          ) : (
+            <X size={19} />
+          )}
+        </IconButton>
+      </div>
+      {children}
+    </>
+  );
   return (
     <Dialog.Root
       open
@@ -171,21 +210,57 @@ export function Modal({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content
-          className={`dialog ${className}`}
-          aria-describedby={undefined}
-          onInteractOutside={(e) => e.preventDefault()}
-        >
-          <div className="dialog-header">
-            <Dialog.Title>{title}</Dialog.Title>
-            <IconButton label={t('action.close')} onClick={onClose}>
-              <X size={19} />
-            </IconButton>
-          </div>
-          {children}
+        <Dialog.Content asChild aria-describedby={undefined} onInteractOutside={(e) => e.preventDefault()}>
+          <motion.div
+            className={`dialog ${className}`}
+            layoutId={layoutId}
+            initial={layoutId && !reducedMotion ? { opacity: 0 } : false}
+            animate={layoutId ? { opacity: 1 } : undefined}
+            exit={layoutId && !reducedMotion ? { opacity: 0 } : undefined}
+            transition={{ duration: reducedMotion ? 0 : 0.2, ease: 'easeOut' }}
+          >
+            {content}
+          </motion.div>
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
+  );
+}
+
+export function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel,
+  cancelLabel,
+  danger = false,
+  onOpenChange,
+  onConfirm,
+}: {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmLabel: string;
+  cancelLabel: string;
+  danger?: boolean;
+  onOpenChange(open: boolean): void;
+  onConfirm(): void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel className="button secondary">{cancelLabel}</AlertDialogCancel>
+          <AlertDialogAction className={`button ${danger ? 'danger-button' : 'primary'}`} onClick={onConfirm}>
+            {confirmLabel}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }
 export function download(name: string, value: string | Blob, type = 'text/plain') {

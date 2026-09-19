@@ -7,6 +7,7 @@ import { PreferencesProvider } from './app/preferences';
 import { SessionProvider } from './app/session';
 import App from './app/App';
 import './styles/app.css';
+import './styles/app-shell.css';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };

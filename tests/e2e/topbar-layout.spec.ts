@@ -48,8 +48,11 @@ for (const width of [320, 390, 768, 1100, 1280]) {
       };
       await checkBounds();
       await page.screenshot({ path: testInfo.outputPath('top.png') });
+      await page.locator('.main-content').hover();
       await page.mouse.wheel(0, 900);
-      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(300);
+      await expect
+        .poll(() => page.locator('.main-content').evaluate((element) => element.scrollTop))
+        .toBeGreaterThan(300);
       expect((await topbar.boundingBox())!.y).toBe(0);
       await checkBounds();
       await topbar.locator('.search-box input').fill('合成');
@@ -84,19 +87,25 @@ test('trash card deletion supports cancel, offline protection, failure and retry
   await expect(purge).toBeDisabled();
   await context.setOffline(false);
   await expect(purge).toBeEnabled();
-  page.once('dialog', (dialog) => void dialog.dismiss());
   await purge.click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(card).toHaveCount(1);
   expect(remote.writes.filter((write) => write.path === '/graphql')).toHaveLength(0);
   remote.failNextDeleteIssue = true;
-  page.once('dialog', (dialog) => void dialog.accept());
   await purge.click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: /Delete forever/i })
+    .click();
   await expect.poll(() => remote.writes.filter((write) => write.path === '/graphql').length).toBe(1);
   await expect(purge).toBeEnabled();
   await expect(card).toHaveCount(1);
   await expect(page.locator('.workspace-status')).toHaveClass(/status-error/);
-  page.once('dialog', (dialog) => void dialog.accept());
   await purge.click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: /Delete forever/i })
+    .click();
   await expect(card).toHaveCount(0);
   expect(remote.issues).toHaveLength(0);
   await page.reload();

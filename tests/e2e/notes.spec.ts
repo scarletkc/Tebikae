@@ -87,14 +87,14 @@ test('trash then delete forever removes the Issue through GraphQL and does not r
   await page.locator('a[href$="#/trash"]').click();
   await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  page.once('dialog', (confirmation) => void confirmation.dismiss());
   await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect
     .poll(() => remote.writes.filter((write) => write.path === '/graphql').length, { timeout: 5_000 })
     .toBe(0);
   expect(remote.issues.find((issue) => issue.number === 1)).toBeDefined();
-  page.on('dialog', (confirmation) => confirmation.accept());
   await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete forever', exact: true }).click();
   await expect
     .poll(() => remote.writes.filter((write) => write.path === '/graphql').length, { timeout: 10_000 })
     .toBe(1);
@@ -122,8 +122,8 @@ test('a failed forever deletion keeps the note in the trash', async ({ page, con
   await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
   remote.failNextDeleteIssue = true;
   const dialog = page.getByRole('dialog');
-  page.once('dialog', (confirmation) => void confirmation.accept());
   await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Delete forever', exact: true }).click();
   await expect(dialog.getByRole('alert')).toBeVisible();
   await closeDialog(page);
   await page.locator('a[href$="#/trash"]').click();

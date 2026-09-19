@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { Pin, Archive, ArchiveRestore, Trash2, RotateCcw, CircleAlert } from 'lucide-react';
+import { motion, useReducedMotion } from 'motion/react';
+import { Pin, Archive, ArchiveRestore, Trash2, RotateCcw, CircleAlert, MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Label, LocalNote } from '../../domain/types';
 import { isSimpleChecklist, parseChecklist } from '../../domain/markdown';
@@ -10,6 +11,7 @@ import './notes.css';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
 import { LabelContextMenu } from '../labels/LabelContextMenu';
 import { canEditNote } from './actions';
+import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
 
@@ -61,11 +63,15 @@ export default function NoteCard({
   writable,
   menuItems = [],
   selected = false,
+  active = false,
+  layout = true,
   onSelect,
   onRemoveLabel,
 }: {
   menuItems?: MenuAction[];
   selected?: boolean;
+  active?: boolean;
+  layout?: boolean;
   onSelect?: (event: React.MouseEvent) => boolean;
   onRemoveLabel?: (id: number) => void;
   note: LocalNote;
@@ -78,6 +84,7 @@ export default function NoteCard({
   writable: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const reducedMotion = useReducedMotion();
   const document = note.current;
   const checklist = useMemo(
     () =>
@@ -91,10 +98,51 @@ export default function NoteCard({
   const editable = writable && canEditNote(note);
   const updated =
     note.syncStatus === 'synced' ? note.base?.updatedAt || note.localModifiedAt : note.localModifiedAt;
+  const renderActionButtons = () =>
+    trashed ? (
+      <>
+        <IconButton label={t('action.restore')} onClick={() => onChange('restore')} disabled={!editable}>
+          <RotateCcw size={16} />
+        </IconButton>
+        {onPurge && (
+          <IconButton label={t('action.deleteForever')} onClick={onPurge} disabled={!writable || !canPurge}>
+            <Trash2 size={16} />
+          </IconButton>
+        )}
+      </>
+    ) : (
+      <>
+        <IconButton
+          label={t(document.meta.pinned ? 'action.unpin' : 'action.pin')}
+          onClick={() => onChange('pin')}
+          disabled={!editable}
+        >
+          <Pin size={16} />
+        </IconButton>
+        <IconButton
+          label={t(document.archived ? 'action.unarchive' : 'action.archive')}
+          onClick={() => onChange('archive')}
+          disabled={!editable}
+        >
+          {document.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+        </IconButton>
+        <IconButton label={t('action.trash')} onClick={() => onChange('trash')} disabled={!editable}>
+          <Trash2 size={16} />
+        </IconButton>
+      </>
+    );
   return (
     <ContextMenu items={menuItems} className="context-card">
-      <article
-        className={`note-card note-${document.meta.color} ${selected ? 'is-selected' : ''}`}
+      <motion.article
+        layout={layout}
+        layoutId={`note-${note.localId}`}
+        transition={{
+          layout: { duration: reducedMotion ? 0 : 0.2, ease: 'easeOut' },
+          opacity: { duration: reducedMotion ? 0 : 0.12 },
+        }}
+        animate={{ opacity: active ? 0 : 1 }}
+        aria-hidden={active}
+        className={`note-card note-${document.meta.color} ${selected ? 'is-selected' : ''} ${active ? 'is-active' : ''}`}
         tabIndex={0}
         onClickCapture={(e) => {
           if ((e.target as Element).closest('.card-actions, .label-badge, [role="menu"]')) return;
@@ -192,49 +240,20 @@ export default function NoteCard({
             </span>
           )}
           <div className="card-actions">
-            {trashed ? (
-              <>
-                <IconButton
-                  label={t('action.restore')}
-                  onClick={() => onChange('restore')}
-                  disabled={!editable}
-                >
-                  <RotateCcw size={16} />
+            <div className="card-action-buttons">{renderActionButtons()}</div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <IconButton label={t('action.more')} className="card-more-button">
+                  <MoreHorizontal size={16} />
                 </IconButton>
-                {onPurge && (
-                  <IconButton
-                    label={t('action.deleteForever')}
-                    onClick={onPurge}
-                    disabled={!writable || !canPurge}
-                  >
-                    <Trash2 size={16} />
-                  </IconButton>
-                )}
-              </>
-            ) : (
-              <>
-                <IconButton
-                  label={t(document.meta.pinned ? 'action.unpin' : 'action.pin')}
-                  onClick={() => onChange('pin')}
-                  disabled={!editable}
-                >
-                  <Pin size={16} />
-                </IconButton>
-                <IconButton
-                  label={t(document.archived ? 'action.unarchive' : 'action.archive')}
-                  onClick={() => onChange('archive')}
-                  disabled={!editable}
-                >
-                  {document.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
-                </IconButton>
-                <IconButton label={t('action.trash')} onClick={() => onChange('trash')} disabled={!editable}>
-                  <Trash2 size={16} />
-                </IconButton>
-              </>
-            )}
+              </PopoverTrigger>
+              <PopoverContent align="end" className="card-action-popover">
+                {renderActionButtons()}
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
-      </article>
+      </motion.article>
     </ContextMenu>
   );
 }

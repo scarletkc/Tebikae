@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import * as Dialog from '@radix-ui/react-dialog';
+import { AnimatePresence } from 'motion/react';
 import {
   Archive,
   ArrowUpRight,
@@ -17,6 +17,8 @@ import {
   Menu,
   NotebookPen,
   Pencil,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   RefreshCw,
   Search,
@@ -31,7 +33,11 @@ import { registerSW } from 'virtual:pwa-register';
 import { useSession, flushAllDrafts } from './session';
 import { usePreferences } from './preferences';
 import { PwaUpdateContext, clearAppCaches, reloadFresh } from './pwa';
-import { Brand, IconButton, Modal, PreferencesControls, download } from './ui';
+import { ToastProvider, useToast } from './toast';
+import { Brand, ConfirmDialog, IconButton, Modal, PreferencesControls, download } from './ui';
+import { Sidebar } from '../components/ui/sidebar';
+import { Sheet, SheetContent, SheetTitle } from '../components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../components/ui/tooltip';
 import { db } from '../storage/db';
 import { defaultFilters, filterNotes, labelCounts, sidebarLabels } from '../domain/filters';
 import WorkspaceStatus, { type WorkspaceNotice } from './WorkspaceStatus';
@@ -53,6 +59,7 @@ import NoteDialog from '../features/notes/NoteDialog';
 import { FilterChips, FiltersDialog, filterCount } from '../features/filters/Filters';
 import Settings from '../features/settings/Settings';
 import MarkdownPreview from '../features/editor/MarkdownPreview';
+import CommandPalette from './CommandPalette';
 
 function restoreFilters(scope: string): NoteFilters {
   try {
@@ -140,32 +147,37 @@ export default function App() {
     reloadFresh();
   };
   return (
-    <PwaUpdateContext.Provider value={{ available: updateReady, update: applyUpdate, forceUpdate }}>
-      {session.restoring ? (
-        <main className="loading-notice" role="status">
-          {t('connect.restoring')}
-        </main>
-      ) : session.connection ? (
-        <Workspace key={session.connection.scopeId} offlineReady={offlineReady} />
-      ) : (
-        <ConnectPage />
-      )}
-      {updateReady && (
-        <div className="update-toast" role="status">
-          <span>{t('settings.update')}</span>
-          <button className="button primary" onClick={() => void applyUpdate().catch(() => {})}>
-            {t('settings.updateAction')}
-          </button>
-          <IconButton label={t('action.close')} onClick={() => setUpdateReady(false)}>
-            <X size={16} />
-          </IconButton>
-        </div>
-      )}
-    </PwaUpdateContext.Provider>
+    <ToastProvider>
+      <PwaUpdateContext.Provider value={{ available: updateReady, update: applyUpdate, forceUpdate }}>
+        <TooltipProvider delayDuration={350}>
+          {session.restoring ? (
+            <main className="loading-notice" role="status">
+              {t('connect.restoring')}
+            </main>
+          ) : session.connection ? (
+            <Workspace key={session.connection.scopeId} offlineReady={offlineReady} />
+          ) : (
+            <ConnectPage />
+          )}
+          {updateReady && (
+            <div className="update-toast" role="status">
+              <span>{t('settings.update')}</span>
+              <button className="button primary" onClick={() => void applyUpdate().catch(() => {})}>
+                {t('settings.updateAction')}
+              </button>
+              <IconButton label={t('action.close')} onClick={() => setUpdateReady(false)}>
+                <X size={16} />
+              </IconButton>
+            </div>
+          )}
+        </TooltipProvider>
+      </PwaUpdateContext.Provider>
+    </ToastProvider>
   );
 }
 function Workspace({ offlineReady }: { offlineReady: boolean }) {
   const { t } = useTranslation();
+  const { push } = useToast();
   const session = useSession();
   const prefs = usePreferences();
   const connection = session.connection!;
@@ -184,6 +196,15 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   const [labelSelectionMode, setLabelSelectionMode] = useState(false);
   const [selectedLabelIds, setSelectedLabelIds] = useState<number[]>([]);
   const [drawer, setDrawer] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem('tebikae.sidebar.collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [confirmPurge, setConfirmPurge] = useState<LocalNote | null>(null);
   const [labelName, setLabelName] = useState('');
   const [labelColor, setLabelColor] = useState('#62836a');
   const [busy, setBusy] = useState(false);
@@ -197,6 +218,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     initial?: LocalNote;
     labelIds?: number[];
   } | null>(null);
+  const editorHistory = useRef(false);
   const [issue, setIssue] = useState<UnmanagedIssue | null>(null);
   const notes = useLiveQuery(() => db.notes.where('scopeId').equals(scope).toArray(), [scope], []);
   const labels = useLiveQuery(() => db.labels.where('scopeId').equals(scope).toArray(), [scope], []);
@@ -253,7 +275,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           danger: true,
           separator: true,
           disabled: targets.length > 1 || !session.writable || !session.engine || !online || busy,
-          run: () => void purge(note),
+          run: () => requestPurge(note),
         },
       ];
     if (targets.length > 1) return actions;
@@ -307,6 +329,44 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       window.removeEventListener('offline', update);
     };
   }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem('tebikae.sidebar.collapsed', String(sidebarCollapsed));
+    } catch {
+      /* Preferences are optional. */
+    }
+  }, [sidebarCollapsed]);
+  useEffect(() => {
+    const onPopState = () => {
+      if (!editorHistory.current) return;
+      editorHistory.current = false;
+      setSelection(null);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+  useEffect(() => {
+    if (!selection || editorHistory.current) return;
+    window.history.pushState({ ...window.history.state, tebikaeEditor: true }, '', window.location.href);
+    editorHistory.current = true;
+  }, [selection]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest('input, textarea, [contenteditable="true"], [role="menu"]')) return;
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setPaletteOpen(true);
+      } else if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        newNote();
+      } else if (event.key === 'Escape') {
+        multi.clear();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  });
   function newNote(kind: NoteKind = 'markdown') {
     setSelection({
       kind,
@@ -319,11 +379,24 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   function report(error: unknown) {
     setNotice(error instanceof ApiError ? t(`error.${error.code}`) : t('error.generic'));
   }
+  function requestPurge(note: LocalNote) {
+    if (!session.writable || !session.engine || !online || busy) return;
+    setConfirmPurge(note);
+  }
+  function closeEditor() {
+    if (!selection) return;
+    const shouldGoBack = editorHistory.current && window.history.state?.tebikaeEditor;
+    editorHistory.current = false;
+    setSelection(null);
+    if (shouldGoBack) window.history.back();
+  }
   async function purge(note: LocalNote) {
-    if (!session.writable || !session.engine || !online || busy || !confirm(t('note.deleteConfirm'))) return;
+    setConfirmPurge(null);
+    if (!session.writable || !session.engine || !online || busy) return;
     setBusy(true);
     try {
       await session.engine.destroy(note.localId);
+      push(t('action.deleteForever'));
     } catch (error) {
       report(error);
     } finally {
@@ -368,15 +441,37 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     }
   }
   async function change(note: LocalNote, action: 'pin' | 'archive' | 'trash' | 'restore') {
+    if (!session.writable || !canEditNote(note)) return;
     await mutateNotes([note], (current) => {
       if (action === 'pin') current.meta.pinned = !current.meta.pinned;
       else if (action === 'archive') current.archived = !current.archived;
       else current.meta.trashedAt = action === 'trash' ? new Date().toISOString() : null;
     });
+    push(
+      t(
+        action === 'pin'
+          ? note.current.meta.pinned
+            ? 'action.unpin'
+            : 'action.pin'
+          : action === 'archive'
+            ? note.current.archived
+              ? 'action.unarchive'
+              : 'action.archive'
+            : action === 'trash'
+              ? 'action.trash'
+              : 'action.restore',
+      ),
+    );
   }
   function openNote(note: LocalNote) {
     session.engine?.setEditing(note.localId, true);
     setSelection({ id: note.localId, ids: result.notes.map((n) => n.localId), initial: note });
+  }
+  function navigateFromPalette(path: string) {
+    multi.clear();
+    setLimit(100);
+    closeEditor();
+    navigate(path);
   }
   function navigateNote(direction: -1 | 1) {
     if (!selection) return;
@@ -523,6 +618,18 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     <>
       <div className="sidebar-brand">
         <Brand />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <IconButton
+              className="sidebar-collapse"
+              label={t(sidebarCollapsed ? 'nav.expand' : 'nav.collapse')}
+              onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}
+            </IconButton>
+          </TooltipTrigger>
+          <TooltipContent>{t(sidebarCollapsed ? 'nav.expand' : 'nav.collapse')}</TooltipContent>
+        </Tooltip>
       </div>
       <nav className="main-nav">
         {navItems.map(([name, Icon]) => {
@@ -798,7 +905,9 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           query={filters.query}
           writable={session.writable}
           canPurge={session.writable && !!session.engine && online && !busy}
-          onPurge={() => void purge(note)}
+          onPurge={() => requestPurge(note)}
+          active={selection?.id === note.localId}
+          layout={prefs.layout !== 'list'}
           onOpen={() => openNote(note)}
           onChange={(action) => void change(note, action)}
           menuItems={menuFor(note)}
@@ -824,20 +933,20 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     </NotesGrid>
   );
   return (
-    <div className="workspace" onContextMenu={preventUndefinedContextMenu}>
-      <aside className="sidebar">{nav}</aside>
-      <Dialog.Root open={drawer} onOpenChange={setDrawer}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="dialog-overlay" />
-          <Dialog.Content className="mobile-drawer" aria-describedby={undefined}>
-            <Dialog.Title className="sr-only">{t('nav.menu')}</Dialog.Title>
-            <IconButton label={t('nav.close')} className="drawer-close" onClick={() => setDrawer(false)}>
-              <X size={20} />
-            </IconButton>
-            {nav}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
+    <div
+      className={`workspace ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+      onContextMenu={preventUndefinedContextMenu}
+    >
+      <Sidebar collapsed={sidebarCollapsed}>{nav}</Sidebar>
+      <Sheet open={drawer} onOpenChange={setDrawer}>
+        <SheetContent side="left" className="mobile-drawer" aria-describedby={undefined}>
+          <SheetTitle className="sr-only">{t('nav.menu')}</SheetTitle>
+          <IconButton label={t('nav.close')} className="drawer-close" onClick={() => setDrawer(false)}>
+            <X size={20} />
+          </IconButton>
+          {nav}
+        </SheetContent>
+      </Sheet>
       <div className="workspace-body">
         <header className="app-topbar">
           <IconButton className="mobile-menu" label={t('nav.menu')} onClick={() => setDrawer(true)}>
@@ -1159,19 +1268,42 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           </form>
         </Modal>
       )}
-      {selection && (
-        <NoteDialog
-          key={selection.id || 'new'}
-          initialNote={selection.initial}
-          kind={selection.kind}
-          labels={labels}
-          initialLabelIds={selection.labelIds}
-          onClose={() => setSelection(null)}
-          onNavigate={navigateNote}
-          canPrevious={!!selection.id && selection.ids.indexOf(selection.id) > 0}
-          canNext={!!selection.id && selection.ids.indexOf(selection.id) < selection.ids.length - 1}
-        />
-      )}
+      <AnimatePresence initial={false} mode="wait">
+        {selection && (
+          <NoteDialog
+            key={selection.id || 'new'}
+            initialNote={selection.initial}
+            kind={selection.kind}
+            labels={labels}
+            initialLabelIds={selection.labelIds}
+            onClose={closeEditor}
+            onNavigate={navigateNote}
+            canPrevious={!!selection.id && selection.ids.indexOf(selection.id) > 0}
+            canNext={!!selection.id && selection.ids.indexOf(selection.id) < selection.ids.length - 1}
+          />
+        )}
+      </AnimatePresence>
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        onNewNote={newNote}
+        onNavigate={navigateFromPalette}
+        onSearch={(query) => setFilters({ ...filters, query })}
+      />
+      <ConfirmDialog
+        open={!!confirmPurge}
+        title={t('action.deleteForever')}
+        description={t('note.deleteConfirm')}
+        confirmLabel={t('action.deleteForever')}
+        cancelLabel={t('action.cancel')}
+        danger
+        onOpenChange={(open) => {
+          if (!open) setConfirmPurge(null);
+        }}
+        onConfirm={() => {
+          if (confirmPurge) void purge(confirmPurge);
+        }}
+      />
       {issue && (
         <Modal title={t('home.readIssue')} onClose={() => setIssue(null)} className="issue-dialog">
           <div className="issue-content">

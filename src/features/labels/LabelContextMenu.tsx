@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { Palette, Pencil, Tag, Trash2 } from 'lucide-react';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
-import { Modal } from '../../app/ui';
+import { ConfirmDialog, Modal } from '../../app/ui';
 import { useSession } from '../../app/session';
 import { db } from '../../storage/db';
 import type { Label } from '../../domain/types';
@@ -43,6 +43,7 @@ export function LabelContextMenu({
   const [name, setName] = useState(label.name);
   const [error, setError] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const disabled = !session.writable || !session.engine || !navigator.onLine || busy;
   const perform = async (action: () => Promise<unknown>) => {
     setBusy(true);
@@ -114,8 +115,7 @@ export function LabelContextMenu({
           danger: true,
           separator: true,
           run: () => {
-            if (confirm(t('context.deleteLabelConfirm', { name: label.name, count })))
-              void perform(() => session.engine!.deleteLabel(label.id));
+            setDeleteConfirmOpen(true);
           },
         },
       ];
@@ -155,6 +155,19 @@ export function LabelContextMenu({
           </form>
         </Modal>
       )}
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title={t('context.deleteLabel')}
+        description={t('context.deleteLabelConfirm', { name: label.name, count })}
+        confirmLabel={t('context.deleteLabel')}
+        cancelLabel={t('action.cancel')}
+        danger
+        onOpenChange={setDeleteConfirmOpen}
+        onConfirm={() => {
+          setDeleteConfirmOpen(false);
+          void perform(() => session.engine!.deleteLabel(label.id));
+        }}
+      />
     </>
   );
 }

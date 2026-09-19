@@ -180,8 +180,11 @@ test('clearing device data also removes the saved credentials', async ({ page, c
   await mockGitHub(context);
   await connect(page);
   await page.locator('a[href$="#/settings"]').click();
-  page.once('dialog', (dialog) => dialog.accept());
   await page.getByRole('button', { name: 'Clear this device’s data', exact: true }).click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Clear this device’s data', exact: true })
+    .click();
   await expect(page.getByLabel('Personal access token', { exact: true })).toHaveValue('');
   expect(await savedRecords(page)).toBe(0);
   await page.reload();

@@ -93,11 +93,10 @@ test('label rename and deletion affect labels, not notes', async ({ page, contex
     .getByRole('button')
     .first()
     .click({ button: 'right' });
-  page.once('dialog', async (dialog) => {
-    expect(dialog.message()).toContain('2 notes');
-    await dialog.accept();
-  });
   await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+  const confirmation = page.getByRole('alertdialog');
+  await expect(confirmation).toContainText('2 notes');
+  await confirmation.getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.locator('.sidebar .label-nav-row')).toHaveCount(1);
   await expect(page.locator('.note-card')).toHaveCount(2);
   expect(remote.issues.filter((n) => n.number <= 2).every((n) => !n.labels.some((l) => l.id === 11))).toBe(

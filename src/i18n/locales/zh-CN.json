@@ -15,6 +15,8 @@
     "trash": "回收站",
     "issues": "已有 Issues",
     "settings": "设置",
+    "collapse": "收起侧栏",
+    "expand": "展开侧栏",
     "labels": "标签",
     "menu": "打开导航",
     "close": "关闭导航"

@@ -1,0 +1,451 @@
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+}
+
+body {
+  overflow-x: hidden;
+  overscroll-behavior: none;
+}
+
+.workspace {
+  --sidebar-width: 238px;
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 40;
+  width: var(--sidebar-width);
+  height: 100dvh;
+  min-width: 0;
+  padding: 18px 14px 14px;
+  overflow: hidden;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: blur(16px);
+  transition: background 0.2s ease;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 8px 28px;
+}
+
+.sidebar-brand .brand {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sidebar-brand .brand > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sidebar-collapse {
+  flex: 0 0 auto;
+}
+
+.sidebar[data-collapsed='true'] {
+  padding-inline: 10px;
+}
+
+.sidebar[data-collapsed='true'] .sidebar-brand {
+  justify-content: center;
+  padding-inline: 0;
+}
+
+.sidebar[data-collapsed='true'] .sidebar-brand .brand {
+  gap: 0;
+}
+
+.sidebar[data-collapsed='true'] .sidebar-brand .brand > span:last-child,
+.sidebar[data-collapsed='true'] .nav-item > span,
+.sidebar[data-collapsed='true'] .labels-heading,
+.sidebar[data-collapsed='true'] .empty-labels,
+.sidebar[data-collapsed='true'] .repository-pill > span:nth-child(2),
+.sidebar[data-collapsed='true'] .repository-pill > svg {
+  display: none;
+}
+
+.sidebar[data-collapsed='true'] .main-nav,
+.sidebar[data-collapsed='true'] .label-nav {
+  width: 100%;
+}
+
+.sidebar[data-collapsed='true'] .nav-item {
+  justify-content: center;
+  gap: 0;
+  padding-inline: 8px;
+}
+
+.sidebar[data-collapsed='true'] .repository-pill {
+  justify-content: center;
+  padding-inline: 8px;
+}
+
+.sidebar[data-collapsed='true'] .workspace-preferences {
+  justify-content: center;
+}
+
+.workspace-body {
+  width: calc(100% - var(--sidebar-width));
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  min-width: 0;
+  min-height: 0;
+  margin-left: var(--sidebar-width);
+  overflow: hidden;
+  transition:
+    width 0.2s ease,
+    margin-left 0.2s ease;
+}
+
+.app-topbar {
+  flex: 0 0 auto;
+  min-height: 64px;
+  padding: 10px 20px;
+  border-bottom-color: color-mix(in srgb, var(--border) 75%, transparent);
+  background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(16px);
+}
+
+.main-content {
+  width: 100%;
+  container-type: inline-size;
+  max-width: none;
+  height: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 28px 32px 56px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.workspace-footer {
+  display: none;
+}
+
+.toast-layer {
+  position: fixed;
+  z-index: 130;
+  right: max(18px, env(safe-area-inset-right));
+  bottom: max(18px, env(safe-area-inset-bottom));
+  display: grid;
+  gap: 8px;
+  width: min(340px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.app-toast {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  font-size: 12px;
+  pointer-events: auto;
+  backdrop-filter: blur(14px);
+}
+
+.app-toast > svg {
+  color: var(--accent);
+}
+
+.app-toast > span {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.app-toast button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.app-toast button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.notes-grid {
+  width: 100%;
+  min-width: 0;
+}
+
+.notes-grid.notes-masonry {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.notes-item,
+.masonry-item {
+  min-width: 0;
+}
+
+.note-card {
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 16px;
+  box-shadow: none;
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.note-card:hover,
+.note-card:focus-within {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--text) 7%, transparent);
+}
+
+.note-card:active {
+  transform: scale(0.992);
+}
+
+.note-card.is-selected {
+  outline: 0;
+  box-shadow:
+    0 0 0 2px var(--accent),
+    0 8px 22px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.note-card.is-active {
+  pointer-events: none;
+}
+
+.card-action-buttons {
+  display: flex;
+  align-items: center;
+}
+
+.card-more-button {
+  display: none;
+}
+
+.card-action-popover {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.card-action-popover .icon-button {
+  opacity: 1;
+}
+
+.dialog-overlay {
+  z-index: 50;
+  background: color-mix(in srgb, #101813 15%, transparent);
+  backdrop-filter: blur(2px);
+}
+
+.dialog {
+  top: 50%;
+  left: 50%;
+  width: min(900px, calc(100vw - 80px));
+  height: min(800px, calc(100dvh - 80px));
+  max-height: calc(100dvh - 80px);
+  border-radius: 20px;
+  translate: -50% -50%;
+  transform: none;
+  box-shadow: 0 22px 80px color-mix(in srgb, #162219 19%, transparent);
+}
+
+.dialog-header {
+  min-height: 54px;
+  padding: 10px 16px;
+}
+
+.note-dialog {
+  width: min(900px, calc(100vw - 80px));
+  height: min(800px, calc(100dvh - 80px));
+}
+
+.note-dialog-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+.ui-sheet-overlay {
+  z-index: 50;
+}
+
+.ui-sheet-content.mobile-drawer {
+  z-index: 51;
+  inset: 0 auto 0 0;
+  width: min(300px, 86vw);
+  height: 100dvh;
+  padding: 18px 14px 14px;
+  overflow: hidden;
+  border: 0;
+  border-right: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.mobile-drawer .sidebar-brand {
+  padding: 3px 8px 28px;
+}
+
+.mobile-drawer .sidebar-collapse {
+  display: none;
+}
+
+.mobile-drawer .sidebar-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.ui-command-dialog {
+  top: max(10vh, env(safe-area-inset-top));
+}
+
+@container (max-width: 520px) {
+  .main-content .notes-grid.notes-masonry {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+@container (max-width: 340px) {
+  .main-content .notes-grid.notes-masonry {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container (min-width: 900px) {
+  .main-content .notes-grid.notes-masonry {
+    grid-template-columns: repeat(auto-fill, minmax(245px, 1fr));
+  }
+}
+
+@media (max-width: 1100px) and (min-width: 761px) {
+  .workspace {
+    --sidebar-width: 208px;
+  }
+
+  .main-content {
+    padding-inline: 24px;
+  }
+}
+
+@media (hover: none), (max-width: 760px) {
+  .card-actions {
+    opacity: 1;
+  }
+
+  .card-action-buttons {
+    display: none;
+  }
+
+  .card-more-button {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace {
+    --sidebar-width: 0px;
+  }
+
+  .sidebar {
+    display: none;
+  }
+
+  .workspace-body {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .app-topbar {
+    min-height: 58px;
+    padding: 8px 14px;
+  }
+
+  .main-content {
+    height: auto;
+    padding: 20px 16px calc(30px + env(safe-area-inset-bottom));
+  }
+
+  .note-card {
+    border-radius: 13px;
+  }
+
+  .dialog {
+    inset: 0;
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border: 0;
+    border-radius: 0;
+    translate: 0 0;
+  }
+
+  .dialog-close-desktop {
+    display: none;
+  }
+
+  .dialog-close-mobile {
+    display: inline-flex;
+  }
+
+  .note-dialog {
+    width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .note-dialog-scroll {
+    padding-inline: 18px;
+  }
+
+  .note-editor-footer {
+    padding-bottom: max(10px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-body,
+  .note-card {
+    transition: none;
+  }
+
+  .note-card:hover,
+  .note-card:focus-within,
+  .note-card:active {
+    transform: none;
+  }
+}
