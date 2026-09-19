@@ -9,6 +9,7 @@ import type {
 } from '../../domain/types';
 import type { Credential, CredentialProvider } from '../../security/credentials';
 import { parseRepository } from '../../security/urls';
+import type { IssuePage, SearchPage, SearchRange } from './issue-pages';
 
 export const GITHUB_API_VERSION = '2026-03-10';
 export const GITHUB_API_ORIGIN = 'https://api.github.com';
@@ -460,6 +461,61 @@ export class GitHubClient {
       yield issues;
       url = nextPage(link, endpoint);
     }
+  }
+  async listIssuesPage(connection: Connection, next?: string, signal?: AbortSignal): Promise<IssuePage> {
+    const endpoint = `${this.#path(connection)}/issues`;
+    const url = next
+      ? nextPage(`<${next}>; rel="next"`, endpoint)!
+      : `${endpoint}?state=all&sort=created&direction=desc&per_page=100`;
+    const { data, link } = await this.#request('GET', url, connection.scopeId, undefined, signal);
+    if (!Array.isArray(data)) throw new ApiError({ code: 'SERVER_ERROR' });
+    return {
+      issues: data
+        .filter((item: unknown) => !(typeof item === 'object' && item !== null && 'pull_request' in item))
+        .map(mapIssue),
+      next: nextPage(link, endpoint),
+    };
+  }
+
+  async searchIssuesPage(
+    connection: Connection,
+    query: string,
+    range: SearchRange,
+    signal?: AbortSignal,
+  ): Promise<SearchPage> {
+    this.#path(connection);
+    // Treat input as text, so qualifiers cannot escape the connected private repository.
+    const text = query
+      .trim()
+      .split(/\s+/u)
+      .filter(Boolean)
+      .map((term) => `"${term.replace(/["\\]/gu, ' ')}"`)
+      .join(' ');
+    const stamp = (seconds: number) => new Date(seconds * 1000).toISOString().replace('.000Z', 'Z');
+    const params = new URLSearchParams({
+      q: `${text} repo:${connection.owner}/${connection.repo} is:issue in:title,body created:${stamp(range.from)}..${stamp(range.to)}`,
+      sort: 'created',
+      order: 'desc',
+      per_page: '100',
+      page: String(range.page),
+    });
+    const { data } = await this.#request(
+      'GET',
+      `/search/issues?${params}`,
+      connection.scopeId,
+      undefined,
+      signal,
+    );
+    const result = z
+      .object({
+        total_count: z.number().int().nonnegative(),
+        incomplete_results: z.boolean(),
+        items: z.array(z.unknown()),
+      })
+      .safeParse(data);
+    if (!result.success || result.data.incomplete_results)
+      throw new ApiError({ code: 'SERVER_ERROR', detail: 'Incomplete search results; retry the page' });
+    return { issues: result.data.items.map(mapIssue), total: result.data.total_count };
   }
   async getIssue(connection: Connection, number: number, signal?: AbortSignal): Promise<RawIssueSnapshot> {
     return mapIssue(

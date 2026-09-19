@@ -93,6 +93,7 @@
     "privateOnly": "请使用你自己拥有的 GitHub 私人仓库。"
   },
   "home": {
+    "searchTooDense": "同一秒内创建的匹配 Issue 超过 1000 条，请缩小搜索范围以获取完整结果。",
     "search": "搜索笔记",
     "pinned": "置顶",
     "other": "其他笔记",
@@ -343,7 +344,7 @@
     "labelColor": "标签颜色",
     "rename": "重命名",
     "deleteLabel": "删除",
-    "deleteLabelConfirm": "删除「{{name}}」标签？该标签会从 {{count}} 条笔记中移除，笔记本身不会被删除。",
+    "deleteLabelConfirm": "删除「{{name}}」标签？该标签会从 GitHub 仓库以及所有使用它的笔记中移除，但不会删除笔记。",
     "clearTrashConfirm_other": "永久删除回收站中的 {{count}} 条笔记？此操作无法撤销。",
     "removeLabel": "移除标签",
     "apply": "应用",

@@ -213,3 +213,15 @@
     padding-top: 16px;
   }
 }
+.feed-skeletons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  padding: 24px 0;
+}
+.feed-skeleton {
+  height: 90px;
+  border-radius: 12px;
+  background: var(--surface-hover, var(--border));
+  opacity: 0.5;
+}

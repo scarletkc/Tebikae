@@ -125,7 +125,6 @@ export default function NoteDialog({
   const [persistedRevision, setPersistedRevision] = useState(initialNote?.localRevision || 0);
   const persistence = useRef<Promise<void>>(Promise.resolve());
   const localTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const syncTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const editorFlush = useRef<() => Promise<void>>(async () => {});
   useEffect(() => {
     if (
@@ -211,13 +210,19 @@ export default function NoteDialog({
     },
     [scope, t, engine],
   );
-  const flush = useCallback(async () => {
-    await editorFlush.current();
-    await persist();
-  }, [persist]);
+  const flush = useCallback(
+    async (options?: { finalizeEmptyTitle?: boolean }) => {
+      await editorFlush.current();
+      await persist(options);
+      if (options?.finalizeEmptyTitle && idRef.current) {
+        engine?.setEditing(idRef.current, false);
+      }
+    },
+    [persist, engine],
+  );
   const flushRef = useRef(flush);
   flushRef.current = flush;
-  useEffect(() => registerDraftFlusher(() => flushRef.current()), []);
+  useEffect(() => registerDraftFlusher((options) => flushRef.current(options)), []);
   useEffect(() => {
     if (localId) engine?.setEditing(localId, true);
     return () => {
@@ -227,7 +232,6 @@ export default function NoteDialog({
   useEffect(
     () => () => {
       clearTimeout(localTimer.current);
-      clearTimeout(syncTimer.current);
     },
     [],
   );
@@ -239,14 +243,6 @@ export default function NoteDialog({
     setSaving(true);
     clearTimeout(localTimer.current);
     localTimer.current = setTimeout(() => void persist().catch(() => {}), 150);
-    clearTimeout(syncTimer.current);
-    syncTimer.current = setTimeout(
-      () =>
-        void persist()
-          .then(() => engine?.flush(false))
-          .catch(() => {}),
-      2000,
-    );
   }
   async function purge() {
     if (
@@ -267,7 +263,6 @@ export default function NoteDialog({
     setDeleting(true);
     setDeleteError(false);
     clearTimeout(localTimer.current);
-    clearTimeout(syncTimer.current);
     try {
       await persistence.current;
       await editorFlush.current();
@@ -288,10 +283,18 @@ export default function NoteDialog({
     try {
       await editorFlush.current();
       await persist({ finalizeEmptyTitle: true });
+      // Closing or navigating commits only this editor. Other Outbox entries remain
+      // queued for the normal online retry/manual-sync paths.
+      if (idRef.current) {
+        try {
+          await engine?.flushNote(idRef.current);
+        } catch {
+          /* Keep the local draft and Outbox entry when the network is unavailable. */
+        }
+      }
       if (idRef.current) engine?.setEditing(idRef.current, false);
       if (direction) onNavigate(direction);
       else onClose();
-      void engine?.flush(false).catch(() => {});
     } catch {
       /* Keep the only unsaved copy open. */
     }
@@ -299,7 +302,7 @@ export default function NoteDialog({
   async function sync() {
     try {
       await flush();
-      await engine?.flush(true);
+      if (idRef.current) await engine?.flushNote(idRef.current);
     } catch {
       /* The local error and queue status provide recovery actions. */
     }
@@ -310,7 +313,7 @@ export default function NoteDialog({
         event.preventDefault();
         void flushRef
           .current()
-          .then(() => engine?.flush(true))
+          .then(() => (idRef.current ? engine?.flushNote(idRef.current) : undefined))
           .catch(() => {});
       }
     };
@@ -335,7 +338,7 @@ export default function NoteDialog({
       setDocument(docRef.current);
       version.current = 0;
       savedVersion.current = 0;
-      void engine?.flush(true).catch(() => {});
+      void engine?.flushNote(localId).catch(() => {});
     } catch {
       setSaveError('generic');
     }
@@ -783,7 +786,6 @@ export default function NoteDialog({
               disabled={!writable || saving}
               onClick={() => {
                 clearTimeout(localTimer.current);
-                clearTimeout(syncTimer.current);
                 void persistence.current
                   .then(() => discardDraft(scope, localId!))
                   .then(onClose)
