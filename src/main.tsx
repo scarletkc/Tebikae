@@ -5,6 +5,8 @@ import './i18n';
 import i18n from './i18n';
 import { PreferencesProvider } from './app/preferences';
 import { SessionProvider } from './app/session';
+import { ToastProvider } from './app/toast';
+import { ConfirmProvider } from './app/confirm';
 import App from './app/App';
 import './styles/app.css';
 
@@ -34,9 +36,13 @@ createRoot(document.getElementById('root')!).render(
   <ErrorBoundary>
     <PreferencesProvider>
       <SessionProvider>
-        <HashRouter>
-          <App />
-        </HashRouter>
+        <ToastProvider>
+          <ConfirmProvider>
+            <HashRouter>
+              <App />
+            </HashRouter>
+          </ConfirmProvider>
+        </ToastProvider>
       </SessionProvider>
     </PreferencesProvider>
   </ErrorBoundary>,

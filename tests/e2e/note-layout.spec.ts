@@ -10,8 +10,10 @@ const bodies = [
   '[链接](https://example.com)\n\n![封面](https://example.com/private.png)\n\n<script>alert(1)</script>\n\n- [x] 附带任务',
 ];
 for (const width of [390, 1280]) {
-  test(`mixed note previews and masonry at ${width}px`, async ({ page }, testInfo) => {
+  test(`mixed note previews and layout at ${width}px`, async ({ page }, testInfo) => {
     await page.setViewportSize({ width, height: 900 });
+    // A notes area narrower than two grid columns forces list layout and hides the toggle.
+    const wideNotesArea = width > 760;
     const remote = await mockGitHub(
       page.context(),
       Array.from({ length: 12 }, (_, i) =>
@@ -38,9 +40,14 @@ for (const width of [390, 1280]) {
       await expect(table).toHaveCSS('overflow-x', 'hidden');
     }
     await expect(cards.locator('a')).toHaveCount(0);
-    await expect
-      .poll(() => page.locator('.masonry-item').first().getAttribute('style'))
-      .toContain('grid-row-end');
+    if (wideNotesArea) {
+      await expect
+        .poll(() => page.locator('.masonry-item').first().getAttribute('style'))
+        .toContain('grid-row-end');
+    } else {
+      await expect(page.locator('.masonry-item')).toHaveCount(0);
+      await expect(page.locator('.notes-list')).toBeVisible();
+    }
     const titles = await cards.locator('h3').allTextContents();
     expect(titles).toEqual([...titles].sort());
     const boxes = await Promise.all((await cards.all()).map((card) => card.boundingBox()));
@@ -79,7 +86,15 @@ for (const width of [390, 1280]) {
     await expect(page.getByRole('dialog')).toBeVisible();
     await closeDialog(page);
     await expect(page.locator('.checklist-count').first()).toHaveText('1 of 4 complete');
-    await page.getByRole('button', { name: 'List view', exact: true }).click();
+    const listToggle = page.getByRole('button', { name: 'List view', exact: true });
+    if (wideNotesArea) {
+      await expect(listToggle).toBeVisible();
+      await listToggle.click();
+    } else {
+      // Too narrow for two grid columns: no toggle, list layout is forced.
+      await expect(listToggle).toHaveCount(0);
+      await expect(page.locator('.masonry-item')).toHaveCount(0);
+    }
     await expect(page.locator('.notes-list .note-card')).toHaveCount(12);
     await expect(page.locator('.masonry-item')).toHaveCount(0);
     await expect(cards.first()).toHaveCSS('display', 'block');
@@ -89,3 +104,27 @@ for (const width of [390, 1280]) {
     expect(remote.writes).toHaveLength(0);
   });
 }
+
+test('pinned cards keep an always-visible unpin control in the card header', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await mockGitHub(page.context(), [
+    mockIssue(1, 'Pinned note', 'Keep me on top', { pinned: true }),
+    mockIssue(2, 'Regular note', 'An ordinary thought'),
+  ]);
+  await connect(page);
+  const pinned = page.locator('.note-card').filter({ hasText: 'Pinned note' });
+  const regular = page.locator('.note-card').filter({ hasText: 'Regular note' });
+  const headerToggle = pinned.locator('.card-title .card-pin-toggle');
+  await expect(headerToggle).toHaveCount(1);
+  await expect(headerToggle).toBeVisible();
+  await expect(headerToggle).toHaveAccessibleName('Unpin note');
+  // The footer no longer repeats the pin action for a pinned card.
+  await expect(pinned.locator('.card-actions button[aria-label="Unpin note"]')).toHaveCount(0);
+  await expect(pinned.locator('.card-actions button[aria-label="Pin note"]')).toHaveCount(0);
+  // Unpinned cards keep the header clean and pin from the footer.
+  await expect(regular.locator('.card-pin-toggle')).toHaveCount(0);
+  await expect(regular.locator('.card-actions button[aria-label="Pin note"]')).toHaveCount(1);
+  await headerToggle.click();
+  await expect(pinned.locator('.card-pin-toggle')).toHaveCount(0);
+  await expect(pinned.locator('.card-actions button[aria-label="Pin note"]')).toHaveCount(1);
+});

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { closeDialog, mockIssue, mockGitHub, connect } from './fixtures';
+import { closeDialog, confirmPrompt, mockIssue, mockGitHub, connect } from './fixtures';
 
 const notes = Array.from({ length: 30 }, (_, i) =>
   mockIssue(100 + i, `合成笔记 ${i + 1}`, `第 ${i + 1} 条合成内容，用于检查列表滚动。`.repeat(3), {
@@ -29,11 +29,16 @@ for (const width of [320, 390, 768, 1100, 1280]) {
       await connect(page);
       await setPreferences(page, language, language === 'en' ? 'light' : 'dark');
       const topbar = page.locator('.app-topbar');
-      const newNote = topbar.getByRole('button', {
+      const newNote = page.getByRole('button', {
         name: language === 'en' ? 'New note' : '新建笔记',
         exact: true,
       });
       await expect(newNote).toBeVisible();
+      if (width <= 768) {
+        await expect(page.locator('.fab-new-note')).toBeVisible();
+      } else {
+        await expect(topbar.locator('.new-note-button:not(.fab-new-note)')).toBeVisible();
+      }
       await expect(page.locator('.note-card')).toHaveCount(30);
       const controls = topbar.locator('button:visible, input, select');
       const checkBounds = async () => {
@@ -43,13 +48,18 @@ for (const width of [320, 390, 768, 1100, 1280]) {
           expect(box.x).toBeGreaterThanOrEqual(0);
           expect(box.x + box.width).toBeLessThanOrEqual(width);
           expect(box.y).toBeGreaterThanOrEqual(0);
-          expect(box.y + box.height).toBeLessThan(250);
+          expect(box.y + box.height).toBeLessThan(120);
         }
       };
       await checkBounds();
       await page.screenshot({ path: testInfo.outputPath('top.png') });
+      // The App Shell keeps the page fixed and scrolls the notes area internally.
+      await page.mouse.move(width - 60, 500);
       await page.mouse.wheel(0, 900);
-      await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(300);
+      await expect
+        .poll(() => page.locator('.main-content').evaluate((element) => element.scrollTop))
+        .toBeGreaterThan(300);
+      await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
       expect((await topbar.boundingBox())!.y).toBe(0);
       await checkBounds();
       await topbar.locator('.search-box input').fill('合成');
@@ -84,19 +94,19 @@ test('trash card deletion supports cancel, offline protection, failure and retry
   await expect(purge).toBeDisabled();
   await context.setOffline(false);
   await expect(purge).toBeEnabled();
-  page.once('dialog', (dialog) => void dialog.dismiss());
   await purge.click();
+  await confirmPrompt(page, false);
   await expect(card).toHaveCount(1);
   expect(remote.writes.filter((write) => write.path === '/graphql')).toHaveLength(0);
   remote.failNextDeleteIssue = true;
-  page.once('dialog', (dialog) => void dialog.accept());
   await purge.click();
+  await confirmPrompt(page, true, 'Delete forever');
   await expect.poll(() => remote.writes.filter((write) => write.path === '/graphql').length).toBe(1);
   await expect(purge).toBeEnabled();
   await expect(card).toHaveCount(1);
   await expect(page.locator('.workspace-status')).toHaveClass(/status-error/);
-  page.once('dialog', (dialog) => void dialog.accept());
   await purge.click();
+  await confirmPrompt(page, true, 'Delete forever');
   await expect(card).toHaveCount(0);
   expect(remote.issues).toHaveLength(0);
   await page.reload();
@@ -216,4 +226,44 @@ test('topbar actions preserve filtering, sorting, views and route-specific contr
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await expect(topbar.locator('.topbar-note-actions')).toHaveCount(0);
   expect(remote.writes).toHaveLength(0);
+});
+
+test('custom sort dropdown and language dropdown use custom menus with unified selected styling and no item icons', async ({
+  page,
+}) => {
+  await mockGitHub(page.context());
+  await connect(page);
+  const topbar = page.locator('.app-topbar');
+
+  // Test custom sort dropdown
+  const sortTrigger = topbar.locator('.sort-menu-trigger');
+  await expect(sortTrigger).toBeVisible();
+  await sortTrigger.click();
+  const sortMenu = page.locator('.sort-menu-content');
+  await expect(sortMenu).toBeVisible();
+
+  // Selected item has data-state='checked' and unified styling
+  const checkedSort = sortMenu.locator('.sort-menu-item[data-state="checked"]');
+  await expect(checkedSort).toHaveCount(1);
+  await expect(checkedSort).toHaveText(/Recently modified|最近修改/);
+
+  // Click another sort option
+  const titleOption = sortMenu.locator('.sort-menu-item').filter({ hasText: /Title|标题/ });
+  await titleOption.click();
+  await expect(sortMenu).toHaveCount(0);
+  await expect(sortTrigger).toHaveText(/Title|标题/);
+
+  // Test language menu in sidebar preferences
+  const langTrigger = page.locator('.language-menu-trigger');
+  if (await langTrigger.isVisible()) {
+    await langTrigger.click();
+    const langMenu = page.locator('.language-menu-content');
+    await expect(langMenu).toBeVisible();
+    // Language options have no svg icons inside the list
+    await expect(langMenu.locator('.language-menu-item .language-menu-icon')).toHaveCount(0);
+    // Checked item has data-state='checked'
+    const checkedLang = langMenu.locator('.language-menu-item[data-state="checked"]');
+    await expect(checkedLang).toHaveCount(1);
+    await page.keyboard.press('Escape');
+  }
 });
