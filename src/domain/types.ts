@@ -139,6 +139,8 @@ export interface SyncState {
   rateLimitUntil?: string;
   pullRetryAt?: string;
   pullRetryAttempts?: number;
+  /** A failed explicit full scan must not resume using the incremental cursor. */
+  pullRetryFull?: boolean;
   error?: ApiFailure;
 }
 export interface Recovery {

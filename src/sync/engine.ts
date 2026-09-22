@@ -223,7 +223,13 @@ export class SyncEngine {
       this.db.syncState.get(scopeId),
       this.db.outbox.where('scopeId').equals(scopeId).toArray(),
     ]);
-    const eligible = entries.filter((entry) => canRetry(entry) && timestamp(entry.retryAt));
+    if (state?.error && !isTransient(state.error)) return;
+    const eligible = entries.filter(
+      (entry) =>
+        canRetry(entry) &&
+        (entry.status === 'pending' || timestamp(entry.retryAt)) &&
+        (!this.connection.readOnly || needsCreateDiscovery(entry)),
+    );
     const notes = await this.db.notes.bulkGet(eligible.map((entry) => [scopeId, entry.localId]));
     if (!this.canRunInBackground() || revision !== this.retryScheduleRevision) return;
     const available = new Set(
@@ -240,12 +246,10 @@ export class SyncEngine {
         .map((note) => note.localId),
     );
     const deadlines = [timestamp(state?.pullRetryAt)];
-    if (!this.connection.readOnly) {
-      for (const entry of eligible) {
-        if (!canRetry(entry) || !available.has(entry.localId)) continue;
-        const due = timestamp(entry.retryAt);
-        if (due) deadlines.push(Math.max(due, this.lastAutoWrite + 30_000));
-      }
+    for (const entry of eligible) {
+      if (!available.has(entry.localId)) continue;
+      const due = timestamp(entry.retryAt) || Date.now();
+      deadlines.push(Math.max(due, this.lastAutoWrite + 30_000));
     }
     // The scope cooldown also wakes otherwise untouched notes after a limit interrupted a batch.
     if (this.pausedUntil > Date.now()) deadlines.push(this.pausedUntil);
@@ -256,10 +260,12 @@ export class SyncEngine {
     this.retryTimer = setTimeout(
       () => {
         if (!this.canRunInBackground()) return;
+        let readyToFlush = false;
         void this.enqueue(async (generation) => {
           if (!this.canRunInBackground() || Date.now() < this.pausedUntil) return;
           const latest = await this.db.syncState.get(scopeId);
-          if (timestamp(latest?.pullRetryAt) > Date.now()) return;
+          if (timestamp(latest?.pullRetryAt) > Date.now() || (latest?.error && !isTransient(latest.error)))
+            return;
           const pending = await this.db.outbox.where('scopeId').equals(scopeId).toArray();
           const discover = pending.some(
             (entry) =>
@@ -270,9 +276,10 @@ export class SyncEngine {
           if (discover || latest?.pullRetryAt || !this.hasPulled) {
             if (!(await this.pullInner(generation, discover))) return;
           }
+          readyToFlush = true;
         })
           .then(() => {
-            if (this.canRunInBackground()) return this.flush();
+            if (readyToFlush && this.canRunInBackground()) return this.flush();
           })
           .catch(() => undefined);
       },
@@ -288,6 +295,7 @@ export class SyncEngine {
     if (!forceFull && timestamp(previous?.pullRetryAt) > Date.now()) return false;
     const full =
       forceFull ||
+      previous?.pullRetryFull ||
       !previous?.initialLoadComplete ||
       !previous.lastFullScanAt ||
       Date.now() - Date.parse(previous.lastFullScanAt) >= 86_400_000;
@@ -380,6 +388,7 @@ export class SyncEngine {
         lastPullAt: stamp,
         pullRetryAt: undefined,
         pullRetryAttempts: undefined,
+        pullRetryFull: undefined,
         rateLimitUntil: undefined,
       });
       this.pausedUntil = 0;
@@ -398,6 +407,7 @@ export class SyncEngine {
         error: failure,
         pullRetryAttempts: isTransient(failure) ? attempts : undefined,
         pullRetryAt: retryDeadline(failure, attempts),
+        pullRetryFull: full,
       });
       this.emit();
       throw error;

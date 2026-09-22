@@ -103,6 +103,88 @@ async function advance(ms: number) {
 }
 
 describe('durable synchronization retry', () => {
+  it('stops discovery wakeups after a terminal full-scan failure', async () => {
+    await createNote(connection.scopeId, document(), db);
+    client.createIssue.mockRejectedValueOnce(failure('NETWORK_UNCERTAIN'));
+    await engine.start();
+    client.getAnchor.mockRejectedValue(failure('AUTH_REQUIRED'));
+    await advance(30_000);
+    await vi.waitFor(async () =>
+      expect((await db.syncState.get(connection.scopeId))?.error?.code).toBe('AUTH_REQUIRED'),
+    );
+    await engine.flush(true);
+    const reads = client.getAnchor.mock.calls.length;
+    await advance(10_000);
+    await engine.flush(true);
+    expect(client.getAnchor).toHaveBeenCalledTimes(reads);
+    expect((await firstEntry()).status).toBe('uncertain');
+    expect(client.createIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('preserves a failed full-scan requirement through a restart with a recent cursor', async () => {
+    await engine.pull();
+    client.listIssues.mockImplementationOnce(async function* () {
+      yield [];
+      throw failure('SERVER_ERROR');
+    });
+    await expect(engine.pull(true)).rejects.toThrow('SERVER_ERROR');
+    engine.stop();
+    engine = new SyncEngine(db, client, connection);
+    await engine.start();
+    await advance(5_000);
+    await vi.waitFor(async () =>
+      expect((await db.syncState.get(connection.scopeId))?.pullRetryAt).toBeUndefined(),
+    );
+    expect(client.listIssues.mock.calls.at(-1)?.[1]?.since).toBeUndefined();
+  });
+
+  it('allows read-only discovery of an uncertain create while keeping all writes disabled', async () => {
+    const draft = await createNote(connection.scopeId, document(), db);
+    issues = [snapshot(draft.current)];
+    await db.syncState.put({
+      scopeId: connection.scopeId,
+      initialLoadComplete: true,
+      cursor: new Date().toISOString(),
+      lastFullScanAt: new Date().toISOString(),
+    });
+    await db.outbox.update([connection.scopeId, draft.localId], {
+      status: 'uncertain',
+      attemptSnapshot: draft.current,
+      attemptRevision: 1,
+      attemptStartedAt: new Date().toISOString(),
+      retryAt: new Date(Date.now() + 5_000).toISOString(),
+    });
+    client.listIssues.mockImplementation(async function* (_, options) {
+      yield options?.since ? [] : structuredClone(issues);
+    });
+    engine.stop();
+    engine = new SyncEngine(db, client, { ...connection, readOnly: true });
+    await engine.start();
+    await advance(5_000);
+    await vi.waitFor(async () => expect((await firstNote()).syncStatus).toBe('synced'), { timeout: 1_000 });
+    expect(client.createIssue).not.toHaveBeenCalled();
+    expect(client.updateIssue).not.toHaveBeenCalled();
+  });
+
+  it('schedules newer input remaining after a successful retry acknowledgement', async () => {
+    const note = await editRemote();
+    client.getIssue.mockRejectedValueOnce(failure('SERVER_ERROR'));
+    await engine.start();
+    const update = client.updateIssue.getMockImplementation()!;
+    client.updateIssue.mockImplementationOnce(async (...args) => {
+      const remote = await update(...args);
+      await saveNote(connection.scopeId, note.localId, { ...note.current, title: 'Newer input' }, db);
+      return remote;
+    });
+    await advance(5_000);
+    await vi.waitFor(async () => expect((await firstNote()).current.title).toBe('Newer input'));
+    expect((await firstNote()).syncStatus).toBe('pending');
+    await advance(30_000);
+    await vi.waitFor(async () => expect((await firstNote()).syncStatus).toBe('synced'), { timeout: 1_000 });
+    expect(issues[0]!.title).toBe('Newer input');
+    expect(client.updateIssue).toHaveBeenCalledTimes(2);
+  });
+
   it('resumes crash-interrupted create discovery against the persisted database', async () => {
     const draft = await createNote(connection.scopeId, document(), db);
     issues = [snapshot(draft.current)];
