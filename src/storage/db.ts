@@ -78,7 +78,10 @@ export async function recoverInterruptedWrites(database: TebikaeDB, scopeId: str
     const entries = await database.outbox.where('scopeId').equals(scopeId).toArray();
     for (const entry of entries) {
       if (entry.status !== 'sending') continue;
-      await database.outbox.update([scopeId, entry.localId], { status: 'uncertain' });
+      await database.outbox.update([scopeId, entry.localId], {
+        status: 'uncertain',
+        retryAt: entry.retryAt || new Date().toISOString(),
+      });
       await database.notes.update([scopeId, entry.localId], { syncStatus: 'uncertain' });
     }
   });

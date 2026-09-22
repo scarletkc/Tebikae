@@ -89,7 +89,7 @@ export function useIssueFeed(
   const feed = useMemo(() => {
     if (!engine || !client || !enabled) return null;
     const search = query
-      ? new IssueSearchPages((range, signal) => client.searchIssuesPage(connection, query, range, signal))
+      ? new IssueSearchPages((range, signal) => engine.searchIssuePage(query, range, signal))
       : null;
     return new IssueFeed(
       (next, signal) => (search ? search.next(signal) : engine.loadIssuePage(next, signal)),

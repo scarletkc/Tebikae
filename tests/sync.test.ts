@@ -369,6 +369,9 @@ describe('durable synchronization', () => {
     await engine.flush(true);
     expect((await database.outbox.get([connection.scopeId, note.localId]))?.status).toBe('uncertain');
     const scan = vi.spyOn(client, 'listIssues');
+    await database.outbox.update([connection.scopeId, note.localId], {
+      retryAt: new Date(Date.now() - 1_000).toISOString(),
+    });
     await engine.pull();
     expect(scan).toHaveBeenCalledWith(connection, { since: undefined });
     expect((await database.notes.get([connection.scopeId, note.localId]))?.issueNumber).toBe(1);

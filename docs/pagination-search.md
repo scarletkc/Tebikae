@@ -6,8 +6,9 @@ that unseen Issues were deleted. Periodic synchronization still uses the increme
 `since` cursor. Explicit full scans remain available for uncertain-create and
 uncertain-delete recovery; browsing never advances that recovery checkpoint.
 `initialPageLoaded` records that startup has usable data without falsely marking a
-partial cache as a complete repository backup. Pending uncertain creates or purges
-still trigger a full recovery scan when synchronization runs.
+partial cache as a complete repository backup. Pending purges still trigger a full
+recovery scan. Uncertain creates follow the persisted discovery schedule in the
+[sync protocol](protocol.md#持久化同步重试).
 
 Each fetched page is ingested through `SyncEngine` in a single Dexie transaction.
 The first 25 matching cards are rendered. Scrolling past about 65% of the displayed
@@ -24,6 +25,7 @@ pagination session. Online text searches use GitHub's Issues Search API, scoped 
 the connected repository, Issues only, and title/body text. Metadata filters remain
 local and pages are fetched until enough matching notes are available. Sidebar
 counts and offline results describe the cached subset, not a repository-wide total.
+Page and search requests share the sync engine's persisted server cooldown.
 
 Search pages contain at most 100 results. Queries with more than 1,000 matches are
 split recursively into non-overlapping `created` ranges, newest first, at second
@@ -51,6 +53,9 @@ the HTTP cache, and prevents in-flight page responses from restoring the deleted
 
 Editor changes use a short IndexedDB debounce only. The open editor is marked in the
 sync engine, so background polling and online retry skip its pending Outbox entry.
+The retry scheduler also excludes these writes until the editor closes; read-only
+discovery of an uncertain creation remains allowed. Closing rebuilds the wakeup
+from the existing retry deadline rather than resetting the wait.
 Closing the editor or moving to the previous/next note persists the final document
 and calls `flushNote(localId)`, which writes only that note. The editor save button
 and Ctrl/Cmd+S use the same immediate per-note path. An unchanged note has no Outbox
