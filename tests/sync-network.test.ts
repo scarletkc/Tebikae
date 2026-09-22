@@ -108,6 +108,10 @@ describe('adapter + outbox failure integration', () => {
     expect((await database.notes.toArray())[0]?.syncStatus).toBe('uncertain');
     remote.body = serializeNoteBody(note.current.meta, 'A third version on GitHub');
     await engine.flush(true);
+    expect((await database.notes.toArray())[0]?.syncStatus).toBe('uncertain');
+    expect(patches).toBe(1);
+    // A general flush honors backoff; explicitly retrying this note reconciles immediately.
+    await engine.retry(note.localId);
     expect((await database.notes.toArray())[0]?.syncStatus).toBe('conflict');
     expect((await database.notes.toArray())[0]?.current.markdown).toBe('Local write');
     expect(patches).toBe(1);
