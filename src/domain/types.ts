@@ -132,6 +132,8 @@ export interface SyncState {
   cursor?: string;
   lastFullScanAt?: string;
   initialLoadComplete: boolean;
+  /** A usable first page is separate from a complete repository listing. */
+  initialPageLoaded?: boolean;
   loading?: boolean;
   loadedCount?: number;
   lastPullAt?: string;

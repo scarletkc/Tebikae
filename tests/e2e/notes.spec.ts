@@ -51,6 +51,31 @@ test(
   },
 );
 
+test('editor debounce stays local until close, and close syncs only that note', async ({ page, context }) => {
+  const remote = await mockGitHub(context);
+  await connect(page);
+  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Title', { exact: true }).fill('Edited on close');
+  await page.waitForTimeout(2_300);
+  expect(remote.writes.filter((request) => request.method === 'PATCH')).toHaveLength(0);
+  await closeDialog(page);
+  await expect.poll(() => remote.issues[0]!.title).toBe('Edited on close');
+  expect(remote.writes.filter((request) => request.method === 'PATCH')).toHaveLength(1);
+});
+
+test('Ctrl/Cmd+S immediately syncs the current editor', async ({ page, context }) => {
+  const remote = await mockGitHub(context);
+  await connect(page);
+  await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Title', { exact: true }).fill('Saved with shortcut');
+  const modifier = process.platform === 'darwin' ? 'Meta' : 'Control';
+  await page.keyboard.press(`${modifier}+s`);
+  await expect.poll(() => remote.issues[0]!.title).toBe('Saved with shortcut');
+  expect(remote.writes.filter((request) => request.method === 'PATCH')).toHaveLength(1);
+});
+
 test(
   'offline input persists locally and reopens without entering a token',
   { tag: '@smoke' },
@@ -148,7 +173,8 @@ test('combined filters and preview navigation share the same result set', async 
   await closeDialog(page);
   await page.locator('.search-box .search-clear-button').click();
   await expect(page.locator('.note-card')).toHaveCount(2);
-  await page.getByLabel('Search your notes', { exact: true }).fill('tea ideas');
+  await page.getByLabel('Search your notes', { exact: true }).fill('tea');
+  await page.getByLabel('Search your notes', { exact: true }).press('Enter');
   await expect(page.locator('.note-card')).toHaveCount(1);
   await expect(
     page.getByRole('button', { name: 'Edit note: A little checklist', exact: true }),

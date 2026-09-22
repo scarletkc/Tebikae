@@ -11,9 +11,17 @@ import type {
   SyncState,
 } from '../domain/types';
 import { recoverInterruptedWrites, saveRecovery, type TebikaeDB } from '../storage/db';
+import type { IssuePage, SearchPage, SearchRange } from '../adapters/github/issue-pages';
 import { canRetry, isTransient, needsCreateDiscovery, retryDeadline, timestamp } from './retry-policy';
 
 export interface SyncClient {
+  listIssuesPage?(connection: Connection, next?: string, signal?: AbortSignal): Promise<IssuePage>;
+  searchIssuesPage?(
+    connection: Connection,
+    query: string,
+    range: SearchRange,
+    signal?: AbortSignal,
+  ): Promise<SearchPage>;
   updateLabel?(
     connection: Connection,
     name: string,
@@ -83,6 +91,8 @@ export class SyncEngine {
   private retryTimer?: ReturnType<typeof setTimeout>;
   private retryScheduleRevision = 0;
   private purging = new Map<string, Promise<void>>();
+  private firstIssuePage?: IssuePage;
+  private deletedLabelIds = new Set<number>();
 
   constructor(
     readonly db: TebikaeDB,
@@ -97,8 +107,10 @@ export class SyncEngine {
     };
   }
   setEditing(localId: string, editing: boolean) {
+    if (this.editingIds.has(localId) === editing) return;
     if (editing) this.editingIds.add(localId);
     else this.editingIds.delete(localId);
+    void this.scheduleRetry().catch(() => undefined);
   }
   private emit() {
     for (const listener of this.listeners) listener();
@@ -228,6 +240,7 @@ export class SyncEngine {
       (entry) =>
         canRetry(entry) &&
         (entry.status === 'pending' || timestamp(entry.retryAt)) &&
+        (!this.editingIds.has(entry.localId) || needsCreateDiscovery(entry)) &&
         (!this.connection.readOnly || needsCreateDiscovery(entry)),
     );
     const notes = await this.db.notes.bulkGet(eligible.map((entry) => [scopeId, entry.localId]));
@@ -287,18 +300,99 @@ export class SyncEngine {
     );
   }
 
+  /** Browsing shares the sync queue and the same draft/conflict protection as pulls. */
+  async loadIssuePage(next?: string, signal?: AbortSignal): Promise<IssuePage> {
+    let result: IssuePage = { issues: [] };
+    await this.enqueue(async (generation) => {
+      signal?.throwIfAborted();
+      if (!next && this.firstIssuePage) {
+        result = this.firstIssuePage;
+        return;
+      }
+      if (!this.client.listIssuesPage) return;
+      this.assertNotRateLimited();
+      result = await this.client.listIssuesPage(this.connection, next, signal);
+      signal?.throwIfAborted();
+      await this.ingestPageInner(result.issues, generation, signal);
+      if (!next) this.firstIssuePage = result;
+    });
+    return result;
+  }
+
+  async searchIssuePage(query: string, range: SearchRange, signal?: AbortSignal): Promise<SearchPage> {
+    let result: SearchPage = { issues: [], total: 0 };
+    await this.enqueue(async (generation) => {
+      signal?.throwIfAborted();
+      this.assertNotRateLimited();
+      if (!this.client.searchIssuesPage)
+        throw Object.assign(new Error('SEARCH_UNAVAILABLE'), { failure: { code: 'SERVER_ERROR' } });
+      result = await this.client.searchIssuesPage(this.connection, query, range, signal);
+      signal?.throwIfAborted();
+      this.assertActive(generation);
+    });
+    return result;
+  }
+
+  ingestPage(issues: RawIssueSnapshot[], signal?: AbortSignal) {
+    return this.enqueue((generation) => this.ingestPageInner(issues, generation, signal));
+  }
+
+  private async ingestPageInner(issues: RawIssueSnapshot[], generation: number, signal?: AbortSignal) {
+    await this.db.transaction(
+      'rw',
+      [
+        this.db.notes,
+        this.db.labels,
+        this.db.outbox,
+        this.db.recovery,
+        this.db.deletedIssues,
+        this.db.unmanagedIssues,
+      ],
+      async () => {
+        for (const issue of issues) {
+          signal?.throwIfAborted();
+          await this.ingest(issue, generation, signal);
+        }
+        signal?.throwIfAborted();
+        this.assertActive(generation);
+      },
+    );
+    await this.detectDuplicates();
+    this.emit();
+  }
+
   private async pullInner(generation: number, forceFull: boolean) {
     const scopeId = this.connection.scopeId;
     if (Date.now() < this.pausedUntil || (typeof navigator !== 'undefined' && !navigator.onLine))
       return false;
     const previous = await this.db.syncState.get(scopeId);
     if (!forceFull && timestamp(previous?.pullRetryAt) > Date.now()) return false;
+    const needsRecoveryScan =
+      this.client.listIssuesPage &&
+      ((await this.db.outbox
+        .where('scopeId')
+        .equals(scopeId)
+        .filter(
+          (entry) =>
+            needsCreateDiscovery(entry) &&
+            timestamp(entry.retryAt) > 0 &&
+            timestamp(entry.retryAt) <= Date.now(),
+        )
+        .first()) ||
+        (await this.db.notes
+          .where('scopeId')
+          .equals(scopeId)
+          .filter((note) => !!note.purgeStartedAt)
+          .first()));
     const full =
       forceFull ||
       previous?.pullRetryFull ||
-      !previous?.initialLoadComplete ||
-      !previous.lastFullScanAt ||
-      Date.now() - Date.parse(previous.lastFullScanAt) >= 86_400_000;
+      !!needsRecoveryScan ||
+      (!this.client.listIssuesPage &&
+        (!previous?.initialLoadComplete ||
+          !previous.lastFullScanAt ||
+          Date.now() - Date.parse(previous.lastFullScanAt) >= 86_400_000));
+    const firstPageOnly = !full && !this.hasPulled && !!this.client.listIssuesPage;
     const state: SyncState = {
       ...previous,
       scopeId,
@@ -320,17 +414,21 @@ export class SyncEngine {
       const seen = new Set<number>();
       const since =
         !full && previous?.cursor ? new Date(Date.parse(previous.cursor) - 60_000).toISOString() : undefined;
-      for await (const page of this.client.listIssues(this.connection, { since })) {
+      const first = firstPageOnly ? await this.client.listIssuesPage!(this.connection) : undefined;
+      const pages = first ? [first.issues] : this.client.listIssues(this.connection, { since });
+      for await (const page of pages) {
         this.assertActive(generation);
-        for (const remote of page) {
-          if (seen.has(remote.id)) continue;
+        const fresh = page.filter((remote) => {
+          if (seen.has(remote.id)) return false;
           seen.add(remote.id);
-          await this.ingest(remote, generation);
-        }
+          return true;
+        });
+        await this.ingestPageInner(fresh, generation);
         await this.db.syncState.update(scopeId, { loadedCount: seen.size });
         this.emit();
       }
       this.assertActive(generation);
+      if (first) this.firstIssuePage = first;
       await this.detectDuplicates();
       if (full) {
         // A complete discovery scan is one retry attempt. If the UUID is absent,
@@ -382,8 +480,9 @@ export class SyncEngine {
         ...state,
         loading: false,
         loadedCount: seen.size,
-        initialLoadComplete: full ? true : state.initialLoadComplete,
-        cursor: anchor || previous?.cursor,
+        initialLoadComplete: full || (first !== undefined && !first.next) || state.initialLoadComplete,
+        initialPageLoaded: true,
+        cursor: firstPageOnly && previous?.cursor ? previous.cursor : anchor || previous?.cursor,
         lastFullScanAt: full ? stamp : previous?.lastFullScanAt,
         lastPullAt: stamp,
         pullRetryAt: undefined,
@@ -414,20 +513,33 @@ export class SyncEngine {
     }
   }
 
-  private async ingest(remote: RawIssueSnapshot, generation: number) {
+  private async ingest(remote: RawIssueSnapshot, generation: number, signal?: AbortSignal) {
     this.assertActive(generation);
+    remote = { ...remote, labels: remote.labels.filter((label) => !this.deletedLabelIds.has(label.id)) };
     const scopeId = this.connection.scopeId;
     const document = snapshotToDocument(remote);
     await this.db.transaction(
       'rw',
-      this.db.notes,
-      this.db.unmanagedIssues,
-      this.db.outbox,
-      this.db.recovery,
-      this.db.deletedIssues,
+      [
+        this.db.notes,
+        this.db.unmanagedIssues,
+        this.db.outbox,
+        this.db.recovery,
+        this.db.deletedIssues,
+        this.db.labels,
+      ],
       async () => {
+        this.assertActive(generation);
+        signal?.throwIfAborted();
         if (await this.db.deletedIssues.get([scopeId, remote.id])) return;
+        const labelKeys = remote.labels.map((label) => [scopeId, label.id] as [string, number]);
+        const knownLabels = await this.db.labels.bulkGet(labelKeys);
+        const missingLabels = remote.labels.filter((_, index) => !knownLabels[index]);
+        if (missingLabels.length)
+          await this.db.labels.bulkPut(missingLabels.map((label) => ({ ...label, scopeId })));
         let note = await this.db.notes.where('[scopeId+issueId]').equals([scopeId, remote.id]).first();
+        if (note?.lastSeenRemote && Date.parse(remote.updatedAt) < Date.parse(note.lastSeenRemote.updatedAt))
+          return;
         if (note?.purgeStartedAt) {
           // The Issue exists again, so a pending purge attempt never took effect remotely;
           // drop the attempt and ingest the note normally so it stays recoverable.
@@ -458,12 +570,16 @@ export class SyncEngine {
         }
         await this.db.unmanagedIssues.delete([scopeId, remote.id]);
         if (!note) {
-          const candidates = await this.db.notes
+          const attempts = await this.db.outbox
             .where('scopeId')
             .equals(scopeId)
-            .filter((candidate) => !candidate.issueId && candidate.current.meta.id === document.meta.id)
+            .filter((attempt) => attempt.kind === 'create' && !!attempt.attemptStartedAt)
             .toArray();
+          const candidates = await this.db.notes.bulkGet(
+            attempts.map((attempt) => [scopeId, attempt.localId]),
+          );
           for (const candidate of candidates) {
+            if (!candidate || candidate.issueId || candidate.current.meta.id !== document.meta.id) continue;
             const attempt = await this.db.outbox.get([scopeId, candidate.localId]);
             if (attempt?.attemptStartedAt) {
               note = candidate;
@@ -482,7 +598,11 @@ export class SyncEngine {
             ...note,
             lastSeenRemote: remote,
             remoteUnavailable: false,
-            ...(pending || this.editingIds.has(note.localId)
+            ...(pending ||
+            this.editingIds.has(note.localId) ||
+            note.syncStatus !== 'synced' ||
+            !note.base ||
+            !this.sameContent(note.current, snapshotToDocument(note.base) ?? note.current)
               ? {}
               : { current: document, base: remote, syncStatus: 'synced' as const, error: undefined }),
           });
@@ -587,6 +707,104 @@ export class SyncEngine {
     return intentionalRename ? note.current.meta.id : remoteId || note.current.meta.id;
   }
 
+  /**
+   * Persisted editor drafts are deliberately separate from remote writes. Callers use
+   * this method when the current editor is closed or when the user explicitly saves;
+   * it only considers the requested note and leaves every other Outbox entry queued.
+   */
+  flushNote(localId: string): Promise<void> {
+    return this.enqueue(async (generation) => {
+      await this.flushOne(localId, generation, true);
+      this.emit();
+    }, 10);
+  }
+
+  private async flushOne(localId: string, generation: number, manual: boolean): Promise<boolean> {
+    if (this.connection.readOnly || Date.now() < this.pausedUntil) return true;
+    const key: [string, string] = [this.connection.scopeId, localId];
+    // A close/navigation of an unchanged note must not cause a remote read or
+    // write. An Outbox entry is the durable signal that this note actually needs
+    // reconciliation with GitHub.
+    let entry = await this.db.outbox.get(key);
+    if (!entry) return true;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      await this.db.notes
+        .where('[scopeId+localId]')
+        .equals([this.connection.scopeId, localId])
+        .modify((note) => {
+          if (note.syncStatus === 'pending' || note.syncStatus === 'local-draft') note.syncStatus = 'offline';
+        });
+      return true;
+    }
+    if (!this.hasPulled && !(await this.pullInner(generation, false))) return false;
+    this.assertActive(generation);
+    entry = await this.db.outbox.get(key);
+    if (!entry) return true;
+    if (
+      entry.status === 'conflict' ||
+      entry.status === 'error' ||
+      (entry.retryAt && Date.parse(entry.retryAt) > Date.now())
+    )
+      return true;
+    const note = await this.db.notes.get(key);
+    if (!note || note.duplicate || note.remoteUnavailable || note.purgeStartedAt) return true;
+    if (entry.status === 'uncertain' && note.error && !isTransient(note.error)) return true;
+    // Background polling/retry must not publish an editor that is still open. The
+    // editor's close, Ctrl/Cmd+S, or explicit save button calls flushNote manually.
+    if (!manual && this.editingIds.has(localId)) return true;
+    if (entry.kind === 'create' && entry.status === 'uncertain') return true;
+
+    // An edit can be undone before its debounce runs. Drop that now-empty update
+    // intent instead of issuing a PATCH that would write identical content.
+    const base = note.base && snapshotToDocument(note.base);
+    if (
+      entry.kind === 'update' &&
+      entry.status === 'pending' &&
+      !note.conflictFields?.length &&
+      base &&
+      this.sameContent(note.current, base)
+    ) {
+      await this.db.transaction('rw', this.db.notes, this.db.outbox, async () => {
+        const latest = await this.db.notes.get(key);
+        const pending = await this.db.outbox.get(key);
+        const latestBase = latest?.base && snapshotToDocument(latest.base);
+        // New edits retain the operation ID, so it cannot identify an unchanged draft.
+        if (
+          latest &&
+          latest.localRevision === note.localRevision &&
+          pending?.operationId === entry.operationId &&
+          pending.status === 'pending' &&
+          !latest.conflictFields?.length &&
+          latestBase &&
+          this.sameContent(latest.current, latestBase)
+        ) {
+          await this.db.outbox.delete(key);
+          await this.db.notes.update(key, { syncStatus: 'synced', error: undefined });
+        }
+      });
+      return true;
+    }
+    if (!manual && this.lastAutoWrite && Date.now() - this.lastAutoWrite < 30_000) {
+      clearTimeout(this.autoTimer);
+      this.autoTimer = setTimeout(
+        () => void this.flush().catch(() => undefined),
+        30_000 - (Date.now() - this.lastAutoWrite),
+      );
+      return false;
+    }
+    try {
+      if (note.issueNumber) await this.update(note, entry as Attempt, generation);
+      else await this.create(note, generation);
+    } catch (error) {
+      if (!this.active(generation)) return false;
+      const failure = failureOf(error);
+      if (failure.code === 'SESSION_EXPIRED') return false;
+      await this.recordFailure(note, failure);
+      return !['AUTH_REQUIRED', 'RATE_LIMITED', 'FORBIDDEN'].includes(failure.code);
+    }
+    return true;
+  }
+
   flush(manual = false) {
     if (!manual) {
       const wait = Math.max(0, this.lastAutoWrite + 30_000 - Date.now());
@@ -614,36 +832,7 @@ export class SyncEngine {
         const entries = await this.db.outbox.where('scopeId').equals(this.connection.scopeId).toArray();
         for (const entry of entries) {
           this.assertActive(generation);
-          if (
-            entry.status === 'conflict' ||
-            entry.status === 'error' ||
-            (entry.retryAt && Date.parse(entry.retryAt) > Date.now())
-          )
-            continue;
-          const note = await this.db.notes.get([entry.scopeId, entry.localId]);
-          if (!note || note.duplicate || note.remoteUnavailable || note.purgeStartedAt) continue;
-          if (entry.status === 'uncertain' && note.error && !isTransient(note.error)) continue;
-          if (entry.kind === 'create' && entry.status === 'uncertain') continue;
-          if (!manual && this.lastAutoWrite && Date.now() - this.lastAutoWrite < 30_000) {
-            clearTimeout(this.autoTimer);
-            this.autoTimer = setTimeout(
-              () => {
-                void this.flush().catch(() => undefined);
-              },
-              30_000 - (Date.now() - this.lastAutoWrite),
-            );
-            break;
-          }
-          try {
-            if (note.issueNumber) await this.update(note, entry as Attempt, generation);
-            else await this.create(note, generation);
-          } catch (error) {
-            if (!this.active(generation)) return;
-            const failure = failureOf(error);
-            if (failure.code === 'SESSION_EXPIRED') return;
-            await this.recordFailure(note, failure);
-            if (['AUTH_REQUIRED', 'RATE_LIMITED', 'FORBIDDEN'].includes(failure.code)) break;
-          }
+          if (!(await this.flushOne(entry.localId, generation, manual))) break;
         }
         this.emit();
       },
@@ -1188,6 +1377,7 @@ export class SyncEngine {
       if (!label) throw new Error('LABEL_NOT_FOUND');
       await this.client.deleteLabel(this.connection, label.name);
       this.assertActive(generation);
+      this.deletedLabelIds.add(id);
       // Deletion is already applied on GitHub. Remove the ID from local baselines and
       // queued snapshots as well, so an unrelated draft cannot resurrect it.
       await this.db.transaction(
@@ -1196,9 +1386,11 @@ export class SyncEngine {
         this.db.notes,
         this.db.outbox,
         this.db.unmanagedIssues,
+        this.db.httpCache,
         async () => {
           this.assertActive(generation);
           await this.db.labels.delete([scopeId, id]);
+          await this.db.httpCache.where('scopeId').equals(scopeId).delete();
           await this.db.notes
             .where('scopeId')
             .equals(scopeId)
@@ -1232,7 +1424,30 @@ export class SyncEngine {
     await this.enqueue(async (generation) => {
       this.assertNotRateLimited();
       if (this.connection.readOnly) throw new Error('READ_ONLY');
-      result = await this.client.createLabel(this.connection, { name: name.trim(), color });
+      const scopeId = this.connection.scopeId;
+      const normalized = name.trim().toLowerCase();
+      if (!normalized)
+        throw Object.assign(new Error('EMPTY_LABEL'), { failure: { code: 'VALIDATION_FAILED' } });
+      const find = (labels: Label[]) =>
+        labels.find((label) => label.name.trim().toLowerCase() === normalized);
+      result = find(await this.db.labels.where('scopeId').equals(scopeId).toArray());
+      const refresh = async () => {
+        const labels = await this.client.listLabels(this.connection);
+        this.assertActive(generation);
+        await this.db.labels.bulkPut(labels.map((label) => ({ ...label, scopeId })));
+        return find(labels);
+      };
+      result ??= await refresh();
+      if (!result) {
+        try {
+          this.assertActive(generation);
+          result = await this.client.createLabel(this.connection, { name: name.trim(), color });
+        } catch (error) {
+          if (failureOf(error).status !== 422) throw error;
+          result = await refresh();
+          if (!result) throw error;
+        }
+      }
       this.assertActive(generation);
       await this.db.labels.put({ ...result, scopeId: this.connection.scopeId });
     }, 10);

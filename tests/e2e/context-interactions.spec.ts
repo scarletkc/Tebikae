@@ -215,8 +215,18 @@ test('modal context is viewport anchored and clamped after scroll and zoom', asy
   await page.getByRole('button', { name: 'Edit note: Position test' }).click();
   const title = page.getByRole('textbox', { name: 'Title', exact: true });
   const box = (await title.boundingBox())!;
+  await page.waitForTimeout(100);
   const point = { x: box.x + 30, y: box.y + 20 };
-  await page.mouse.click(point.x, point.y, { button: 'right' });
+  await title.evaluate((element, at) => {
+    element.dispatchEvent(
+      new MouseEvent('contextmenu', {
+        bubbles: true,
+        cancelable: true,
+        clientX: at.x,
+        clientY: at.y,
+      }),
+    );
+  }, point);
   let menu = (await page.getByRole('menu').boundingBox())!;
   expect(Math.abs(menu.x - point.x)).toBeLessThan(3);
   expect(Math.abs(menu.y - point.y)).toBeLessThan(3);

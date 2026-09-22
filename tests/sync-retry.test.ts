@@ -103,6 +103,99 @@ async function advance(ms: number) {
 }
 
 describe('durable synchronization retry', () => {
+  it('does not repeatedly wake a background write for an open editor, and resumes on close', async () => {
+    const note = await createNote(connection.scopeId, document(), db);
+    engine.setEditing(note.localId, true);
+    await engine.start();
+    const flush = vi.spyOn(engine, 'flush');
+    await advance(2_000);
+    expect(flush).not.toHaveBeenCalled();
+    expect(client.createIssue).not.toHaveBeenCalled();
+    engine.setEditing(note.localId, false);
+    await vi.waitFor(async () => expect((await firstNote()).syncStatus).toBe('synced'));
+    expect(client.createIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let a per-note save bypass a deferred initial pull', async () => {
+    const note = await createNote(connection.scopeId, document(), db);
+    await db.syncState.put({
+      scopeId: connection.scopeId,
+      initialLoadComplete: false,
+      pullRetryAt: new Date(Date.now() + 5_000).toISOString(),
+      pullRetryFull: true,
+    });
+    const page = vi.fn(async () => ({ issues: [], next: 'older' }));
+    Object.assign(client, { listIssuesPage: page });
+    await engine.flushNote(note.localId);
+    expect(client.getAnchor).not.toHaveBeenCalled();
+    expect(page).not.toHaveBeenCalled();
+    expect(client.createIssue).not.toHaveBeenCalled();
+    expect(await db.outbox.count()).toBe(1);
+    await advance(5_000);
+    await engine.flushNote(note.localId);
+    expect(page).not.toHaveBeenCalled();
+    expect(client.listIssues).toHaveBeenCalledWith(connection, { since: undefined });
+    expect(client.createIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps terminal uncertain-update failures out of per-note saves', async () => {
+    const note = await editRemote();
+    client.updateIssue.mockRejectedValueOnce(failure('NETWORK_UNCERTAIN'));
+    await engine.flushNote(note.localId);
+    client.getIssue.mockRejectedValueOnce(failure('AUTH_REQUIRED'));
+    await engine.retry(note.localId);
+    expect((await firstEntry()).status).toBe('uncertain');
+    expect((await firstNote()).error?.code).toBe('AUTH_REQUIRED');
+    const reads = client.getIssue.mock.calls.length;
+    await engine.flushNote(note.localId);
+    expect(client.getIssue).toHaveBeenCalledTimes(reads);
+    expect(client.updateIssue).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores the persisted cooldown before browsing or searching and records search limits', async () => {
+    const page = vi.fn(async () => ({ issues: [], next: 'older' }));
+    const search = vi.fn(async () => ({ issues: [], total: 0 }));
+    Object.assign(client, { listIssuesPage: page, searchIssuesPage: search });
+    await db.syncState.put({
+      scopeId: connection.scopeId,
+      initialLoadComplete: false,
+      rateLimitUntil: new Date(Date.now() + 60_000).toISOString(),
+    });
+    const range = { from: 0, to: 100, page: 1 };
+    await expect(engine.loadIssuePage()).rejects.toThrow('RATE_LIMITED');
+    await expect(engine.searchIssuePage('term', range)).rejects.toThrow('RATE_LIMITED');
+    expect(page).not.toHaveBeenCalled();
+    expect(search).not.toHaveBeenCalled();
+    await advance(60_000);
+    search.mockRejectedValueOnce(failure('RATE_LIMITED', new Date(Date.now() + 60_000).toISOString()));
+    await expect(engine.searchIssuePage('term', range)).rejects.toThrow('RATE_LIMITED');
+    await expect(engine.loadIssuePage()).rejects.toThrow('RATE_LIMITED');
+    expect(page).not.toHaveBeenCalled();
+    await advance(60_000);
+    await engine.loadIssuePage();
+    await engine.searchIssuePage('term', range);
+    expect(page).toHaveBeenCalledTimes(1);
+    expect(search).toHaveBeenCalledTimes(2);
+  });
+
+  it('does one complete discovery after paginated startup and does not repeat a missing UUID scan', async () => {
+    const page = vi.fn(async () => ({ issues: [], next: 'older' }));
+    Object.assign(client, { listIssuesPage: page });
+    await createNote(connection.scopeId, document(), db);
+    client.createIssue.mockRejectedValueOnce(failure('NETWORK_UNCERTAIN'));
+    await engine.start();
+    expect(page).toHaveBeenCalledTimes(1);
+    expect(client.listIssues).not.toHaveBeenCalled();
+    await advance(30_000);
+    await vi.waitFor(async () => expect((await firstEntry()).retryAt).toBeUndefined());
+    expect(client.listIssues.mock.calls.filter(([, options]) => !options?.since)).toHaveLength(1);
+    await advance(60_000);
+    await engine.pull();
+    expect(client.listIssues.mock.calls.filter(([, options]) => !options?.since)).toHaveLength(1);
+    expect(client.createIssue).toHaveBeenCalledTimes(1);
+    expect((await firstEntry()).status).toBe('uncertain');
+  });
+
   it('stops discovery wakeups after a terminal full-scan failure', async () => {
     await createNote(connection.scopeId, document(), db);
     client.createIssue.mockRejectedValueOnce(failure('NETWORK_UNCERTAIN'));
@@ -121,22 +214,28 @@ describe('durable synchronization retry', () => {
     expect(client.createIssue).toHaveBeenCalledTimes(1);
   });
 
-  it('preserves a failed full-scan requirement through a restart with a recent cursor', async () => {
-    await engine.pull();
-    client.listIssues.mockImplementationOnce(async function* () {
-      yield [];
-      throw failure('SERVER_ERROR');
-    });
-    await expect(engine.pull(true)).rejects.toThrow('SERVER_ERROR');
-    engine.stop();
-    engine = new SyncEngine(db, client, connection);
-    await engine.start();
-    await advance(5_000);
-    await vi.waitFor(async () =>
-      expect((await db.syncState.get(connection.scopeId))?.pullRetryAt).toBeUndefined(),
-    );
-    expect(client.listIssues.mock.calls.at(-1)?.[1]?.since).toBeUndefined();
-  });
+  it.each([false, true])(
+    'preserves a failed full-scan requirement through restart (paginated: %s)',
+    async (paginated) => {
+      const page = vi.fn(async () => ({ issues: [], next: 'older' }));
+      if (paginated) Object.assign(client, { listIssuesPage: page });
+      await engine.pull();
+      client.listIssues.mockImplementationOnce(async function* () {
+        yield [];
+        throw failure('SERVER_ERROR');
+      });
+      await expect(engine.pull(true)).rejects.toThrow('SERVER_ERROR');
+      engine.stop();
+      engine = new SyncEngine(db, client, connection);
+      await engine.start();
+      await advance(5_000);
+      await vi.waitFor(async () =>
+        expect((await db.syncState.get(connection.scopeId))?.pullRetryAt).toBeUndefined(),
+      );
+      expect(client.listIssues.mock.calls.at(-1)?.[1]?.since).toBeUndefined();
+      expect(page).toHaveBeenCalledTimes(paginated ? 1 : 0);
+    },
+  );
 
   it('allows read-only discovery of an uncertain create while keeping all writes disabled', async () => {
     const draft = await createNote(connection.scopeId, document(), db);

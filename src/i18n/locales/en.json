@@ -93,6 +93,7 @@
     "privateOnly": "Use a private repository owned by your GitHub account."
   },
   "home": {
+    "searchTooDense": "Over 1,000 matching Issues were created in the same second. Narrow your search to retrieve all results.",
     "search": "Search your notes",
     "pinned": "Pinned",
     "other": "Everything else",
@@ -343,7 +344,7 @@
     "labelColor": "Label color",
     "rename": "Rename",
     "deleteLabel": "Delete",
-    "deleteLabelConfirm": "Delete “{{name}}”? It will be removed from {{count}} notes. The notes themselves will not be deleted.",
+    "deleteLabelConfirm": "Delete “{{name}}” from the GitHub repository and every note using it? The notes themselves will not be deleted.",
     "clearTrashConfirm_one": "Permanently delete {{count}} trashed note? This cannot be undone.",
     "clearTrashConfirm_other": "Permanently delete {{count}} trashed notes? This cannot be undone.",
     "removeLabel": "Remove label",

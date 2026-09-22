@@ -150,6 +150,281 @@ afterEach(async () => {
 const firstNote = async () => (await database.notes.toArray())[0]!;
 
 describe('durable synchronization', () => {
+  it('retains and syncs an edit arriving while an undone update is being cleared', async () => {
+    client.issues = [raw(doc(), 1)];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(connection.scopeId, note.localId, { ...note.current, markdown: 'temporary' }, database);
+    await saveNote(connection.scopeId, note.localId, structuredClone(note.current), database);
+    const key: [string, string] = [connection.scopeId, note.localId];
+    const entry = await database.outbox.get(key);
+    const getNote = database.notes.get.bind(database.notes);
+    vi.spyOn(database.notes, 'get').mockImplementationOnce((key) =>
+      getNote(key).then(async (snapshot) => {
+        await saveNote(
+          connection.scopeId,
+          note.localId,
+          { ...note.current, markdown: 'new concurrent edit' },
+          database,
+        );
+        return snapshot;
+      }),
+    );
+    await engine.flushNote(note.localId);
+    expect((await firstNote()).current.markdown).toBe('new concurrent edit');
+    expect((await firstNote()).syncStatus).toBe('pending');
+    expect(await database.outbox.get(key)).toMatchObject({
+      operationId: entry!.operationId,
+      status: 'pending',
+    });
+    await engine.flushNote(note.localId);
+    expect(client.issues[0]!.body).toContain('new concurrent edit');
+    expect(await database.outbox.get(key)).toBeUndefined();
+  });
+  it('reuses local labels after trim and case folding without repository writes', async () => {
+    const label = { id: 5, name: 'bug', color: 'aaaaaa', description: null };
+    await database.labels.put({ ...label, scopeId: connection.scopeId });
+    const create = vi.spyOn(client, 'createLabel');
+    const list = vi.spyOn(client, 'listLabels');
+    expect(await engine.createLabel('  BUG  ')).toMatchObject(label);
+    expect(create).not.toHaveBeenCalled();
+    expect(list).not.toHaveBeenCalled();
+  });
+
+  it('refreshes repository labels before creating and caches an existing remote label', async () => {
+    client.labels = [{ id: 5, name: 'bug', color: 'aaaaaa', description: null }];
+    const create = vi.spyOn(client, 'createLabel');
+    expect(await engine.createLabel(' BUG ')).toEqual(client.labels[0]);
+    expect(create).not.toHaveBeenCalled();
+    expect(await database.labels.get([connection.scopeId, 5])).toMatchObject({ name: 'bug' });
+  });
+
+  it('recovers a concurrent label creation on 422, without replaying POST', async () => {
+    const label = { id: 5, name: 'Bug', color: 'aaaaaa', description: null };
+    const create = vi.spyOn(client, 'createLabel').mockImplementation(async () => {
+      client.labels = [label];
+      throw Object.assign(error('VALIDATION_FAILED'), {
+        failure: { code: 'VALIDATION_FAILED', status: 422 },
+      });
+    });
+    const list = vi.spyOn(client, 'listLabels');
+    expect(await engine.createLabel(' bug ')).toEqual(label);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(list).toHaveBeenCalledTimes(2);
+    expect(await database.labels.count()).toBe(1);
+  });
+
+  it('does not hide a 422 with no matching label or create after a failed lookup', async () => {
+    const failure = Object.assign(error('VALIDATION_FAILED'), {
+      failure: { code: 'VALIDATION_FAILED', status: 422 },
+    });
+    const create = vi.spyOn(client, 'createLabel').mockRejectedValue(failure);
+    await expect(engine.createLabel('bug')).rejects.toBe(failure);
+    create.mockClear();
+    vi.spyOn(client, 'listLabels').mockRejectedValue(error('FORBIDDEN'));
+    await expect(engine.createLabel('bug')).rejects.toThrow('FORBIDDEN');
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('adds/removes an existing label with Issue endpoints and retains the repository label', async () => {
+    client.labels = [{ id: 5, name: 'bug', color: 'aaaaaa', description: null }];
+    client.issues = [raw(doc())];
+    await engine.pull();
+    const create = vi.spyOn(client, 'createLabel');
+    const removeRepository = vi.spyOn(client, 'deleteLabel');
+    const add = vi.spyOn(client, 'addLabels');
+    const remove = vi.spyOn(client, 'removeLabel');
+    let note = await firstNote();
+    await saveNote(connection.scopeId, note.localId, { ...note.current, labelIds: [5] }, database);
+    await engine.flush(true);
+    note = await firstNote();
+    await saveNote(connection.scopeId, note.localId, { ...note.current, labelIds: [] }, database);
+    await engine.flush(true);
+    expect(add).toHaveBeenCalledWith(connection, 1, ['bug']);
+    expect(remove).toHaveBeenCalledWith(connection, 1, 'bug');
+    expect(create).not.toHaveBeenCalled();
+    expect(removeRepository).not.toHaveBeenCalled();
+    expect(await database.labels.count()).toBe(1);
+  });
+
+  it('flushNote synchronizes only the requested note and leaves other Outbox entries queued', async () => {
+    client.issues = [raw(doc(), 1), raw({ ...doc(), title: 'Second' }, 2)];
+    await engine.pull();
+    const notes = (await database.notes.toArray()).sort(
+      (a, b) => (a.issueNumber ?? 0) - (b.issueNumber ?? 0),
+    );
+    await saveNote(
+      connection.scopeId,
+      notes[0]!.localId,
+      { ...notes[0]!.current, markdown: 'first local' },
+      database,
+    );
+    await saveNote(
+      connection.scopeId,
+      notes[1]!.localId,
+      { ...notes[1]!.current, markdown: 'second local' },
+      database,
+    );
+    const writesBefore = client.patches.length;
+    await engine.flushNote(notes[0]!.localId);
+    expect(client.patches.length).toBe(writesBefore + 1);
+    expect(client.issues[0]!.body).toContain('first local');
+    expect(client.issues[1]!.body).not.toContain('second local');
+    expect(await database.outbox.get([connection.scopeId, notes[1]!.localId])).toMatchObject({
+      status: 'pending',
+    });
+  });
+
+  it('does not send a PATCH when an update was undone back to the remote baseline', async () => {
+    client.issues = [raw(doc(), 1)];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(connection.scopeId, note.localId, { ...note.current, markdown: 'temporary' }, database);
+    await saveNote(connection.scopeId, note.localId, structuredClone(note.current), database);
+    const patches = vi.spyOn(client, 'updateIssue');
+    await engine.flushNote(note.localId);
+    expect(patches).not.toHaveBeenCalled();
+    expect(await database.outbox.get([connection.scopeId, note.localId])).toBeUndefined();
+    expect((await firstNote()).syncStatus).toBe('synced');
+  });
+
+  it('keeps the current Outbox entry on an offline close and retries it when connectivity returns', async () => {
+    client.issues = [raw(doc(), 1)];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(
+      connection.scopeId,
+      note.localId,
+      { ...note.current, markdown: 'offline local' },
+      database,
+    );
+    const originalNavigator = globalThis.navigator;
+    Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { onLine: false } });
+    try {
+      await engine.flushNote(note.localId);
+      expect(client.issues[0]!.body).not.toContain('offline local');
+      expect(await database.outbox.get([connection.scopeId, note.localId])).toMatchObject({
+        status: 'pending',
+      });
+    } finally {
+      Object.defineProperty(globalThis, 'navigator', { configurable: true, value: originalNavigator });
+    }
+    await engine.flushNote(note.localId);
+    expect(client.issues[0]!.body).toContain('offline local');
+  });
+
+  it('does not background-sync an open editor, but flushNote still commits it immediately', async () => {
+    client.issues = [raw(doc(), 1)];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(connection.scopeId, note.localId, { ...note.current, markdown: 'while open' }, database);
+    engine.setEditing(note.localId, true);
+    await engine.flush();
+    expect(client.issues[0]!.body).not.toContain('while open');
+    await engine.flushNote(note.localId);
+    expect(client.issues[0]!.body).toContain('while open');
+  });
+
+  it('loads only the newest page at startup, caches subsequent pages and never marks unseen notes unavailable', async () => {
+    client.issues = Array.from({ length: 205 }, (_, i) => raw(doc(), i + 1));
+    await engine.ingestPage([client.issues[0]!]);
+    const first = { issues: client.issues.slice(105), next: 'page2' };
+    const page = vi.fn(async (_connection: Connection, next?: string) =>
+      next ? { issues: client.issues.slice(5, 105), next: 'page3' } : first,
+    );
+    Object.assign(client, { listIssuesPage: page });
+    const scan = vi.spyOn(client, 'listIssues');
+    await engine.pull();
+    expect(page).toHaveBeenCalledTimes(1);
+    expect(scan).not.toHaveBeenCalled();
+    expect(await database.notes.count()).toBe(101);
+    expect(await database.syncState.get(connection.scopeId)).toMatchObject({
+      initialLoadComplete: false,
+      initialPageLoaded: true,
+    });
+    expect((await firstNote()).remoteUnavailable).not.toBe(true);
+    expect(await engine.loadIssuePage()).toEqual(first);
+    expect(page).toHaveBeenCalledTimes(1);
+    await engine.loadIssuePage('page2');
+    expect(await database.notes.count()).toBe(201);
+    await engine.pull(true);
+    expect(scan).toHaveBeenCalled();
+  }, 20000);
+
+  it('keeps the previous incremental cursor on paginated reconnect and scans fully for uncertain creates', async () => {
+    const oldCursor = '2026-09-01T00:00:00Z';
+    await database.syncState.put({
+      scopeId: connection.scopeId,
+      cursor: oldCursor,
+      initialLoadComplete: false,
+    });
+    const page = vi.fn(async () => ({ issues: [], next: 'page2' }));
+    Object.assign(client, { listIssuesPage: page });
+    await engine.pull();
+    expect((await database.syncState.get(connection.scopeId))?.cursor).toBe(oldCursor);
+    await engine.pull();
+    expect(client.requestedSince).toBe('2026-08-31T23:59:00.000Z');
+    const note = await createNote(connection.scopeId, doc(), database);
+    client.failCreateAfterWrite = true;
+    await engine.flush(true);
+    expect((await database.outbox.get([connection.scopeId, note.localId]))?.status).toBe('uncertain');
+    const scan = vi.spyOn(client, 'listIssues');
+    await database.outbox.update([connection.scopeId, note.localId], {
+      retryAt: new Date(Date.now() - 1_000).toISOString(),
+    });
+    await engine.pull();
+    expect(scan).toHaveBeenCalledWith(connection, { since: undefined });
+    expect((await database.notes.get([connection.scopeId, note.localId]))?.issueNumber).toBe(1);
+    expect(await database.outbox.count()).toBe(0);
+    expect(client.creates).toBe(1);
+  });
+
+  it.each(['pending', 'editing', 'unsaved'] as const)(
+    'page ingestion protects %s current content',
+    async (mode) => {
+      const remote = raw(doc());
+      await engine.ingestPage([remote]);
+      const note = await firstNote();
+      if (mode === 'pending')
+        await saveNote(
+          connection.scopeId,
+          note.localId,
+          { ...note.current, markdown: 'Local draft' },
+          database,
+        );
+      else if (mode === 'editing') engine.setEditing(note.localId, true);
+      else
+        await database.notes.update([connection.scopeId, note.localId], {
+          current: { ...note.current, markdown: 'Local draft' },
+        });
+      const before = (await firstNote()).current;
+      const update = { ...remote, title: 'Remote title', updatedAt: '2026-09-17T00:00:00Z' };
+      await engine.ingestPage([update]);
+      expect((await firstNote()).current).toEqual(before);
+      expect((await firstNote()).lastSeenRemote).toEqual(update);
+    },
+  );
+
+  it('rejects cancelled ingestion and ignores stale snapshots and deleted labels', async () => {
+    const label = { id: 5, name: 'bug', color: 'aaaaaa', description: null };
+    client.labels = [label];
+    const original = { ...raw(doc()), labels: [label] };
+    client.issues = [original];
+    await engine.pull();
+    const newer = { ...original, title: 'Latest', updatedAt: '2026-09-18T00:00:00Z' };
+    await engine.ingestPage([newer]);
+    await engine.ingestPage([original]);
+    expect((await firstNote()).current.title).toBe('Latest');
+    const controller = new AbortController();
+    controller.abort();
+    await expect(engine.ingestPage([raw(doc(), 2)], controller.signal)).rejects.toThrow();
+    expect(await database.notes.count()).toBe(1);
+    await engine.deleteLabel(5);
+    await engine.ingestPage([newer]);
+    expect((await firstNote()).current.labelIds).toEqual([]);
+    expect(await database.labels.count()).toBe(0);
+  });
+
   it('label deletion cleans pending drafts and baselines without deleting notes or restoring the label', async () => {
     const label = { id: 21, name: 'Work', color: '123456', description: null };
     client.labels = [label];

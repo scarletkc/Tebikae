@@ -26,7 +26,7 @@ export interface MockGitHubState {
   dropNextCreateResponse: boolean;
   failNextDeleteIssue: boolean;
   writes: { method: string; path: string; body: Record<string, unknown> | null }[];
-  requests: { method: string; path: string }[];
+  requests: { method: string; path: string; url: string }[];
 }
 export const mockLabels: MockLabel[] = [
   { id: 11, name: 'Ideas', color: 'b1c6b0', description: null },
@@ -102,10 +102,11 @@ export async function mockGitHub(
       method = request.method(),
       url = new URL(request.url()),
       path = url.pathname;
-    state.requests.push({ method, path });
+    state.requests.push({ method, path, url: url.href });
     const headers = {
       'access-control-allow-origin': '*',
       'access-control-allow-headers': '*',
+      'access-control-expose-headers': 'link, etag, x-poll-interval',
       'content-type': 'application/json',
     };
     const send = (body: unknown, status = 200, extra: Record<string, string> = {}) =>
@@ -144,6 +145,12 @@ export async function mockGitHub(
       });
     if (path === '/repos/scarletkc/Tebikae-dev/labels') {
       if (method === 'POST') {
+        if (
+          state.labels.some(
+            (label) => label.name.trim().toLowerCase() === String(payload?.name).trim().toLowerCase(),
+          )
+        )
+          return send({ message: 'Already exists' }, 422);
         const label = {
           id: 20 + state.labels.length,
           name: String(payload?.name),
@@ -171,6 +178,27 @@ export async function mockGitHub(
           issue.labels = issue.labels.map((l) => (l.id === label.id ? { ...label } : l));
         return send(label);
       }
+    }
+    if (path === '/search/issues') {
+      const query = url.searchParams.get('q') || '';
+      const terms = [...query.matchAll(/"([^"]+)"/gu)].map((match) => match[1]!.toLowerCase());
+      const range = /created:(\S+)\.\.(\S+)/u.exec(query);
+      const matches = state.issues
+        .filter(
+          (issue) =>
+            !issue.pull_request &&
+            terms.every((term) => `${issue.title}\n${issue.body}`.toLowerCase().includes(term)) &&
+            (!range ||
+              (Date.parse(issue.created_at) >= Date.parse(range[1]!) &&
+                Date.parse(issue.created_at) <= Date.parse(range[2]!))),
+        )
+        .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.number - a.number);
+      const page = Number(url.searchParams.get('page') || 1);
+      return send({
+        total_count: matches.length,
+        incomplete_results: false,
+        items: matches.slice((page - 1) * 100, page * 100),
+      });
     }
     const match = /^\/repos\/scarletkc\/Tebikae-dev\/issues(?:\/(\d+))?(?:\/labels(?:\/(.*))?)?$/u.exec(path);
     if (!match) return send({ message: 'Unexpected mocked endpoint' }, 404);
@@ -201,7 +229,7 @@ export async function mockGitHub(
       const sorted = [...state.issues].sort((a, b) =>
         url.searchParams.get('sort') === 'updated'
           ? b.updated_at.localeCompare(a.updated_at)
-          : a.number - b.number,
+          : (a.number - b.number) * (url.searchParams.get('direction') === 'desc' ? -1 : 1),
       );
       const since = url.searchParams.get('since');
       const values = since

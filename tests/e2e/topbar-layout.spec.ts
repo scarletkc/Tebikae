@@ -39,7 +39,7 @@ for (const width of [320, 390, 768, 1100, 1280]) {
       } else {
         await expect(topbar.locator('.new-note-button:not(.fab-new-note)')).toBeVisible();
       }
-      await expect(page.locator('.note-card')).toHaveCount(30);
+      await expect(page.locator('.note-card')).toHaveCount(25);
       const controls = topbar.locator('button:visible, input, select');
       const checkBounds = async () => {
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
@@ -69,7 +69,7 @@ for (const width of [320, 390, 768, 1100, 1280]) {
       await expect(topbar.locator('.search-clear-button')).toBeVisible();
       await checkBounds();
       await topbar.locator('.search-clear-button').click();
-      await expect(page.locator('.note-card')).toHaveCount(30);
+      await expect(page.locator('.note-card')).toHaveCount(25);
       await page.screenshot({ path: testInfo.outputPath('scrolled.png') });
       await newNote.click();
       await expect(page.getByRole('dialog')).toBeVisible();
