@@ -11,6 +11,7 @@ import type {
   SyncState,
 } from '../domain/types';
 import { recoverInterruptedWrites, saveRecovery, type TebikaeDB } from '../storage/db';
+import { canRetry, isTransient, needsCreateDiscovery, retryDeadline, timestamp } from './retry-policy';
 
 export interface SyncClient {
   updateLabel?(
@@ -78,6 +79,9 @@ export class SyncEngine {
   private listeners = new Set<StatusListener>();
   private removeEvents?: () => void;
   private pausedUntil = 0;
+  private started = false;
+  private retryTimer?: ReturnType<typeof setTimeout>;
+  private retryScheduleRevision = 0;
   private purging = new Map<string, Promise<void>>();
 
   constructor(
@@ -122,12 +126,22 @@ export class SyncEngine {
         this.assertActive(job.generation);
         if (!this.initialized) {
           await recoverInterruptedWrites(this.db, this.connection.scopeId);
+          const state = await this.db.syncState.get(this.connection.scopeId);
+          this.pausedUntil = Math.max(
+            timestamp(state?.rateLimitUntil),
+            state?.error?.code === 'RATE_LIMITED' ? timestamp(state.error.retryAt) : 0,
+          );
           this.initialized = true;
         }
         this.assertActive(job.generation);
         await job.work(job.generation);
+        await this.scheduleRetry().catch(() => undefined);
         job.resolve();
       } catch (error) {
+        if (this.active(job.generation)) {
+          await this.pause(failureOf(error)).catch(() => undefined);
+          await this.scheduleRetry().catch(() => undefined);
+        }
         job.reject(error);
       }
     }
@@ -136,6 +150,7 @@ export class SyncEngine {
 
   async start() {
     if (this.stopped) return;
+    this.started = true;
     if (!this.interval && typeof window !== 'undefined') {
       const refresh = (minimum = 15_000) => {
         if (document.visibilityState !== 'visible' || (typeof navigator !== 'undefined' && !navigator.onLine))
@@ -145,17 +160,24 @@ export class SyncEngine {
             .then(() => this.flush())
             .catch(() => undefined);
       };
-      const visible = () => refresh();
+      const visible = () => {
+        void this.scheduleRetry().catch(() => undefined);
+        refresh();
+      };
       const online = () => {
+        void this.scheduleRetry().catch(() => undefined);
         void this.pull()
           .then(() => this.flush())
           .catch(() => undefined);
       };
       document.addEventListener('visibilitychange', visible);
       window.addEventListener('online', online);
+      const offline = () => clearTimeout(this.retryTimer);
+      window.addEventListener('offline', offline);
       this.removeEvents = () => {
         document.removeEventListener('visibilitychange', visible);
         window.removeEventListener('online', online);
+        window.removeEventListener('offline', offline);
       };
       this.interval = setInterval(
         () => refresh(Math.max(60_000, this.client.pollIntervalMs || 60_000)),
@@ -171,17 +193,97 @@ export class SyncEngine {
     this.generation++;
     clearInterval(this.interval);
     clearTimeout(this.autoTimer);
+    clearTimeout(this.retryTimer);
+    this.retryScheduleRevision++;
     this.removeEvents?.();
   }
 
   pull(full = false) {
-    return this.enqueue((generation) => this.pullInner(generation, full));
+    return this.enqueue(async (generation) => {
+      await this.pullInner(generation, full);
+    });
+  }
+
+  private canRunInBackground() {
+    return (
+      this.started &&
+      !this.stopped &&
+      (typeof navigator === 'undefined' || navigator.onLine) &&
+      (typeof document === 'undefined' || document.visibilityState === 'visible')
+    );
+  }
+
+  /** Rebuild one wakeup from durable state; never retain a snapshot of note contents. */
+  private async scheduleRetry() {
+    const revision = ++this.retryScheduleRevision;
+    clearTimeout(this.retryTimer);
+    if (!this.canRunInBackground()) return;
+    const scopeId = this.connection.scopeId;
+    const [state, entries] = await Promise.all([
+      this.db.syncState.get(scopeId),
+      this.db.outbox.where('scopeId').equals(scopeId).toArray(),
+    ]);
+    const eligible = entries.filter((entry) => canRetry(entry) && timestamp(entry.retryAt));
+    const notes = await this.db.notes.bulkGet(eligible.map((entry) => [scopeId, entry.localId]));
+    if (!this.canRunInBackground() || revision !== this.retryScheduleRevision) return;
+    const available = new Set(
+      notes
+        .filter((note): note is LocalNote =>
+          Boolean(
+            note &&
+            !note.duplicate &&
+            !note.remoteUnavailable &&
+            !note.purgeStartedAt &&
+            (!note.error || isTransient(note.error)),
+          ),
+        )
+        .map((note) => note.localId),
+    );
+    const deadlines = [timestamp(state?.pullRetryAt)];
+    if (!this.connection.readOnly) {
+      for (const entry of eligible) {
+        if (!canRetry(entry) || !available.has(entry.localId)) continue;
+        const due = timestamp(entry.retryAt);
+        if (due) deadlines.push(Math.max(due, this.lastAutoWrite + 30_000));
+      }
+    }
+    // The scope cooldown also wakes otherwise untouched notes after a limit interrupted a batch.
+    if (this.pausedUntil > Date.now()) deadlines.push(this.pausedUntil);
+    const next = Math.min(...deadlines.filter((deadline) => deadline > 0));
+    if (!Number.isFinite(next)) return;
+    const due = Math.max(next, this.pausedUntil, timestamp(state?.pullRetryAt));
+    clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(
+      () => {
+        if (!this.canRunInBackground()) return;
+        void this.enqueue(async (generation) => {
+          if (Date.now() < this.pausedUntil) return;
+          const latest = await this.db.syncState.get(scopeId);
+          if (timestamp(latest?.pullRetryAt) > Date.now()) return;
+          const pending = await this.db.outbox.where('scopeId').equals(scopeId).toArray();
+          const discover = pending.some(
+            (entry) =>
+              needsCreateDiscovery(entry) &&
+              timestamp(entry.retryAt) > 0 &&
+              timestamp(entry.retryAt) <= Date.now(),
+          );
+          if (discover || latest?.pullRetryAt || !this.hasPulled) {
+            if (!(await this.pullInner(generation, discover))) return;
+          }
+        })
+          .then(() => this.flush())
+          .catch(() => undefined);
+      },
+      Math.min(2_147_483_647, Math.max(50, due - Date.now())),
+    );
   }
 
   private async pullInner(generation: number, forceFull: boolean) {
     const scopeId = this.connection.scopeId;
-    if (Date.now() < this.pausedUntil) return;
+    if (Date.now() < this.pausedUntil || (typeof navigator !== 'undefined' && !navigator.onLine))
+      return false;
     const previous = await this.db.syncState.get(scopeId);
+    if (!forceFull && timestamp(previous?.pullRetryAt) > Date.now()) return false;
     const full =
       forceFull ||
       !previous?.initialLoadComplete ||
@@ -221,6 +323,13 @@ export class SyncEngine {
       this.assertActive(generation);
       await this.detectDuplicates();
       if (full) {
+        // A complete discovery scan is one retry attempt. If the UUID is absent,
+        // leave the create uncertain for user confirmation, without a tight scan loop.
+        await this.db.outbox
+          .where('scopeId')
+          .equals(scopeId)
+          .filter((entry) => needsCreateDiscovery(entry) && timestamp(entry.retryAt) <= Date.now())
+          .modify({ retryAt: undefined });
         await this.db.notes
           .where('scopeId')
           .equals(scopeId)
@@ -267,16 +376,27 @@ export class SyncEngine {
         cursor: anchor || previous?.cursor,
         lastFullScanAt: full ? stamp : previous?.lastFullScanAt,
         lastPullAt: stamp,
+        pullRetryAt: undefined,
+        pullRetryAttempts: undefined,
+        rateLimitUntil: undefined,
       });
+      this.pausedUntil = 0;
       this.hasPulled = true;
       this.lastPull = Date.now();
       this.emit();
+      return true;
     } catch (error) {
-      if (!this.active(generation)) return;
+      if (!this.active(generation)) return false;
       const failure = failureOf(error);
-      if (failure.code === 'SESSION_EXPIRED') return;
-      this.pause(failure);
-      await this.db.syncState.update(scopeId, { loading: false, error: failure });
+      if (failure.code === 'SESSION_EXPIRED') return false;
+      await this.pause(failure);
+      const attempts = (previous?.pullRetryAttempts || 0) + 1;
+      await this.db.syncState.update(scopeId, {
+        loading: false,
+        error: failure,
+        pullRetryAttempts: isTransient(failure) ? attempts : undefined,
+        pullRetryAt: retryDeadline(failure, attempts),
+      });
       this.emit();
       throw error;
     }
@@ -477,7 +597,7 @@ export class SyncEngine {
             .modify({ syncStatus: 'offline' });
           return;
         }
-        if (!this.hasPulled) await this.pullInner(generation, false);
+        if (!this.hasPulled && !(await this.pullInner(generation, false))) return;
         this.assertActive(generation);
         const entries = await this.db.outbox.where('scopeId').equals(this.connection.scopeId).toArray();
         for (const entry of entries) {
@@ -490,6 +610,7 @@ export class SyncEngine {
             continue;
           const note = await this.db.notes.get([entry.scopeId, entry.localId]);
           if (!note || note.duplicate || note.remoteUnavailable || note.purgeStartedAt) continue;
+          if (entry.status === 'uncertain' && note.error && !isTransient(note.error)) continue;
           if (entry.kind === 'create' && entry.status === 'uncertain') continue;
           if (!manual && this.lastAutoWrite && Date.now() - this.lastAutoWrite < 30_000) {
             clearTimeout(this.autoTimer);
@@ -733,6 +854,7 @@ export class SyncEngine {
             ...entry,
             kind: 'update',
             status: conflicts.length ? 'conflict' : final ? 'pending' : 'sending',
+            ...(final ? { retryAttempts: undefined, retryAt: undefined } : {}),
           });
       }
     });
@@ -783,18 +905,36 @@ export class SyncEngine {
       throw Object.assign(new Error('LABEL_MISSING'), { failure: { code: 'VALIDATION_FAILED' } });
     return resolved as Label[];
   }
-  private pause(failure: ApiFailure) {
-    if (failure.code === 'RATE_LIMITED')
-      this.pausedUntil = failure.retryAt ? Date.parse(failure.retryAt) : Date.now() + 60_000;
+  private async pause(failure: ApiFailure) {
+    if (failure.code !== 'RATE_LIMITED') return;
+    this.pausedUntil = Math.max(this.pausedUntil, timestamp(retryDeadline(failure, 1)));
+    const scopeId = this.connection.scopeId;
+    await this.db.transaction('rw', this.db.syncState, async () => {
+      const state = await this.db.syncState.get(scopeId);
+      await this.db.syncState.put({
+        ...state,
+        scopeId,
+        initialLoadComplete: state?.initialLoadComplete || false,
+        rateLimitUntil: new Date(this.pausedUntil).toISOString(),
+      });
+    });
+  }
+  private assertNotRateLimited() {
+    if (Date.now() < this.pausedUntil)
+      throw Object.assign(new Error('RATE_LIMITED'), {
+        failure: { code: 'RATE_LIMITED', retryAt: new Date(this.pausedUntil).toISOString() },
+      });
   }
   private async recordFailure(note: LocalNote, failure: ApiFailure) {
-    this.pause(failure);
+    await this.pause(failure);
     await this.db.transaction('rw', this.db.notes, this.db.outbox, async () => {
       const key: [string, string] = [note.scopeId, note.localId];
       const entry = await this.db.outbox.get(key);
       const uncertain =
-        (entry?.status === 'sending' || entry?.status === 'uncertain') &&
-        ['NETWORK_UNCERTAIN', 'SERVER_ERROR'].includes(failure.code);
+        entry?.status === 'uncertain' ||
+        (entry?.status === 'sending' && ['NETWORK_UNCERTAIN', 'SERVER_ERROR'].includes(failure.code));
+      const attempts = (entry?.retryAttempts || 0) + 1;
+      const retryAt = retryDeadline(failure, attempts);
       await this.db.notes.update(key, {
         syncStatus: uncertain
           ? 'uncertain'
@@ -807,25 +947,40 @@ export class SyncEngine {
       });
       if (entry)
         await this.db.outbox.update(key, {
-          status: uncertain ? 'uncertain' : failure.code === 'RATE_LIMITED' ? 'pending' : 'error',
-          retryAt: failure.retryAt,
+          status: uncertain ? 'uncertain' : retryAt ? 'pending' : 'error',
+          retryAt,
+          retryAttempts: retryAt ? attempts : undefined,
         });
     });
   }
 
   async retry(localId: string, allowUncertainCreate = false) {
     const scopeId = this.connection.scopeId;
-    const entry = await this.db.outbox.get([scopeId, localId]);
-    if (!entry) return;
-    if (entry.kind === 'create' && entry.status === 'uncertain') {
-      await this.pull(true);
-      const updated = await this.db.outbox.get([scopeId, localId]);
-      if (!updated || updated.kind !== 'create') return this.flush(true);
-      if (!allowUncertainCreate) return;
-    }
-    const status = entry.kind === 'update' && entry.status === 'uncertain' ? 'uncertain' : 'pending';
-    await this.db.outbox.update([scopeId, localId], { status });
-    await this.db.notes.update([scopeId, localId], { syncStatus: status, error: undefined });
+    await this.enqueue(async (generation) => {
+      if (Date.now() < this.pausedUntil) return;
+      let entry = await this.db.outbox.get([scopeId, localId]);
+      if (!entry) return;
+      if (needsCreateDiscovery(entry)) {
+        // A skipped (offline/rate-limited) scan cannot authorize another POST.
+        if (!(await this.pullInner(generation, true))) return;
+        entry = await this.db.outbox.get([scopeId, localId]);
+        // Discovery may have resolved the creation into an update or a conflict.
+        // Its newly computed state must not be overwritten by this older retry request.
+        if (!entry || !needsCreateDiscovery(entry) || !allowUncertainCreate) return;
+      }
+      this.assertActive(generation);
+      await this.db.transaction('rw', this.db.notes, this.db.outbox, async () => {
+        const latest = await this.db.outbox.get([scopeId, localId]);
+        if (!latest) return;
+        const status = latest.kind === 'update' && latest.status === 'uncertain' ? 'uncertain' : 'pending';
+        await this.db.outbox.update([scopeId, localId], {
+          status,
+          retryAt: undefined,
+          retryAttempts: undefined,
+        });
+        await this.db.notes.update([scopeId, localId], { syncStatus: status, error: undefined });
+      });
+    }, 10);
     return this.flush(true);
   }
 
@@ -948,7 +1103,7 @@ export class SyncEngine {
         } catch (error) {
           if (this.active(generation)) {
             const failure = failureOf(error);
-            this.pause(failure);
+            await this.pause(failure);
             await this.db.notes.update(key, {
               error: failure,
               ...(['NETWORK_UNCERTAIN', 'SERVER_ERROR', 'SESSION_EXPIRED'].includes(failure.code)
@@ -1001,6 +1156,7 @@ export class SyncEngine {
 
   updateLabel(id: number, payload: { new_name?: string; color?: string }) {
     return this.enqueue(async (generation) => {
+      this.assertNotRateLimited();
       if (this.connection.readOnly || !this.client.updateLabel) throw new Error('READ_ONLY');
       const scopeId = this.connection.scopeId;
       const label = await this.db.labels.get([scopeId, id]);
@@ -1013,6 +1169,7 @@ export class SyncEngine {
 
   deleteLabel(id: number) {
     return this.enqueue(async (generation) => {
+      this.assertNotRateLimited();
       if (this.connection.readOnly || !this.client.deleteLabel) throw new Error('READ_ONLY');
       const scopeId = this.connection.scopeId;
       const label = await this.db.labels.get([scopeId, id]);
@@ -1061,6 +1218,7 @@ export class SyncEngine {
   async createLabel(name: string, color = '8b8b8b'): Promise<Label> {
     let result: Label | undefined;
     await this.enqueue(async (generation) => {
+      this.assertNotRateLimited();
       if (this.connection.readOnly) throw new Error('READ_ONLY');
       result = await this.client.createLabel(this.connection, { name: name.trim(), color });
       this.assertActive(generation);
@@ -1072,6 +1230,7 @@ export class SyncEngine {
   /** User chooses the original; every other duplicate becomes an independent note. */
   resolveDuplicate(originalLocalId: string) {
     return this.enqueue(async (generation) => {
+      this.assertNotRateLimited();
       const scopeId = this.connection.scopeId;
       const original = await this.db.notes.get([scopeId, originalLocalId]);
       if (!original?.duplicate) return;

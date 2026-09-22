@@ -100,7 +100,8 @@ export async function saveNote(
               : existing.status === 'sending' || blocked
                 ? existing.status
                 : 'pending',
-            retryAt: undefined,
+            // New input must not erase backoff or reconciliation for an in-flight write.
+            retryAt: existing.retryAt,
           }
         : {
             scopeId,

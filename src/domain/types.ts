@@ -122,6 +122,8 @@ export interface OutboxEntry {
   attemptStartedAt?: string;
   retryAt?: string;
   attemptBase?: RawIssueSnapshot;
+  /** Consecutive transient failures; reset after confirmed progress or an explicit retry. */
+  retryAttempts?: number;
   attemptLocalSnapshot?: NoteDocument;
   forceExpectedRemote?: RawIssueSnapshot;
 }
@@ -133,6 +135,10 @@ export interface SyncState {
   loading?: boolean;
   loadedCount?: number;
   lastPullAt?: string;
+  /** Durable scope-wide server cooldown, including across a fresh authenticated session. */
+  rateLimitUntil?: string;
+  pullRetryAt?: string;
+  pullRetryAttempts?: number;
   error?: ApiFailure;
 }
 export interface Recovery {
