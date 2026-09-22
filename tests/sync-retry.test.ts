@@ -133,9 +133,8 @@ describe('durable synchronization retry', () => {
     const draft = await createNote(connection.scopeId, document(), db);
     const create = client.createIssue.getMockImplementation()!;
     client.createIssue.mockImplementationOnce(async (...args) => {
-      const remote = await create(...args);
+      await create(...args);
       issues[0]!.title = 'Remote title';
-      void remote;
       throw failure('NETWORK_UNCERTAIN');
     });
     await engine.flush(true);
@@ -145,6 +144,10 @@ describe('durable synchronization retry', () => {
     expect((await firstNote()).current.title).toBe('Local title');
     expect(client.updateIssue).not.toHaveBeenCalled();
     expect(client.createIssue).toHaveBeenCalledTimes(1);
+    // A stale retry action must not act as a conflict-resolution choice.
+    await engine.retry(draft.localId);
+    expect((await firstEntry()).status).toBe('conflict');
+    expect(client.updateIssue).not.toHaveBeenCalled();
   });
 
   it('does not advance a cursor or confirm missing Issues after an interrupted page scan', async () => {

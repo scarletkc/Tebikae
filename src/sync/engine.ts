@@ -257,7 +257,7 @@ export class SyncEngine {
       () => {
         if (!this.canRunInBackground()) return;
         void this.enqueue(async (generation) => {
-          if (Date.now() < this.pausedUntil) return;
+          if (!this.canRunInBackground() || Date.now() < this.pausedUntil) return;
           const latest = await this.db.syncState.get(scopeId);
           if (timestamp(latest?.pullRetryAt) > Date.now()) return;
           const pending = await this.db.outbox.where('scopeId').equals(scopeId).toArray();
@@ -271,7 +271,9 @@ export class SyncEngine {
             if (!(await this.pullInner(generation, discover))) return;
           }
         })
-          .then(() => this.flush())
+          .then(() => {
+            if (this.canRunInBackground()) return this.flush();
+          })
           .catch(() => undefined);
       },
       Math.min(2_147_483_647, Math.max(50, due - Date.now())),
@@ -959,7 +961,7 @@ export class SyncEngine {
     await this.enqueue(async (generation) => {
       if (Date.now() < this.pausedUntil) return;
       let entry = await this.db.outbox.get([scopeId, localId]);
-      if (!entry) return;
+      if (!entry || entry.status === 'conflict') return;
       if (needsCreateDiscovery(entry)) {
         // A skipped (offline/rate-limited) scan cannot authorize another POST.
         if (!(await this.pullInner(generation, true))) return;
@@ -971,7 +973,7 @@ export class SyncEngine {
       this.assertActive(generation);
       await this.db.transaction('rw', this.db.notes, this.db.outbox, async () => {
         const latest = await this.db.outbox.get([scopeId, localId]);
-        if (!latest) return;
+        if (!latest || latest.status === 'conflict') return;
         const status = latest.kind === 'update' && latest.status === 'uncertain' ? 'uncertain' : 'pending';
         await this.db.outbox.update([scopeId, localId], {
           status,
