@@ -605,7 +605,17 @@ export class SyncEngine {
       await this.db.transaction('rw', this.db.notes, this.db.outbox, async () => {
         const latest = await this.db.notes.get(key);
         const pending = await this.db.outbox.get(key);
-        if (latest && pending?.operationId === entry.operationId) {
+        const latestBase = latest?.base && snapshotToDocument(latest.base);
+        // New edits retain the operation ID, so it cannot identify an unchanged draft.
+        if (
+          latest &&
+          latest.localRevision === note.localRevision &&
+          pending?.operationId === entry.operationId &&
+          pending.status === 'pending' &&
+          !latest.conflictFields?.length &&
+          latestBase &&
+          this.sameContent(latest.current, latestBase)
+        ) {
           await this.db.outbox.delete(key);
           await this.db.notes.update(key, { syncStatus: 'synced', error: undefined });
         }

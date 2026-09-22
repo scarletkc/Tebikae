@@ -112,6 +112,7 @@ export default function NoteDialog({
   const [online, setOnline] = useState(navigator.onLine);
   const purging = useRef(false);
   const purged = useRef(false);
+  const closing = useRef(false);
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
     window.addEventListener('online', update);
@@ -279,24 +280,32 @@ export default function NoteDialog({
     }
   }
   async function close(direction?: -1 | 1) {
-    if (purging.current || purged.current) return;
+    if (purging.current || purged.current || closing.current) return;
+    closing.current = true;
     try {
-      await editorFlush.current();
-      await persist({ finalizeEmptyTitle: true });
-      // Closing or navigating commits only this editor. Other Outbox entries remain
-      // queued for the normal online retry/manual-sync paths.
-      if (idRef.current) {
-        try {
-          await engine?.flushNote(idRef.current);
-        } catch {
-          /* Keep the local draft and Outbox entry when the network is unavailable. */
+      let flushedVersion: number;
+      do {
+        await editorFlush.current();
+        await persist({ finalizeEmptyTitle: true });
+        flushedVersion = savedVersion.current;
+        if (idRef.current) {
+          try {
+            await engine?.flushNote(idRef.current);
+          } catch {
+            /* Keep the local draft and Outbox entry when the network is unavailable. */
+          }
         }
-      }
+        // Input can arrive during the network request, including buffered Markdown.
+        await editorFlush.current();
+        if (!rootRef.current) return;
+      } while (flushedVersion !== version.current);
       if (idRef.current) engine?.setEditing(idRef.current, false);
       if (direction) onNavigate(direction);
       else onClose();
     } catch {
       /* Keep the only unsaved copy open. */
+    } finally {
+      closing.current = false;
     }
   }
   async function sync() {

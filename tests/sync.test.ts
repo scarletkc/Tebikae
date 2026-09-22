@@ -150,6 +150,37 @@ afterEach(async () => {
 const firstNote = async () => (await database.notes.toArray())[0]!;
 
 describe('durable synchronization', () => {
+  it('retains and syncs an edit arriving while an undone update is being cleared', async () => {
+    client.issues = [raw(doc(), 1)];
+    await engine.pull();
+    const note = await firstNote();
+    await saveNote(connection.scopeId, note.localId, { ...note.current, markdown: 'temporary' }, database);
+    await saveNote(connection.scopeId, note.localId, structuredClone(note.current), database);
+    const key: [string, string] = [connection.scopeId, note.localId];
+    const entry = await database.outbox.get(key);
+    const getNote = database.notes.get.bind(database.notes);
+    vi.spyOn(database.notes, 'get').mockImplementationOnce((key) =>
+      getNote(key).then(async (snapshot) => {
+        await saveNote(
+          connection.scopeId,
+          note.localId,
+          { ...note.current, markdown: 'new concurrent edit' },
+          database,
+        );
+        return snapshot;
+      }),
+    );
+    await engine.flushNote(note.localId);
+    expect((await firstNote()).current.markdown).toBe('new concurrent edit');
+    expect((await firstNote()).syncStatus).toBe('pending');
+    expect(await database.outbox.get(key)).toMatchObject({
+      operationId: entry!.operationId,
+      status: 'pending',
+    });
+    await engine.flushNote(note.localId);
+    expect(client.issues[0]!.body).toContain('new concurrent edit');
+    expect(await database.outbox.get(key)).toBeUndefined();
+  });
   it('reuses local labels after trim and case folding without repository writes', async () => {
     const label = { id: 5, name: 'bug', color: 'aaaaaa', description: null };
     await database.labels.put({ ...label, scopeId: connection.scopeId });
