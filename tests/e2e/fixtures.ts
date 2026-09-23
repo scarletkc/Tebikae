@@ -293,7 +293,11 @@ export async function connect(page: Page, remember = true): Promise<void> {
   });
 }
 export async function closeDialog(page: Page): Promise<void> {
-  await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).last().click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /^(Close|Back)$/, exact: true })
+    .last()
+    .click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 }
 /**
@@ -305,4 +309,13 @@ export async function confirmPrompt(page: Page, accept = true, label?: string): 
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: label ?? (accept ? 'Confirm' : 'Cancel'), exact: true }).click();
   await expect(dialog).toHaveCount(0);
+}
+
+export async function noteAction(page: Page, name: string): Promise<void> {
+  await page.getByRole('dialog').getByRole('button', { name: 'More actions', exact: true }).click();
+  await page.getByRole('menuitem', { name, exact: true }).click();
+}
+export async function noteColor(page: Page, name: string): Promise<void> {
+  await page.getByRole('dialog').getByRole('button', { name: 'More actions', exact: true }).click();
+  await page.getByRole('menuitemradio', { name, exact: true }).click();
 }

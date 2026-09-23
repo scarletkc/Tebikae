@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
-import { closeDialog, confirmPrompt, connect, mockGitHub } from './fixtures';
+import { closeDialog, confirmPrompt, noteAction, connect, mockGitHub } from './fixtures';
 
 test(
   'connect and unchanged reading keep existing Issues intact',
@@ -107,18 +107,17 @@ test('trash then delete forever removes the Issue through GraphQL and does not r
   const remote = await mockGitHub(context);
   await connect(page);
   await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Move to trash', exact: true }).click();
+  await noteAction(page, 'Move to trash');
   await closeDialog(page);
   await page.locator('a[href$="#/trash"]').click();
   await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
-  const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await noteAction(page, 'Delete forever');
   await confirmPrompt(page, false);
   await expect
     .poll(() => remote.writes.filter((write) => write.path === '/graphql').length, { timeout: 5_000 })
     .toBe(0);
   expect(remote.issues.find((issue) => issue.number === 1)).toBeDefined();
-  await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await noteAction(page, 'Delete forever');
   await confirmPrompt(page, true, 'Delete forever');
   await expect
     .poll(() => remote.writes.filter((write) => write.path === '/graphql').length, { timeout: 10_000 })
@@ -141,13 +140,13 @@ test('a failed forever deletion keeps the note in the trash', async ({ page, con
   await connect(page);
   await page.locator('a[href$="#/archive"]').click();
   await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Move to trash', exact: true }).click();
+  await noteAction(page, 'Move to trash');
   await closeDialog(page);
   await page.locator('a[href$="#/trash"]').click();
   await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
   remote.failNextDeleteIssue = true;
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Delete forever', exact: true }).click();
+  await noteAction(page, 'Delete forever');
   await confirmPrompt(page, true, 'Delete forever');
   await expect(dialog.getByRole('alert')).toBeVisible();
   await closeDialog(page);
@@ -191,7 +190,7 @@ test('archive survives trash and restore, and JSON export contains no credential
   await page.locator('a[href$="#/archive"]').click();
   await expect(page.locator('.app-topbar .new-note-button')).toHaveCount(0);
   await page.getByRole('button', { name: 'Edit note: A finished thought', exact: true }).click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Move to trash', exact: true }).click();
+  await noteAction(page, 'Move to trash');
   await closeDialog(page);
   await expect(page.locator('.note-card')).toHaveCount(0);
   await page.locator('a[href$="#/trash"]').click();
@@ -199,7 +198,7 @@ test('archive survives trash and restore, and JSON export contains no credential
   await expect(page.getByRole('dialog').getByLabel('Title', { exact: true })).toHaveAttribute('readonly', '');
   // The editor is open here; scope to it because the card behind keeps its own
   // restore control in the accessibility tree.
-  await page.getByRole('dialog').getByRole('button', { name: 'Restore note', exact: true }).click();
+  await noteAction(page, 'Restore note');
   await closeDialog(page);
   await page.locator('a[href$="#/archive"]').click();
   await expect(
@@ -253,6 +252,7 @@ test('explicit conversion preserves an existing Issue and label changes use incr
   expect(converted.body.endsWith('This stays untouched.')).toBe(true);
   expect(converted.title).toBe('An ordinary Issue');
   expect(converted.state).toBe('open');
+  await page.getByLabel('Choose labels', { exact: true }).click();
   await page.getByRole('dialog').getByLabel('Personal', { exact: true }).check();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect
@@ -415,12 +415,14 @@ test('nested confirmation dialog in note editor traps Tab/Shift+Tab and restores
   await connect(page);
   await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
   const dialog = page.getByRole('dialog');
-  await dialog.getByRole('button', { name: 'Move to trash', exact: true }).click();
+  await noteAction(page, 'Move to trash');
   await closeDialog(page);
 
   await page.locator('a[href$="#/trash"]').click();
   await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
-  const deleteBtn = page.getByRole('dialog').getByRole('button', { name: 'Delete forever', exact: true });
+  const moreButton = page.getByRole('dialog').getByRole('button', { name: 'More actions', exact: true });
+  await moreButton.click();
+  const deleteBtn = page.getByRole('menuitem', { name: 'Delete forever', exact: true });
   await deleteBtn.focus();
   await page.keyboard.press('Enter');
 
@@ -440,5 +442,5 @@ test('nested confirmation dialog in note editor traps Tab/Shift+Tab and restores
   await page.keyboard.press('Escape');
   await expect(confirmDialog).toHaveCount(0);
   await expect(dialog).toBeVisible();
-  await expect(deleteBtn).toBeFocused();
+  await expect(moreButton).toBeFocused();
 });

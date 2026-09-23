@@ -1584,15 +1584,21 @@ mark {
   font-weight: 600;
 }
 .floating-editor.note-dialog {
-  width: min(900px, calc(100vw - 80px));
-  height: min(800px, calc(100dvh - 80px));
+  width: min(1040px, calc(100vw - 80px));
+  height: min(920px, calc(100dvh - 64px));
   position: relative;
   display: flex;
   flex-direction: column;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--editor-tint, var(--surface)) 32%, var(--surface)),
+    var(--surface) 230px
+  );
+  border: 1px solid color-mix(in srgb, var(--border) 45%, transparent);
+  border-radius: 22px;
+  box-shadow:
+    0 32px 100px #101c2426,
+    0 4px 16px #101c240a;
   overflow: hidden;
   outline: none;
 }
@@ -1608,8 +1614,7 @@ mark {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
+  padding: 12px 18px;
   flex-shrink: 0;
 }
 .floating-editor-heading {
@@ -1634,26 +1639,29 @@ mark {
   justify-content: center;
 }
 .editor-layer-dim {
-  background: rgb(0 0 0 / 0.15);
-  backdrop-filter: blur(2px);
-  -webkit-backdrop-filter: blur(2px);
+  background: rgb(12 22 18 / 0.18);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
 }
 .note-dialog-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 30px 26px;
+  padding: 28px max(36px, calc((100% - 720px) / 2)) 64px;
+  scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
-.note-title-input:not([type='checkbox']) {
+.note-dialog .note-title-input:not([type='checkbox']) {
   width: 100%;
   border: 0;
   background: transparent;
-  padding: 4px 0 20px;
+  padding: 4px 0 12px;
   border-radius: 0;
-  font-family: Georgia, 'Songti SC', serif;
-  font-size: 27px;
-  font-weight: 400;
+  font-family: inherit;
+  font-size: clamp(30px, 3vw, 40px);
+  font-weight: 650;
+  line-height: 1.3;
+  letter-spacing: -0.035em;
   box-shadow: none;
 }
 .note-title-input::placeholder {
@@ -1661,12 +1669,12 @@ mark {
   opacity: 0.7;
 }
 .note-properties {
-  border-top: 1px solid var(--border);
-  padding-top: 22px;
   display: flex;
-  flex-direction: column;
-  gap: 22px;
-  margin-top: 25px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 30px;
+  min-height: 30px;
 }
 .color-swatches {
   display: flex;
@@ -1703,12 +1711,10 @@ mark {
 }
 .note-editor-footer {
   flex-shrink: 0;
-  border-top: 1px solid var(--border);
-  padding: 11px 18px;
+  padding: 4px 18px 12px;
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-  background: color-mix(in srgb, var(--surface) 40%, transparent);
+  justify-content: flex-end;
+  gap: 4px;
 }
 .note-tools {
   display: flex;
@@ -2182,10 +2188,11 @@ mark {
     padding-bottom: env(safe-area-inset-bottom);
   }
   .note-dialog-scroll {
-    padding: 18px 20px;
+    padding: 20px 22px 48px;
+    scrollbar-gutter: auto;
   }
-  .note-title-input:not([type='checkbox']) {
-    font-size: 26px;
+  .note-dialog .note-title-input:not([type='checkbox']) {
+    font-size: 30px;
   }
   .note-editor-footer {
     padding: 10px 12px;
@@ -2433,5 +2440,178 @@ mark {
     scroll-behavior: auto !important;
     transition: none !important;
     animation: none !important;
+  }
+}
+
+/* Note canvas: restrained color accents and transient properties. */
+.note-dialog.note-yellow {
+  --editor-tint: var(--card-yellow);
+}
+.note-dialog.note-green {
+  --editor-tint: var(--card-green);
+}
+.note-dialog.note-blue {
+  --editor-tint: var(--card-blue);
+}
+.note-dialog.note-purple {
+  --editor-tint: var(--card-purple);
+}
+.note-dialog.note-red {
+  --editor-tint: var(--card-red);
+}
+.floating-editor-header .note-save-row {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.floating-editor-header .note-save-row > span {
+  flex: initial;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.note-dialog .icon-button {
+  border-radius: 10px;
+}
+.note-dialog .note-title-input:focus-visible {
+  outline: none;
+}
+.note-dialog .note-title-input:focus-visible::placeholder {
+  color: var(--accent);
+}
+.note-dialog .label-badge {
+  padding: 5px 10px;
+  border-radius: 20px;
+}
+.note-label-picker {
+  position: relative;
+  font-size: 12px;
+}
+.note-label-picker summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border-radius: 20px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.note-label-picker summary::-webkit-details-marker {
+  display: none;
+}
+.note-label-picker summary:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.note-label-picker summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-label-options {
+  margin-top: 8px;
+  padding: 16px;
+  max-width: 100%;
+  background: var(--surface-hover);
+  border-radius: 12px;
+}
+.note-label-picker[open] {
+  flex-basis: 100%;
+}
+.note-label-options .choices {
+  margin-top: 10px;
+}
+.note-actions-menu {
+  z-index: 80;
+  min-width: 208px;
+  max-width: calc(100vw - 24px);
+  max-height: var(--radix-dropdown-menu-content-available-height, 75dvh);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  background: var(--surface);
+  color: var(--text);
+}
+.note-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  text-align: start;
+  text-decoration: none;
+  cursor: pointer;
+}
+.note-action[data-highlighted] {
+  outline: none;
+  background: var(--surface-hover);
+}
+.note-action[data-disabled] {
+  opacity: 0.4;
+  cursor: default;
+}
+.note-action svg {
+  flex-shrink: 0;
+}
+.note-menu-separator {
+  height: 1px;
+  background: var(--border);
+  margin: 6px;
+}
+.note-menu-caption {
+  color: var(--muted);
+  font-size: 11px;
+  padding: 6px 12px;
+}
+.note-color-options {
+  display: flex;
+  gap: 5px;
+  padding: 6px 8px 10px;
+}
+.note-color-option {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--text);
+  cursor: pointer;
+}
+.note-color-option[data-state='checked'],
+.note-color-option[data-highlighted] {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-color-option[data-disabled] {
+  opacity: 0.4;
+  cursor: default;
+}
+@media (max-width: 760px) {
+  .floating-editor-header {
+    padding: 8px 12px;
+  }
+  .note-dialog .icon-button,
+  .note-action {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .note-dialog .note-properties {
+    margin-bottom: 22px;
+  }
+  .note-label-picker summary {
+    min-height: 44px;
+  }
+  .note-dialog-scroll {
+    padding-inline: max(22px, env(safe-area-inset-left)) max(22px, env(safe-area-inset-right));
   }
 }

@@ -64,6 +64,7 @@ test('task, code, link and table tools modify real Milkdown documents', async ({
   await expect(source).toHaveValue(/\[x\] A task/);
   await source.fill('const message = "中文";');
   await page.getByRole('button', { name: 'Visual editor', exact: true }).click();
+  await page.getByRole('button', { name: 'More formatting options', exact: true }).click();
   // The searchable language input carries a datalist, so Chromium exposes it as a combobox.
   await page.getByRole('combobox', { name: 'Code language', exact: true }).fill('typescript');
   await page.getByRole('button', { name: 'Insert code block or update its language', exact: true }).click();
