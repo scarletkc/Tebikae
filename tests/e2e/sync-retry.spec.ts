@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { closeDialog, connect, mockGitHub, mockIssue } from './fixtures';
+import { closeDialog, connect, mockGitHub, mockIssue, noteColor } from './fixtures';
 
 async function queued(page: Page) {
   return page.evaluate(
@@ -49,7 +49,7 @@ test('server cooldown survives reload and resumes pending changes automatically'
     return route.fallback();
   });
   await page.getByRole('button', { name: 'Edit note: Durable retry', exact: true }).click();
-  await page.getByRole('button', { name: 'Sage', exact: true }).click();
+  await noteColor(page, 'Sage');
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect.poll(async () => (await queued(page))[0]?.retryAt).toBeTruthy();
   const deadline = (await queued(page))[0]!.retryAt;
@@ -84,7 +84,7 @@ test('transient preflight failures resume automatically after the editor closes'
     return route.fallback();
   });
   await page.getByRole('button', { name: 'Edit note: Temporary failure', exact: true }).click();
-  await page.getByRole('button', { name: 'Sage', exact: true }).click();
+  await noteColor(page, 'Sage');
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect.poll(async () => (await queued(page))[0]?.retryAt).toBeTruthy();
   expect(state.writes).toHaveLength(0);

@@ -39,6 +39,11 @@ for (const mode of ['title', 'markdown', 'invalid-title'] as const) {
         await expect(dialog.locator('.note-save-row').getByRole('status')).toHaveClass(/danger/);
         await expect(dialog.getByLabel('Title', { exact: true })).toHaveValue(latestTitle);
         expect(remote.issues[0]!.title).toBe('A first saved');
+        // The delayed close retries the rejected save once its request resolves. Give that
+        // retry a moment to fail on the invalid title; a valid title typed too early can be
+        // consumed by it, letting the pending navigation complete on its own before the
+        // click below (which would then land on the next note's button).
+        await page.waitForTimeout(1000);
         await dialog.getByLabel('Title', { exact: true }).fill('A recovered edit');
         await next.click();
         await expect(dialog.getByLabel('Title', { exact: true })).toHaveValue('B second');

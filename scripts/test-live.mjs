@@ -79,13 +79,18 @@ async function main() {
   const editor = page.locator('.ProseMirror');
   await expect(editor).toBeVisible();
   await editor.fill('真实 GitHub 验收：Markdown、草稿、标签与归档。');
-  await page.getByRole('button', { name: 'Sage', exact: true }).click();
-  await page.getByLabel(labelName, { exact: true }).check();
+  const noteMenu = page.getByRole('dialog').getByRole('button', { name: 'More actions', exact: true });
+  await noteMenu.click();
+  await page.getByRole('menuitemradio', { name: 'Sage', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('Choose labels', { exact: true }).click();
+  await page.getByRole('dialog').getByLabel(labelName, { exact: true }).check();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.locator('.note-save-row').getByRole('status')).toHaveText('Synced to GitHub', {
     timeout: 45000,
   });
-  const href = await page.getByRole('link', { name: 'Open on GitHub', exact: true }).getAttribute('href');
+  await noteMenu.click();
+  const href = await page.getByRole('menuitem', { name: 'Open on GitHub', exact: true }).getAttribute('href');
+  await page.keyboard.press('Escape');
   const number = Number(href.split('/').at(-1));
   if (!Number.isSafeInteger(number)) throw new Error('No confirmed Issue number.');
   summary.issues.push({ number, url: href });
@@ -101,12 +106,14 @@ async function main() {
     'Created visual Markdown note with Chinese content, color and label; verified via fresh GitHub GET',
   );
 
-  await page.getByRole('button', { name: 'Archive note', exact: true }).click();
+  await noteMenu.click();
+  await page.getByRole('menuitem', { name: 'Archive note', exact: true }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.locator('.note-save-row').getByRole('status')).toHaveText('Synced to GitHub', {
     timeout: 45000,
   });
-  await page.getByRole('button', { name: 'Move to trash', exact: true }).click();
+  await noteMenu.click();
+  await page.getByRole('menuitem', { name: 'Move to trash', exact: true }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.locator('.note-save-row').getByRole('status')).toHaveText('Synced to GitHub', {
     timeout: 45000,
@@ -114,7 +121,8 @@ async function main() {
   remote = await api(`/repos/${repository}/issues/${number}`);
   if (remote.state !== 'closed' || remote.body.includes('"trashedAt":null'))
     throw new Error('Archived trash state was not preserved.');
-  await page.getByRole('button', { name: 'Restore note', exact: true }).click();
+  await noteMenu.click();
+  await page.getByRole('menuitem', { name: 'Restore note', exact: true }).click();
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.locator('.note-save-row').getByRole('status')).toHaveText('Synced to GitHub', {
     timeout: 45000,
