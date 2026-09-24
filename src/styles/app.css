@@ -1617,19 +1617,6 @@ mark {
   padding: 12px 18px;
   flex-shrink: 0;
 }
-.floating-editor-heading {
-  flex: 1;
-  min-width: 0;
-  font-size: 12px;
-  font-weight: 550;
-  color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.floating-editor-close {
-  margin-left: auto;
-}
 .editor-layer {
   position: fixed;
   inset: 0;
@@ -1676,20 +1663,6 @@ mark {
   margin: 0 0 30px;
   min-height: 30px;
 }
-.color-swatches {
-  display: flex;
-  gap: 9px;
-}
-.color-swatch {
-  width: 27px;
-  height: 27px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
-  outline-offset: 3px;
-}
-.color-swatch[aria-pressed='true'] {
-  outline: 2px solid var(--accent);
-}
 .choices {
   display: flex;
   flex-wrap: wrap;
@@ -1715,12 +1688,6 @@ mark {
   display: flex;
   justify-content: flex-end;
   gap: 4px;
-}
-.note-tools {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-  flex-wrap: wrap;
 }
 .note-save-row {
   display: flex;

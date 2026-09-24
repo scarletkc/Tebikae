@@ -186,9 +186,11 @@ function EditorBody({
         const toolsBottom =
           root.querySelector('.editor-toolbar')?.getBoundingClientRect().bottom ?? bounds.top;
         const above = rect.top - 56;
+        let top = above < toolsBottom + 4 ? rect.bottom + 8 : above;
+        if (scrollBounds) top = Math.min(top, scrollBounds.bottom - 56);
         setSelectionPosition({
           x: Math.max(0, Math.min(rect.left + rect.width / 2 - bounds.left - 112, bounds.width - 224)),
-          y: Math.max(0, (above < toolsBottom + 4 ? rect.bottom + 8 : above) - bounds.top),
+          y: Math.max(0, top - bounds.top),
         });
       });
     };
@@ -218,6 +220,7 @@ function EditorBody({
     const root = container.current;
     return () => {
       cancelAnimationFrame(frame);
+      setSelectionPosition(null);
       document.removeEventListener('selectionchange', update);
       document.removeEventListener('scroll', hide, true);
       window.removeEventListener('resize', hide);

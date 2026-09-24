@@ -63,8 +63,6 @@ const MarkdownEditor = lazy(async () => {
   throw lastError;
 });
 
-export type EditorOrigin = { x: number; y: number; width: number; height: number } | null;
-
 export default function NoteDialog({
   initialNote,
   kind = 'markdown',
@@ -83,8 +81,6 @@ export default function NoteDialog({
   onNavigate(direction: -1 | 1): void;
   canPrevious: boolean;
   canNext: boolean;
-  /** Bounding rect of the card the editor expands from; null fades in place (new notes). */
-  origin?: EditorOrigin;
 }) {
   const { t } = useTranslation();
   const { connection, engine, writable, connected } = useSession();
