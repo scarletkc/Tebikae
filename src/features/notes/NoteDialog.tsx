@@ -713,7 +713,7 @@ export default function NoteDialog({
               {t('note.labels')}
             </summary>
             <div className="note-label-options mt-2 max-w-full rounded-xl bg-hover p-4">
-              <fieldset disabled={readOnly}>
+              <fieldset className="min-w-0 border-0 p-0" disabled={readOnly}>
                 <legend className="mb-3 text-xs font-medium text-muted">{t('note.labels')}</legend>
                 <div className="choices mt-2.5 flex flex-wrap gap-x-4 gap-y-2.5">
                   {labels.length ? (
@@ -800,7 +800,7 @@ export default function NoteDialog({
         {latest?.syncStatus === 'uncertain' && (
           <Banner tone="warning" className="banner warning mb-4">
             <p className="w-full">{t('note.uncertain')}</p>
-            <div className="button-row">
+            <div className="button-row flex flex-wrap items-center gap-2.5">
               <Button
                 disabled={!engine}
 
@@ -860,7 +860,7 @@ export default function NoteDialog({
                 </p>
               </div>
             </div>
-            <div className="button-row">
+            <div className="button-row flex flex-wrap items-center gap-2.5">
               <Button disabled={!writable} onClick={() => void resolve('remote')}>
                 {t('note.useRemote')}
               </Button>

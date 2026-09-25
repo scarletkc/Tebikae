@@ -40,7 +40,7 @@ Vitest 使用真实 Markdown 解析、Milkdown、fake-indexeddb 和 MSW 验证�
 
 ### 界面开发
 
-颜色、字号、圆角、阴影和层级使用 `src/styles/theme.css` 中的令牌；按钮、图标按钮、对话框、菜单、表单控件和提示条使用 `src/ui` 中的组件。`pnpm dev` 后打开 `/#/__ui` 可以预览全部组件，这个页面不会进入生产构建。旧样式集中在 `src/styles/legacy.css` 的 `legacy` 层中，只允许删减。完整规范和剩余迁移步骤见 [UI 统一与界面改造方案](ui-overhaul-plan.md)。
+颜色、字号、圆角、阴影和层级使用 `src/styles/theme.css` 中的令牌；按钮、图标按钮、对话框、菜单、表单控件和提示条使用 `src/ui` 中的组件。`pnpm dev` 后打开 `/#/__ui` 可以预览全部组件，这个页面不会进入生产构建。样式规范见 [UI 统一与界面改造方案](ui-overhaul-plan.md)。
 
 ### UI 截图
 

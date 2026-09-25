@@ -26,14 +26,14 @@ export default function IssueDialog({
   return (
     <Dialog title={t('home.readIssue')} onClose={onClose} size="lg" className="issue-dialog">
       <div className="issue-content">
-        <h2>{issue.snapshot.title}</h2>
+        <h2 className="mb-5 text-[25px]">{issue.snapshot.title}</h2>
         {issue.status !== 'unmanaged' && (
           <Banner tone="warning" className="banner warning mb-4">
             {t(`home.${issue.status}`)}
           </Banner>
         )}
         <MarkdownPreview value={issue.snapshot.body} />
-        <div className="button-row">
+        <div className="button-row mt-6 flex flex-wrap items-center gap-2.5">
           {issue.status === 'unmanaged' && (
             <Button
               variant="primary"

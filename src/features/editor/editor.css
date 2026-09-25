@@ -127,7 +127,7 @@
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 6px;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-dialog);
   }
   .editor-table-actions button {
     background: transparent;
@@ -336,6 +336,9 @@
   }
   .markdown-preview input[type='checkbox'] {
     accent-color: var(--accent);
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
   }
   .markdown-preview table,
   .markdown-editor .ProseMirror table {
@@ -427,7 +430,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 12px;
-    box-shadow: var(--shadow);
+    box-shadow: var(--shadow-dialog);
   }
   .editor-selection-toolbar .editor-tool {
     flex: 1;

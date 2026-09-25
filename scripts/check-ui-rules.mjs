@@ -8,11 +8,8 @@ const ALLOWED_CSS = new Set([
   'src/styles/app.css',
   'src/styles/layers.css',
   'src/styles/theme.css',
-  'src/styles/legacy.css',
   'src/features/editor/editor.css', // ProseMirror content typography (allowed long term)
 ]);
-// legacy.css may only shrink. Lower this number whenever a migration deletes rules.
-const LEGACY_MAX_LINES = 264;
 // Raw colors are allowed only in the token file and where colors are user data (GitHub label colors).
 const RAW_COLOR_ALLOWED = ['src/styles/theme.css', 'src/features/labels/'];
 
@@ -39,12 +36,6 @@ for (const file of walk('src')) {
     report(file, 1, 'new stylesheet: style with Tailwind classes and src/ui components instead');
   const rawColorAllowed = RAW_COLOR_ALLOWED.some((prefix) => file.startsWith(prefix));
   const lines = readFileSync(file, 'utf8').split('\n');
-  if (file === 'src/styles/legacy.css' && lines.length > LEGACY_MAX_LINES)
-    report(
-      file,
-      lines.length,
-      `legacy.css grew to ${lines.length} lines (max ${LEGACY_MAX_LINES}); do not add legacy CSS`,
-    );
   lines.forEach((text, index) => {
     const line = index + 1;
     const code = text.replace(/\/\/.*$|\/\*.*?\*\//g, '');
