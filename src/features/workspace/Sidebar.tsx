@@ -38,7 +38,8 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
   const repositoryName = `${connection.owner}/${connection.repo}`;
   const repositoryUrl = safeHref(`https://github.com/${repositoryName}`);
   const collapsedItem = collapsed && 'justify-center gap-0 px-0';
-  const collapsedText = collapsed && 'hidden';
+  // Text collapses to sr-only (not `hidden`) so icon-only links keep accessible names.
+  const collapsedText = collapsed && 'sr-only';
   return (
     <>
       <div className={cn('sidebar-brand flex h-14 items-center px-2', collapsed && 'justify-center px-0')}>
@@ -117,7 +118,7 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
         {ctl.labelSelectionMode ? (
           <Button
             size="sm"
-            className={cn('label-selection-done ms-auto', collapsedText)}
+            className={cn('label-selection-done ms-auto', collapsed && 'hidden')}
             onClick={ctl.finishLabelSelection}
           >
             {t('label.done')}
