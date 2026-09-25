@@ -40,6 +40,8 @@ import { IconButton, download } from '../../app/ui';
 import {
   Banner,
   Button,
+  Checkbox,
+  CheckboxLabel,
   cn,
   iconButtonVariants,
   menuContent,
@@ -650,7 +652,7 @@ export default function NoteDialog({
       <div className="note-dialog-scroll">
         <TextContextMenu readOnly={readOnly}>
           <input
-            className="note-title-input"
+            className="note-title-input w-full border-0 bg-transparent p-0 pb-3 text-2xl font-semibold leading-tight outline-none placeholder:text-muted focus:shadow-none md:text-3xl"
             aria-label={t('note.title')}
             placeholder={t('note.titlePlaceholder')}
             value={document.title}
@@ -690,13 +692,12 @@ export default function NoteDialog({
             </summary>
             <div className="note-label-options">
               <fieldset disabled={readOnly}>
-                <legend>{t('note.labels')}</legend>
-                <div className="choices">
+                <legend className="mb-3 text-xs font-medium text-muted">{t('note.labels')}</legend>
+                <div className="choices mt-2.5 flex flex-wrap gap-x-4 gap-y-2.5">
                   {labels.length ? (
                     labels.map((label) => (
-                      <label key={label.id}>
-                        <input
-                          type="checkbox"
+                      <CheckboxLabel key={label.id}>
+                        <Checkbox
                           checked={document.labelIds.includes(label.id)}
                           onChange={() =>
                             change((d) => ({
@@ -721,7 +722,7 @@ export default function NoteDialog({
                         >
                           <LabelBadge label={label} />
                         </LabelContextMenu>
-                      </label>
+                      </CheckboxLabel>
                     ))
                   ) : (
                     <span className="muted">{t('label.empty')}</span>

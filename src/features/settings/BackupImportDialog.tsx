@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload } from 'lucide-react';
-import { Banner, Button, Dialog } from '../../ui';
+import { Banner, Button, Checkbox, CheckboxLabel, Dialog } from '../../ui';
 import { useSession, flushAllDrafts } from '../../app/session';
 import { BackupImportError, IMPORT_MAX_BYTES, parseBackup } from '../../domain/backup-import';
 import { classify } from '../../domain/codec';
@@ -188,9 +188,9 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
               <ul className="backup-import-notes">
                 {rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((row) => (
                   <li key={row.index}>
-                    <label className="check-label">
-                      <input
-                        type="checkbox"
+                    <CheckboxLabel className="items-start font-medium">
+                      <Checkbox
+                        className="mt-0.5"
                         disabled={busy || row.duplicate}
                         checked={selected.has(row.index)}
                         onChange={(event) =>
@@ -205,7 +205,7 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                       <span className="backup-import-note-title">
                         {row.document.title || t('home.untitled')}
                       </span>
-                    </label>
+                    </CheckboxLabel>
                     <p className="field-help">
                       {t(`nav.${classify(row.document)}`)}
                       {row.duplicate ? ` · ${t('backupImport.duplicate')}` : ''}
@@ -233,15 +233,14 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
               {missing.length > 0 && (
                 <Banner tone="warning" className="banner warning mt-4">
                   <p>{t('backupImport.missing', { names: missing.join(', ') })}</p>
-                  <label className="check-label">
-                    <input
-                      type="checkbox"
+                  <CheckboxLabel>
+                    <Checkbox
                       checked={acceptMissing}
                       disabled={busy}
                       onChange={(event) => setAcceptMissing(event.target.checked)}
                     />
                     {t('backupImport.acceptMissing')}
-                  </label>
+                  </CheckboxLabel>
                 </Banner>
               )}
               <p className="field-help">{t('backupImport.trashHelp')}</p>
