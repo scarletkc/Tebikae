@@ -310,7 +310,9 @@ test('cleared title stays empty through body autosave and sync until close uses 
   await expect(status).toContainText('Synced to GitHub');
   await expect(title).toHaveValue('');
   expect(remote.issues[0]!.title).toBe('Weekend ideas');
-  expect(remote.issues[0]!.body).toContain('Updated body with an empty title.');
+  // The status line flips to "Synced" when the write completes locally; the mocked
+  // remote state can lag one write behind under load, so poll instead of asserting once (#23).
+  await expect.poll(() => remote.issues[0]!.body).toContain('Updated body with an empty title.');
   await closeDialog(page);
   await expect(page.getByRole('button', { name: 'Edit note: Untitled note', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
