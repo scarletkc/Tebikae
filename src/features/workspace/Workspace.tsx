@@ -19,8 +19,8 @@ import IssuesView from './IssuesView';
 import { isNoteListRoute } from './routes';
 import { WorkspaceContext, useWorkspace, useWorkspaceController } from './useWorkspaceController';
 
-const SIDEBAR_WIDTH = 238;
-const SIDEBAR_COLLAPSED_WIDTH = 62;
+const SIDEBAR_WIDTH = 240;
+const SIDEBAR_COLLAPSED_WIDTH = 56;
 
 export default function Workspace({ offlineReady }: { offlineReady: boolean }) {
   const ctl = useWorkspaceController();
@@ -40,15 +40,22 @@ function WorkspaceLayout({ offlineReady }: { offlineReady: boolean }) {
   return (
     <div className="workspace" onContextMenu={preventUndefinedContextMenu}>
       <motion.aside
-        className={`sidebar ${layout.sidebarCollapsed ? 'sidebar-collapsed' : ''}`}
+        className={cn(
+          'sidebar fixed inset-y-0 start-0 z-10 flex h-dvh flex-col overflow-hidden border-e border-line bg-sidebar px-3 pb-4 select-none max-md:hidden',
+          layout.sidebarCollapsed && 'sidebar-collapsed px-2.5',
+        )}
         animate={{ width: layout.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH }}
         initial={false}
         transition={reduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 500, damping: 44 }}
       >
-        <Sidebar />
+        <Sidebar collapsed={layout.sidebarCollapsed} />
       </motion.aside>
       <Sheet open={ctl.drawer} onOpenChange={ctl.setDrawer} title={t('nav.menu')} className="mobile-drawer">
-        <IconButton label={t('nav.close')} className="drawer-close" onClick={() => ctl.setDrawer(false)}>
+        <IconButton
+          label={t('nav.close')}
+          className="drawer-close absolute end-2 top-2"
+          onClick={() => ctl.setDrawer(false)}
+        >
           <X size={20} />
         </IconButton>
         <Sidebar />

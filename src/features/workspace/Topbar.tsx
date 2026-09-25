@@ -9,7 +9,7 @@ import { TextContextMenu } from '../editor/TextContextMenu';
 import { filterCount } from '../filters/Filters';
 import { isNoteListRoute } from './routes';
 import { useWorkspace } from './useWorkspaceController';
-import { Button } from '../../ui';
+import { Button, SegmentedControl } from '../../ui';
 
 export function WorkspaceStatusControl() {
   const { notices, route, visibleIssues, result } = useWorkspace();
@@ -57,23 +57,15 @@ export function ViewToggle({ mode }: { mode: 'icon' | 'segmented' }) {
       </ContextMenu>
     );
   return (
-    <ContextMenu contextName="view" className="view-toggle flex" items={items}>
-      <IconButton
-        size="sm"
-        className={prefs.layout === 'grid' ? 'selected' : ''}
-        label={t('action.grid')}
-        onClick={() => prefs.setLayout('grid')}
-      >
-        <Grid2X2 size={17} />
-      </IconButton>
-      <IconButton
-        size="sm"
-        className={prefs.layout === 'list' ? 'selected' : ''}
-        label={t('action.list')}
-        onClick={() => prefs.setLayout('list')}
-      >
-        <List size={18} />
-      </IconButton>
+    <ContextMenu contextName="view" className="view-toggle" items={items}>
+      <SegmentedControl
+        value={prefs.layout}
+        onChange={(layout) => prefs.setLayout(layout)}
+        options={[
+          { value: 'grid', label: t('action.grid'), icon: <Grid2X2 size={17} /> },
+          { value: 'list', label: t('action.list'), icon: <List size={18} /> },
+        ]}
+      />
     </ContextMenu>
   );
 }
@@ -147,7 +139,10 @@ export default function Topbar() {
   const isMobile = useIsMobile();
   const noteList = isNoteListRoute(route);
   return (
-    <header ref={layout.topbarRef} className="app-topbar">
+    <header
+      ref={layout.topbarRef}
+      className="app-topbar sticky top-0 z-20 flex min-h-14 flex-nowrap items-center gap-2 border-b border-line bg-canvas px-4 pt-[env(safe-area-inset-top)] select-none"
+    >
       <div className="search-box flex h-10 min-w-0 flex-1 items-center gap-1 rounded-lg border border-transparent bg-hover px-1 focus-within:border-line-strong focus-within:bg-surface">
         <IconButton
           size="sm"
@@ -200,7 +195,7 @@ export default function Topbar() {
         )}
         {layout.isCompactTopbar ? (
           noteList ? (
-            <div className="topbar-note-actions search-actions ml-auto gap-1">
+            <div className="topbar-note-actions search-actions ml-auto flex min-w-0 shrink-0 flex-nowrap items-center gap-1">
               <WorkspaceStatusControl />
               <SortControl
                 value={filters.sort}
@@ -218,7 +213,7 @@ export default function Topbar() {
         )}
       </div>
       {!layout.isCompactTopbar && noteList && (
-        <div className="topbar-note-actions">
+        <div className="topbar-note-actions flex min-w-0 max-w-full shrink-0 flex-nowrap items-center gap-3 max-md:gap-2">
           <SortControl
             value={filters.sort}
             onChange={(sort) => setFilters({ ...filters, sort })}
