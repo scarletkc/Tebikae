@@ -1,5 +1,4 @@
 {
-  "tagline": "Simple notes, powered by GitHub Issues.",
   "workspaceStatus": {
     "title": "Workspace status",
     "notifications": "{{count}} notifications",
@@ -264,7 +263,7 @@
     "failed": "Could not prepare the Markdown export. Your notes are unchanged. Please try again."
   },
   "settings": {
-    "title": "Make it yours",
+    "dangerZone": "Danger zone",
     "appearance": "Appearance",
     "theme": "Theme",
     "light": "Light",

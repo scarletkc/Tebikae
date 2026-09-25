@@ -1,5 +1,4 @@
 {
-  "tagline": "Simple notes, powered by GitHub Issues.",
   "workspaceStatus": {
     "title": "工作区状态",
     "notifications": "{{count}} 条提示",
@@ -264,7 +263,7 @@
     "failed": "无法准备 Markdown 导出，笔记未被修改。请重试。"
   },
   "settings": {
-    "title": "用你喜欢的方式",
+    "dangerZone": "危险操作",
     "appearance": "外观",
     "theme": "主题",
     "light": "浅色",
