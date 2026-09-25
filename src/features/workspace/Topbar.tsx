@@ -128,11 +128,12 @@ export function canCreateHere(route: string, view: string) {
 
 function FilterButton() {
   const { t, filters, setFiltersOpen } = useWorkspace();
+  const active = filterCount(filters) > 0;
   return (
     <IconButton
       size="sm"
       label={t('action.filter')}
-      className={`filter-open-button ${filterCount(filters) ? 'is-active' : ''}`}
+      className={`filter-open-button ${active ? 'is-active bg-accent-soft! text-accent! hover:bg-accent-soft! hover:text-accent!' : ''}`}
       onClick={() => setFiltersOpen(true)}
     >
       <SlidersHorizontal size={16} />
@@ -147,7 +148,7 @@ export default function Topbar() {
   const noteList = isNoteListRoute(route);
   return (
     <header ref={layout.topbarRef} className="app-topbar">
-      <div className="search-box">
+      <div className="search-box flex h-10 min-w-0 flex-1 items-center gap-1 rounded-lg border border-transparent bg-hover px-1 focus-within:border-line-strong focus-within:bg-surface">
         <IconButton
           size="sm"
           className={isMobile ? 'mobile-menu nav-toggle-btn' : 'sidebar-toggle nav-toggle-btn'}
@@ -169,6 +170,7 @@ export default function Topbar() {
         >
           <input
             ref={ctl.searchRef}
+            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-base outline-none placeholder:text-muted focus:shadow-none md:text-sm"
             aria-label={t('home.search')}
             placeholder={`${t('home.search')} (Ctrl+K)`}
             value={searchInput}
@@ -198,7 +200,7 @@ export default function Topbar() {
         )}
         {layout.isCompactTopbar ? (
           noteList ? (
-            <div className="topbar-note-actions search-actions">
+            <div className="topbar-note-actions search-actions ml-auto gap-1">
               <WorkspaceStatusControl />
               <SortControl
                 value={filters.sort}

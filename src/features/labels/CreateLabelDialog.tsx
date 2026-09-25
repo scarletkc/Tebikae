@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Dialog } from '../../ui';
+import { Button, Dialog, Field, Input } from '../../ui';
 import { useSession } from '../../app/session';
 
 export default function CreateLabelDialog({
@@ -33,22 +33,37 @@ export default function CreateLabelDialog({
   return (
     <Dialog title={t('label.new')} onClose={onClose} size="sm">
       <form
-        className="label-form"
+        className="label-form flex flex-col gap-5"
         onSubmit={(e) => {
           e.preventDefault();
           void create();
         }}
       >
-        <p>{t('label.createHelp')}</p>
-        <label>
-          {t('label.name')}
-          <input autoFocus value={name} maxLength={50} required onChange={(e) => setName(e.target.value)} />
-        </label>
-        <label>
-          {t('label.color')}
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
-        </label>
-        <Button type="submit" variant="primary" disabled={busy || !session.engine}>
+        <p className="text-xs text-muted">{t('label.createHelp')}</p>
+        <Field label={t('label.name')}>
+          {(id) => (
+            <Input
+              id={id}
+              autoFocus
+              value={name}
+              maxLength={50}
+              required
+              onChange={(e) => setName(e.target.value)}
+            />
+          )}
+        </Field>
+        <Field label={t('label.color')}>
+          {(id) => (
+            <input
+              id={id}
+              type="color"
+              className="h-9 w-14 cursor-pointer rounded-lg border border-line-strong bg-surface p-1"
+              value={color}
+              onChange={(e) => setColor(e.target.value)}
+            />
+          )}
+        </Field>
+        <Button type="submit" variant="primary" className="self-start" disabled={busy || !session.engine}>
           {t('action.create')}
         </Button>
       </form>

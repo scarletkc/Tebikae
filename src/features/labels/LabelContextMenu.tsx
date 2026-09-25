@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { Palette, Pencil, Tag, Trash2 } from 'lucide-react';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
-import { Button, Dialog } from '../../ui';
+import { Button, Dialog, Field, Input } from '../../ui';
 import { confirmDialog } from '../../app/confirm';
 import { useSession } from '../../app/session';
 import { db } from '../../storage/db';
@@ -138,24 +138,31 @@ export function LabelContextMenu({
       {rename && (
         <Dialog title={t('context.rename')} onClose={() => setRename(false)} size="sm">
           <form
-            className="label-form"
+            className="label-form flex flex-col gap-5"
             onSubmit={(e) => {
               e.preventDefault();
               if (name.trim())
                 void perform(() => session.engine!.updateLabel(label.id, { new_name: name.trim() }));
             }}
           >
-            <label>
-              {t('label.name')}
-              <input
-                autoFocus
-                maxLength={50}
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <Button type="submit" variant="primary" disabled={disabled || !name.trim()}>
+            <Field label={t('label.name')}>
+              {(id) => (
+                <Input
+                  id={id}
+                  autoFocus
+                  maxLength={50}
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              )}
+            </Field>
+            <Button
+              type="submit"
+              variant="primary"
+              className="self-start"
+              disabled={disabled || !name.trim()}
+            >
               {t('context.apply')}
             </Button>
           </form>

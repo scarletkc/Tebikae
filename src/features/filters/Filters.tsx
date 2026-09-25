@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { NOTE_COLORS, type Label, type NoteFilters } from '../../domain/types';
 import { defaultFilters } from '../../domain/filters';
-import { Button, Dialog } from '../../ui';
+import { Button, Checkbox, CheckboxLabel, Dialog, Field, Input, Select, cn } from '../../ui';
 import { LabelBadge, LabelDot, labelStyle } from '../labels';
 
 export function filterCount(f: NoteFilters) {
@@ -94,22 +94,22 @@ export function FiltersDialog({
   const { t } = useTranslation();
   return (
     <Dialog title={t('action.filter')} onClose={onClose} className="filters-dialog">
-      <div className="filter-fields">
+      <div className="filter-fields flex flex-col gap-6">
         <fieldset>
-          <legend>{t('filter.labels')}</legend>
-          <select
+          <legend className="mb-3 text-xs font-medium text-muted">{t('filter.labels')}</legend>
+          <Select
+            className="mb-4"
             aria-label={t('filter.labels')}
             value={f.labelMatch}
             onChange={(e) => setFilters({ ...f, labelMatch: e.target.value as 'all' | 'any' })}
           >
             <option value="all">{t('filter.allLabels')}</option>
             <option value="any">{t('filter.anyLabels')}</option>
-          </select>
-          <div className="choices">
+          </Select>
+          <div className="choices flex flex-wrap gap-x-4 gap-y-2.5">
             {labels.map((label) => (
-              <label key={label.id}>
-                <input
-                  type="checkbox"
+              <CheckboxLabel key={label.id}>
+                <Checkbox
                   checked={f.labelIds.includes(label.id)}
                   onChange={() =>
                     setFilters({
@@ -122,25 +122,29 @@ export function FiltersDialog({
                   }
                 />
                 <LabelBadge label={label} />
-              </label>
+              </CheckboxLabel>
             ))}
           </div>
-          <label className="check-label">
-            <input
-              type="checkbox"
+          <CheckboxLabel className="mt-2.5">
+            <Checkbox
               checked={f.unlabeledOnly}
               onChange={(e) => setFilters({ ...f, unlabeledOnly: e.target.checked, labelIds: [] })}
             />
             {t('filter.unlabeled')}
-          </label>
+          </CheckboxLabel>
         </fieldset>
         <fieldset>
-          <legend>{t('filter.colors')}</legend>
-          <div className="choices">
+          <legend className="mb-3 text-xs font-medium text-muted">{t('filter.colors')}</legend>
+          <div className="choices flex flex-wrap gap-x-4 gap-y-2.5">
             {NOTE_COLORS.map((color) => (
-              <label key={color} className={`color-choice note-${color}`}>
-                <input
-                  type="checkbox"
+              <label
+                key={color}
+                className={cn(
+                  'color-choice flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs',
+                  `note-${color}`,
+                )}
+              >
+                <Checkbox
                   checked={f.colors.includes(color)}
                   onChange={() =>
                     setFilters({
@@ -157,12 +161,11 @@ export function FiltersDialog({
           </div>
         </fieldset>
         <fieldset>
-          <legend>{t('filter.kinds')}</legend>
-          <div className="choices">
+          <legend className="mb-3 text-xs font-medium text-muted">{t('filter.kinds')}</legend>
+          <div className="choices flex flex-wrap gap-x-4 gap-y-2.5">
             {(['markdown', 'checklist'] as const).map((kind) => (
-              <label key={kind}>
-                <input
-                  type="checkbox"
+              <CheckboxLabel key={kind}>
+                <Checkbox
                   checked={f.kinds.includes(kind)}
                   onChange={() =>
                     setFilters({
@@ -172,57 +175,64 @@ export function FiltersDialog({
                   }
                 />
                 {t(`filter.${kind}`)}
-              </label>
+              </CheckboxLabel>
             ))}
           </div>
         </fieldset>
-        <label>
-          {t('filter.pinned')}
-          <select
-            value={f.pinned}
-            onChange={(e) => setFilters({ ...f, pinned: e.target.value as NoteFilters['pinned'] })}
-          >
-            <option value="all">{t('filter.any')}</option>
-            <option value="pinned">{t('filter.pinnedOnly')}</option>
-            <option value="unpinned">{t('filter.unpinnedOnly')}</option>
-          </select>
-        </label>
+        <Field label={t('filter.pinned')}>
+          {(id) => (
+            <Select
+              id={id}
+              value={f.pinned}
+              onChange={(e) => setFilters({ ...f, pinned: e.target.value as NoteFilters['pinned'] })}
+            >
+              <option value="all">{t('filter.any')}</option>
+              <option value="pinned">{t('filter.pinnedOnly')}</option>
+              <option value="unpinned">{t('filter.unpinnedOnly')}</option>
+            </Select>
+          )}
+        </Field>
         {(['created', 'updated'] as const).map((field) => (
           <fieldset key={field}>
-            <legend>{t(`filter.${field}`)}</legend>
-            <div className="date-fields">
-              <label>
-                {t('filter.from')}
-                <input
-                  type="date"
-                  aria-label={`${t(`filter.${field}`)} ${t('filter.from')}`}
-                  value={f[`${field}From`] || ''}
-                  max={f[`${field}To`]}
-                  onChange={(e) => setFilters({ ...f, [`${field}From`]: e.target.value || undefined })}
-                />
-              </label>
-              <label>
-                {t('filter.to')}
-                <input
-                  type="date"
-                  aria-label={`${t(`filter.${field}`)} ${t('filter.to')}`}
-                  value={f[`${field}To`] || ''}
-                  min={f[`${field}From`]}
-                  onChange={(e) => setFilters({ ...f, [`${field}To`]: e.target.value || undefined })}
-                />
-              </label>
+            <legend className="mb-3 text-xs font-medium text-muted">{t(`filter.${field}`)}</legend>
+            <div className="date-fields grid grid-cols-2 gap-3">
+              <Field label={t('filter.from')}>
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="date"
+                    aria-label={`${t(`filter.${field}`)} ${t('filter.from')}`}
+                    value={f[`${field}From`] || ''}
+                    max={f[`${field}To`]}
+                    onChange={(e) => setFilters({ ...f, [`${field}From`]: e.target.value || undefined })}
+                  />
+                )}
+              </Field>
+              <Field label={t('filter.to')}>
+                {(id) => (
+                  <Input
+                    id={id}
+                    type="date"
+                    aria-label={`${t(`filter.${field}`)} ${t('filter.to')}`}
+                    value={f[`${field}To`] || ''}
+                    min={f[`${field}From`]}
+                    onChange={(e) => setFilters({ ...f, [`${field}To`]: e.target.value || undefined })}
+                  />
+                )}
+              </Field>
             </div>
           </fieldset>
         ))}
-        <label className="check-label">
-          <input
-            type="checkbox"
+        <CheckboxLabel>
+          <Checkbox
             checked={f.unsyncedOnly}
             onChange={(e) => setFilters({ ...f, unsyncedOnly: e.target.checked })}
           />
           {t('filter.unsynced')}
-        </label>
-        <Button onClick={() => setFilters({ ...defaultFilters, view: f.view })}>{t('action.clear')}</Button>
+        </CheckboxLabel>
+        <Button className="self-start" onClick={() => setFilters({ ...defaultFilters, view: f.view })}>
+          {t('action.clear')}
+        </Button>
       </div>
     </Dialog>
   );

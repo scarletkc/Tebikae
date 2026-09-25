@@ -559,54 +559,6 @@ hr {
   height: 100%;
   opacity: 0;
 }
-.search-box {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  background: var(--surface);
-  color: var(--muted);
-  min-height: 42px;
-}
-.search-box > .nav-toggle-btn,
-.search-box > .sidebar-toggle,
-.search-box > .mobile-menu {
-  flex-shrink: 0;
-  color: var(--muted);
-  display: inline-flex;
-}
-.search-box > .text-context-target {
-  display: contents;
-}
-.search-box input:not([type='checkbox']) {
-  border: 0;
-  padding: 10px 0;
-  background: transparent;
-  font-size: 13px;
-  width: 100%;
-  min-width: 0;
-  flex: 1 1 0;
-  box-shadow: none;
-}
-.search-box .filter-open-button.is-active {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-.search-box input::placeholder {
-  color: var(--muted);
-}
-.search-box .topbar-note-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  flex-shrink: 0;
-  flex-wrap: nowrap;
-}
 .main-content {
   padding: 42px 42px 70px;
   max-width: 1600px;
@@ -926,15 +878,6 @@ hr {
   padding: 12px 0;
   border-bottom: 1px solid var(--border);
 }
-.backup-import-notes .check-label {
-  align-items: flex-start;
-  font-size: 14px;
-  font-weight: 500;
-}
-.backup-import-notes .check-label input {
-  flex-shrink: 0;
-  margin-top: 3px;
-}
 .backup-import-notes .field-help {
   margin: 4px 0 4px 23px;
 }
@@ -1017,23 +960,6 @@ hr {
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
 }
-.note-dialog .note-title-input:not([type='checkbox']) {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  padding: 4px 0 12px;
-  border-radius: 0;
-  font-family: inherit;
-  font-size: clamp(30px, 3vw, 40px);
-  font-weight: 650;
-  line-height: 1.3;
-  letter-spacing: -0.035em;
-  box-shadow: none;
-}
-.note-title-input::placeholder {
-  color: var(--muted);
-  opacity: 0.7;
-}
 .note-properties {
   display: flex;
   align-items: center;
@@ -1041,25 +967,6 @@ hr {
   gap: 8px;
   margin: 0 0 30px;
   min-height: 30px;
-}
-.choices {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-}
-.choices > label,
-.check-label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-.color-choice {
-  padding: 5px 8px;
-  border-radius: 6px;
 }
 .note-editor-footer {
   flex-shrink: 0;
@@ -1139,35 +1046,6 @@ hr {
   font-size: 12px;
   color: var(--muted);
 }
-.filter-fields {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-.filter-fields fieldset > select {
-  margin-bottom: 15px;
-}
-.filter-fields .check-label {
-  margin-top: 10px;
-}
-.date-fields {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-.date-fields input {
-  font-size: 12px;
-  width: 100%;
-}
-.label-form {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.label-form > p {
-  font-size: 12px;
-  color: var(--muted);
-}
 .issue-content > h2 {
   font-size: 25px;
   margin-bottom: 20px;
@@ -1228,24 +1106,8 @@ hr {
     padding: 10px 16px;
     gap: 10px;
   }
-  .app-topbar .search-box {
-    flex-basis: 0;
-  }
   .topbar-note-actions {
     gap: 8px;
-  }
-  .search-box {
-    gap: 7px;
-  }
-  .search-box > svg {
-    display: none;
-  }
-  .search-box .filter-open-button.is-active {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .search-box input:not([type='checkbox']) {
-    font-size: 12px;
   }
   .main-content {
     padding: 29px 22px 50px;
@@ -1312,9 +1174,6 @@ hr {
     padding: 20px 22px 48px;
     scrollbar-gutter: auto;
   }
-  .note-dialog .note-title-input:not([type='checkbox']) {
-    font-size: 30px;
-  }
   .note-editor-footer {
     padding: 10px 12px;
   }
@@ -1335,9 +1194,6 @@ hr {
   .app-topbar {
     padding: 10px 12px;
     gap: 8px;
-  }
-  .app-topbar .search-box {
-    flex-basis: 0;
   }
   .topbar-note-actions {
     gap: 6px;
@@ -1390,12 +1246,6 @@ hr {
   .note-save-row > span {
     min-width: 95px;
   }
-  .date-fields {
-    gap: 8px;
-  }
-  .date-fields input {
-    padding: 10px 7px;
-  }
 }
 .note-card {
   transform-origin: center;
@@ -1441,12 +1291,6 @@ hr {
   font-size: 12px;
   overflow-wrap: anywhere;
 }
-.note-dialog .note-title-input:focus-visible {
-  outline: none;
-}
-.note-dialog .note-title-input:focus-visible::placeholder {
-  color: var(--accent);
-}
 .note-dialog .label-badge {
   padding: 5px 10px;
   border-radius: 20px;
@@ -1486,9 +1330,6 @@ hr {
 }
 .note-label-picker[open] {
   flex-basis: 100%;
-}
-.note-label-options .choices {
-  margin-top: 10px;
 }
 .note-actions-menu {
   z-index: 80;

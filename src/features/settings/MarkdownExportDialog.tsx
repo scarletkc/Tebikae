@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download } from 'lucide-react';
 import { download } from '../../app/ui';
-import { Banner, Button, Dialog } from '../../ui';
+import { Banner, Button, Checkbox, CheckboxLabel, Dialog } from '../../ui';
 import {
   createMarkdownArchive,
   summarizeMarkdownExport,
@@ -48,15 +48,14 @@ export default function MarkdownExportDialog({
       <div className="markdown-export-body" aria-busy={busy}>
         <p>{t('markdownExport.help')}</p>
         <p className="field-help">{t('markdownExport.coverage')}</p>
-        <label className="check-label">
-          <input
-            type="checkbox"
+        <CheckboxLabel>
+          <Checkbox
             checked={includeTrash}
             disabled={busy}
             onChange={(event) => setIncludeTrash(event.target.checked)}
           />
           {t('markdownExport.includeTrash')}
-        </label>
+        </CheckboxLabel>
         <dl className="markdown-export-counts" aria-live="polite">
           {(['notes', 'archive', 'trash', 'unsynced', 'total'] as const).map((key) => (
             <div key={key}>
