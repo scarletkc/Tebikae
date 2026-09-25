@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download } from 'lucide-react';
 import { download } from '../../app/ui';
-import { Button, Dialog } from '../../ui';
+import { Banner, Button, Dialog } from '../../ui';
 import {
   createMarkdownArchive,
   summarizeMarkdownExport,
@@ -67,9 +67,9 @@ export default function MarkdownExportDialog({
         </dl>
         {counts.total === 0 && <p role="status">{t('markdownExport.empty')}</p>}
         {failed && (
-          <p className="banner warning" role="alert">
+          <Banner tone="warning" role="alert" className="banner warning">
             {t('markdownExport.failed')}
-          </p>
+          </Banner>
         )}
         <div className="button-row">
           <Button

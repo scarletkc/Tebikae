@@ -88,9 +88,9 @@
     "pinned": "Pinned",
     "other": "Everything else",
     "count": "{{count}} notes",
-    "empty": "A fresh page",
-    "emptyDescription": "Capture a thought, save a link, or make a little list.",
-    "noResults": "Nothing here just yet",
+    "empty": "No notes yet",
+    "noResults": "No matching notes",
+    "noIssues": "No other Issues",
     "noResultsDescription": "Try another search or adjust your filters.",
     "issuesDescription": "Your existing Issues stay unchanged until you choose to turn one into a note.",
     "loading": "Loading Issues — these results may be incomplete.",
@@ -356,5 +356,9 @@
     "clipboardError": "Clipboard access failed. Use the system copy/paste shortcut or native text menu.",
     "complete": "Complete",
     "incomplete": "Incomplete"
+  },
+  "toast": {
+    "region": "Notifications",
+    "dismiss": "Dismiss"
   }
 }

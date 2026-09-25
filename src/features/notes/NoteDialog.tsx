@@ -37,7 +37,16 @@ import {
 } from '../../application/commands';
 import { useSession, registerDraftFlusher } from '../../app/session';
 import { IconButton, download } from '../../app/ui';
-import { Button, cn, iconButtonVariants, menuContent, menuItem, menuLabel, menuSeparator } from '../../ui';
+import {
+  Banner,
+  Button,
+  cn,
+  iconButtonVariants,
+  menuContent,
+  menuItem,
+  menuLabel,
+  menuSeparator,
+} from '../../ui';
 import { db } from '../../storage/db';
 import { safeHref } from '../../security/urls';
 import { usePwaUpdate } from '../../app/pwa';
@@ -723,15 +732,19 @@ export default function NoteDialog({
           </details>
         </div>
         {pwa.available && (
-          <div className="banner">
-            <span>{t('settings.update')}</span>
+          <Banner className="banner mb-4">
+            <span className="flex-1">{t('settings.update')}</span>
             <Button onClick={() => void pwa.update().catch(() => {})}>{t('settings.updateAction')}</Button>
-          </div>
+          </Banner>
         )}
-        {latest?.remoteUnavailable && <p className="banner warning">{t('home.unavailable')}</p>}
+        {latest?.remoteUnavailable && (
+          <Banner tone="warning" className="banner warning mb-4">
+            <p>{t('home.unavailable')}</p>
+          </Banner>
+        )}
         {!saving && latest?.syncStatus === 'synced' && latest.current.markdown !== document.markdown && (
-          <div className="banner">
-            <span>{t('note.remoteUpdated')}</span>
+          <Banner className="banner mb-4">
+            <span className="flex-1">{t('note.remoteUpdated')}</span>
             <Button
               variant="link"
               size="sm"
@@ -747,10 +760,10 @@ export default function NoteDialog({
             >
               {t('note.loadLatest')}
             </Button>
-          </div>
+          </Banner>
         )}
         {latest?.duplicate && (
-          <div className="banner warning">
+          <Banner tone="warning" className="banner warning mb-4">
             <p>{t('note.duplicate')}</p>
             <p>{t('note.duplicateHelp')}</p>
             <Button
@@ -759,11 +772,11 @@ export default function NoteDialog({
             >
               {t('note.resolveDuplicate')}
             </Button>
-          </div>
+          </Banner>
         )}
         {latest?.syncStatus === 'uncertain' && (
-          <div className="banner warning">
-            <p>{t('note.uncertain')}</p>
+          <Banner tone="warning" className="banner warning mb-4">
+            <p className="w-full">{t('note.uncertain')}</p>
             <div className="button-row">
               <Button
                 disabled={!engine}
@@ -790,7 +803,7 @@ export default function NoteDialog({
                 </Button>
               )}
             </div>
-          </div>
+          </Banner>
         )}
         {latest?.syncStatus === 'conflict' && !latest.duplicate && remote && (
           <section className="conflict-panel">
@@ -863,15 +876,15 @@ export default function NoteDialog({
           />
         </Suspense>
         {saveError && (
-          <div role="alert" className="error-box">
-            <p>{saveError === 'storage' ? t('note.localError') : t(`error.${saveError}`)}</p>
-            <Button className="mt-2.5" onClick={exportCurrent}>
-              {t('note.copyEmergency')}
-            </Button>
+          <Banner tone="danger" role="alert" className="error-box mt-3">
+            <p className="w-full">
+              {saveError === 'storage' ? t('note.localError') : t(`error.${saveError}`)}
+            </p>
+            <Button onClick={exportCurrent}>{t('note.copyEmergency')}</Button>
             <Button variant="link" size="sm" onClick={() => void persist().catch(() => {})}>
               {t('action.retry')}
             </Button>
-          </div>
+          </Banner>
         )}
         {latest?.error && (
           <details className="error-details">
@@ -892,9 +905,9 @@ export default function NoteDialog({
           </details>
         )}
         {deleteError && (
-          <div role="alert" className="error-box">
+          <Banner tone="danger" role="alert" className="error-box mt-3">
             <p>{t('note.deleteFailed')}</p>
-          </div>
+          </Banner>
         )}
       </div>
       <footer className="note-editor-footer">

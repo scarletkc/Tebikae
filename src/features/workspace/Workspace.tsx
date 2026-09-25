@@ -1,7 +1,7 @@
 import { Plus, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { IconButton } from '../../app/ui';
-import { Button, Dialog, Sheet } from '../../ui';
+import { Banner, Button, Dialog, Sheet } from '../../ui';
 import { ContextMenu } from '../../app/ContextMenu';
 import { useIsMobile } from '../../app/useMediaQuery';
 import { preventUndefinedContextMenu } from '../../app/useContextMenuGuard';
@@ -112,13 +112,13 @@ function WorkspaceLayout({ offlineReady }: { offlineReady: boolean }) {
                   </div>
                 )}
                 {ctl.feed.error && (
-                  <p role="alert">
+                  <Banner tone="danger" role="alert" className="mt-6">
                     {t(
                       ctl.feed.error.detail === 'SEARCH_RANGE_TOO_DENSE'
                         ? 'home.searchTooDense'
                         : `error.${ctl.feed.error.code}`,
                     )}
-                  </p>
+                  </Banner>
                 )}
                 {(ctl.availableCount > ctl.limit || ctl.feed.hasMore) && (
                   <Button

@@ -4,7 +4,7 @@ import NoteCard from '../notes/NoteCard';
 import NotesGrid from '../notes/NotesGrid';
 import { FilterChips } from '../filters/Filters';
 import { useWorkspace } from './useWorkspaceController';
-import { Button } from '../../ui';
+import { Button, EmptyState } from '../../ui';
 
 function Cards({ items }: { items: LocalNote[] }) {
   const ctl = useWorkspace();
@@ -58,19 +58,19 @@ export default function NotesView() {
     <>
       <FilterChips filters={activeFilters} setFilters={setFilters} labels={labels} />
       {empty && !feed.loading && !feed.hasMore ? (
-        <div className="empty-state">
-          <div className="empty-illustration">
-            <NotebookPen size={38} strokeWidth={1.3} />
-          </div>
-          <h2>{t(notes.length ? 'home.noResults' : 'home.empty')}</h2>
-          <p>{t(notes.length ? 'home.noResultsDescription' : 'home.emptyDescription')}</p>
-          {!notes.length && view === 'notes' && (
-            <Button className="mt-6" disabled={!session.writable} onClick={() => newNote()}>
-              <Plus size={17} />
-              {t('action.new')}
-            </Button>
-          )}
-        </div>
+        <EmptyState
+          icon={NotebookPen}
+          title={t(notes.length ? 'home.noResults' : 'home.empty')}
+          description={notes.length ? t('home.noResultsDescription') : undefined}
+          action={
+            !notes.length && view === 'notes' ? (
+              <Button disabled={!session.writable} onClick={() => newNote()}>
+                <Plus size={17} />
+                {t('action.new')}
+              </Button>
+            ) : undefined
+          }
+        />
       ) : (
         <>
           {pinned.length > 0 && (
