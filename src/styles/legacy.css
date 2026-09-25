@@ -895,75 +895,6 @@ hr {
 .note-red {
   background-color: var(--card-red);
 }
-.empty-state {
-  grid-column: 1/-1;
-  text-align: center;
-  padding: 65px 15px 90px;
-  color: var(--muted);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-.empty-illustration {
-  width: 92px;
-  height: 92px;
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  background: var(--surface);
-  display: grid;
-  place-items: center;
-  margin-bottom: 23px;
-  transform: rotate(-5deg);
-  color: var(--accent);
-}
-.empty-state h2 {
-  font-size: 24px;
-  color: var(--text);
-  font-weight: 400;
-  margin: 15px 0 10px;
-}
-.empty-state p {
-  font-size: 12px;
-  max-width: 400px;
-}
-.loading-notice {
-  font-size: 12px;
-  color: var(--muted);
-  padding: 10px 0;
-}
-.banner {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 9px;
-  border: 1px solid var(--border);
-  background: var(--surface);
-  border-radius: 9px;
-  padding: 12px 15px;
-  font-size: 12px;
-  line-height: 1.7;
-  margin-bottom: 23px;
-  color: var(--muted);
-}
-.banner > span {
-  flex: 1;
-}
-.banner.warning {
-  background: var(--card-yellow);
-  color: var(--text);
-}
-.error-banner,
-.error-box {
-  background: var(--card-red);
-  color: var(--danger);
-}
-.error-box {
-  padding: 14px;
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.7;
-  margin: 12px 0;
-}
 .mobile-menu {
   display: none;
 }
@@ -1016,13 +947,6 @@ hr {
 }
 .backup-import-result {
   margin-top: 16px;
-}
-.backup-import-body .banner {
-  margin-top: 16px;
-  overflow-wrap: anywhere;
-}
-.backup-import-body .banner p {
-  margin-top: 0;
 }
 .markdown-export-counts {
   margin: 20px 0;
@@ -1251,22 +1175,6 @@ hr {
 .issue-content .button-row {
   margin-top: 25px;
 }
-.update-toast {
-  position: fixed;
-  bottom: 25px;
-  right: 25px;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  padding: 14px 18px;
-  border-radius: 12px;
-  box-shadow: var(--shadow);
-  font-size: 12px;
-  max-width: calc(100vw - 32px);
-}
 .fatal-error {
   padding: 10vh 8vw;
 }
@@ -1416,18 +1324,6 @@ hr {
   .conflict-versions {
     grid-template-columns: 1fr;
   }
-  .update-toast {
-    right: 16px;
-    bottom: 16px;
-    flex-wrap: wrap;
-  }
-  .empty-state {
-    padding: 45px 10px;
-  }
-  .banner {
-    font-size: 12px;
-    padding: 10px 12px;
-  }
   .filter-chips {
     gap: 5px;
   }
@@ -1500,56 +1396,6 @@ hr {
   .date-fields input {
     padding: 10px 7px;
   }
-}
-.toast-layer {
-  position: fixed;
-  bottom: calc(20px + env(safe-area-inset-bottom));
-  right: 20px;
-  z-index: 90;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  pointer-events: none;
-  max-width: calc(100vw - 32px);
-}
-.toast {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 11px 14px;
-  box-shadow: var(--shadow);
-  font-size: 12px;
-  max-width: min(360px, calc(100vw - 32px));
-}
-.toast-message {
-  flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-.toast-success > svg {
-  color: var(--accent);
-}
-.toast-error > svg {
-  color: var(--danger);
-}
-.toast-info > svg {
-  color: var(--muted);
-}
-.toast-close {
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  padding: 3px;
-  display: inline-flex;
-  border-radius: 6px;
-}
-.toast-close:hover {
-  background: var(--surface-hover);
-  color: var(--text);
 }
 .note-card {
   transform-origin: center;

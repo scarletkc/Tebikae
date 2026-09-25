@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload } from 'lucide-react';
-import { Button, Dialog } from '../../ui';
+import { Banner, Button, Dialog } from '../../ui';
 import { useSession, flushAllDrafts } from '../../app/session';
 import { BackupImportError, IMPORT_MAX_BYTES, parseBackup } from '../../domain/backup-import';
 import { classify } from '../../domain/codec';
@@ -112,7 +112,11 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
       <div className="backup-import-body" aria-busy={busy}>
         <p>{t('backupImport.help')}</p>
         <p className="field-help">{t('backupImport.coverage')}</p>
-        {!session.writable && <p className="banner warning">{t('backupImport.errors.readonly')}</p>}
+        {!session.writable && (
+          <Banner tone="warning" className="banner warning mt-4">
+            {t('backupImport.errors.readonly')}
+          </Banner>
+        )}
         {!result && (
           <label className="backup-import-file">
             <span>{t('backupImport.file')}</span>
@@ -131,9 +135,9 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
         {filename && <p className="field-help backup-import-filename">{filename}</p>}
         {busy && <p role="status">{t('backupImport.working')}</p>}
         {error && (
-          <p role="alert" className="banner warning">
+          <Banner tone="warning" role="alert" className="banner warning mt-4">
             {error}
-          </p>
+          </Banner>
         )}
         {result ? (
           <div className="backup-import-result">
@@ -227,7 +231,7 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                 </div>
               )}
               {missing.length > 0 && (
-                <div className="banner warning">
+                <Banner tone="warning" className="banner warning mt-4">
                   <p>{t('backupImport.missing', { names: missing.join(', ') })}</p>
                   <label className="check-label">
                     <input
@@ -238,7 +242,7 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                     />
                     {t('backupImport.acceptMissing')}
                   </label>
-                </div>
+                </Banner>
               )}
               <p className="field-help">{t('backupImport.trashHelp')}</p>
               <Button

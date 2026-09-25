@@ -1,4 +1,5 @@
 import { GitBranch } from 'lucide-react';
+import { EmptyState } from '../../ui';
 import { useWorkspace } from './useWorkspaceController';
 
 /** GitHub issues in the repository that are not Tebikae notes (reached from Settings). */
@@ -17,11 +18,7 @@ export default function IssuesView() {
         </article>
       ))}
       {!issues.length && (
-        <div className="empty-state">
-          <GitBranch size={35} />
-          <h2>{t('home.noResults')}</h2>
-          <p>{t('home.issuesDescription')}</p>
-        </div>
+        <EmptyState icon={GitBranch} title={t('home.noIssues')} description={t('home.issuesDescription')} />
       )}
     </div>
   );

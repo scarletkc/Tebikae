@@ -31,7 +31,10 @@ export default function App() {
       value={{ available: pwa.updateReady, update: pwa.applyUpdate, forceUpdate: pwa.forceUpdate }}
     >
       {session.restoring ? (
-        <main className="loading-notice" role="status">
+        <main
+          className="loading-notice grid min-h-dvh place-items-center px-4 text-sm text-muted"
+          role="status"
+        >
           {t('connect.restoring')}
         </main>
       ) : session.connection ? (
@@ -40,7 +43,10 @@ export default function App() {
         <ConnectPage />
       )}
       {pwa.updateReady && (
-        <div className="update-toast" role="status">
+        <div
+          className="update-toast fixed right-4 bottom-4 z-70 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-sm shadow-popover"
+          role="status"
+        >
           <span>{t('settings.update')}</span>
           <Button variant="primary" onClick={() => void pwa.applyUpdate().catch(() => {})}>
             {t('settings.updateAction')}

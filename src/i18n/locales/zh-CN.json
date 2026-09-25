@@ -88,9 +88,9 @@
     "pinned": "置顶",
     "other": "其他笔记",
     "count": "{{count}} 条笔记",
-    "empty": "从一张空白开始",
-    "emptyDescription": "记下想法，收藏链接，或列一张小清单。",
-    "noResults": "这里暂时没有笔记",
+    "empty": "还没有笔记",
+    "noResults": "没有匹配的笔记",
+    "noIssues": "没有其他 Issue",
     "noResultsDescription": "试试其他关键词，或调整筛选条件。",
     "issuesDescription": "已有 Issue 会保持原样，直到你选择把它转为笔记。",
     "loading": "正在加载 Issues，筛选结果可能不完整。",
@@ -355,5 +355,9 @@
     "clipboardError": "无法访问剪贴板，请使用系统复制粘贴快捷键或原生文字菜单。",
     "complete": "完成",
     "incomplete": "未完成"
+  },
+  "toast": {
+    "region": "通知",
+    "dismiss": "关闭通知"
   }
 }

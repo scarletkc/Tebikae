@@ -1,7 +1,7 @@
 import { ArrowUpRight, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { download } from '../../app/ui';
-import { Button, Dialog } from '../../ui';
+import { Banner, Button, Dialog } from '../../ui';
 import { useSession } from '../../app/session';
 import MarkdownPreview from '../editor/MarkdownPreview';
 import { convertIssue } from '../../application/commands';
@@ -27,7 +27,11 @@ export default function IssueDialog({
     <Dialog title={t('home.readIssue')} onClose={onClose} size="lg" className="issue-dialog">
       <div className="issue-content">
         <h2>{issue.snapshot.title}</h2>
-        {issue.status !== 'unmanaged' && <p className="banner warning">{t(`home.${issue.status}`)}</p>}
+        {issue.status !== 'unmanaged' && (
+          <Banner tone="warning" className="banner warning mb-4">
+            {t(`home.${issue.status}`)}
+          </Banner>
+        )}
         <MarkdownPreview value={issue.snapshot.body} />
         <div className="button-row">
           {issue.status === 'unmanaged' && (
