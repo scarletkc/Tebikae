@@ -1,12 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { ArrowUpRight, ArrowRight, GitBranch, LockKeyhole, NotebookPen, LoaderCircle } from 'lucide-react';
+import { ArrowUpRight, ArrowRight, GitBranch, LockKeyhole, NotebookPen } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Brand, PreferencesControls } from '../../app/ui';
 import { useSession } from '../../app/session';
 import { db } from '../../storage/db';
 import { ApiError } from '../../adapters/github/client';
-import { Banner, Button, Card, Checkbox, CheckboxLabel, Field, Input } from '../../ui';
+import { Banner, Button, Card, Checkbox, CheckboxLabel, Field, Input, Spinner } from '../../ui';
 
 export function ConnectForm({ onConnected }: { onConnected?: () => void }) {
   const { t } = useTranslation();
@@ -115,7 +115,7 @@ export function ConnectForm({ onConnected }: { onConnected?: () => void }) {
           </Banner>
         )}
         <Button variant="primary" size="lg" className="w-full" type="submit" disabled={busy}>
-          {busy ? <LoaderCircle className="spin" size={18} /> : <GitBranch size={18} />}{' '}
+          {busy ? <Spinner size={18} /> : <GitBranch size={18} />}{' '}
           {t(busy ? 'action.connecting' : 'action.connect')} {!busy && <ArrowRight size={18} />}
         </Button>
       </div>

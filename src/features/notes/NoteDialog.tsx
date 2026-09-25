@@ -14,7 +14,6 @@ import {
   RotateCcw,
   Trash2,
   RefreshCw,
-  LoaderCircle,
   X,
   Check,
 } from 'lucide-react';
@@ -37,10 +36,11 @@ import {
 } from '../../application/commands';
 import { useSession, registerDraftFlusher } from '../../app/session';
 import { IconButton, download } from '../../app/ui';
-import { noteColorBg } from './cardColor';
+import { noteColorBg, editorTint } from './cardColor';
 import {
   Banner,
   Button,
+  Card,
   Checkbox,
   CheckboxLabel,
   cn,
@@ -49,6 +49,7 @@ import {
   menuItem,
   menuLabel,
   menuSeparator,
+  Spinner,
 } from '../../ui';
 import { db } from '../../storage/db';
 import { safeHref } from '../../security/urls';
@@ -466,7 +467,16 @@ export default function NoteDialog({
   return (
     <motion.div
       ref={rootRef}
-      className={`floating-editor note-dialog note-${document.meta.color} ${isMobile ? 'floating-editor-mobile' : ''}`}
+      className={cn(
+        'floating-editor note-dialog relative flex flex-col overflow-hidden outline-none',
+        'bg-[linear-gradient(180deg,color-mix(in_srgb,var(--editor-tint,var(--surface))_32%,var(--surface)),var(--surface)_230px)]',
+        `note-${document.meta.color}`,
+        document.meta.color === 'default' ? undefined : editorTint[document.meta.color],
+        'max-md:h-dvh max-md:w-full max-md:rounded-none max-md:border-0',
+        'max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)]',
+        'md:h-[calc(100dvh-48px)] md:w-[min(1040px,calc(100vw-80px))] md:rounded-2xl md:border md:border-line md:shadow-dialog',
+        'max-md:[&_.icon-button]:min-h-11 max-md:[&_.icon-button]:min-w-11',
+      )}
       role="dialog"
       aria-modal="true"
       aria-label={dialogTitle}
@@ -475,12 +485,18 @@ export default function NoteDialog({
       exit={{ opacity: 0, scale: reducedMotion || isMobile ? 1 : 0.99, y: reducedMotion ? 0 : 6 }}
       transition={{ duration: reducedMotion ? 0 : 0.18, ease: 'easeOut' }}
     >
-      <header className="floating-editor-header">
+      <header className="floating-editor-header flex h-14 shrink-0 items-center gap-2 border-b border-line px-3">
         <IconButton label={t(isMobile ? 'action.back' : 'action.close')} onClick={() => void close()}>
           {isMobile ? <ChevronLeft size={20} /> : <X size={18} />}
         </IconButton>
-        <div className="note-save-row">
-          <span role="status" className={saveError ? 'danger' : 'muted'}>
+        <div className="note-save-row flex min-w-0 flex-1 items-center justify-end gap-1.5 max-[430px]:flex-wrap">
+          <span
+            role="status"
+            className={cn(
+              'min-w-0 text-xs wrap-anywhere max-[430px]:min-w-[95px]',
+              saveError ? 'text-danger' : 'text-muted',
+            )}
+          >
             {saveError
               ? t('note.localError')
               : saving
@@ -510,7 +526,7 @@ export default function NoteDialog({
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content
-              className={cn('note-actions-menu', menuContent, 'min-w-52')}
+              className={cn('note-actions-menu', menuContent, 'z-80 min-w-52 max-w-[calc(100vw-24px)]')}
               align="end"
               sideOffset={8}
               collisionPadding={12}
@@ -651,7 +667,7 @@ export default function NoteDialog({
           </DropdownMenu.Portal>
         </DropdownMenu.Root>
       </header>
-      <div className="note-dialog-scroll">
+      <div className="note-dialog-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-[max(36px,calc((100%-720px)/2))] pt-7 pb-16 [scrollbar-gutter:stable] max-md:[scrollbar-gutter:auto] max-md:pt-5 max-md:pr-[max(22px,env(safe-area-inset-right))] max-md:pb-12 max-md:pl-[max(22px,env(safe-area-inset-left))]">
         <TextContextMenu readOnly={readOnly}>
           <input
             className="note-title-input w-full border-0 bg-transparent p-0 pb-3 text-2xl font-semibold leading-tight outline-none placeholder:text-muted focus:shadow-none md:text-3xl"
@@ -662,7 +678,7 @@ export default function NoteDialog({
             onChange={(e) => change((d) => ({ ...d, title: e.target.value }))}
           />
         </TextContextMenu>
-        <div className="note-properties">
+        <div className="note-properties mb-7 flex min-h-[30px] flex-wrap items-center gap-2 max-md:mb-5.5">
           {labels
             .filter((label) => document.labelIds.includes(label.id))
             .map((label) => (
@@ -675,11 +691,11 @@ export default function NoteDialog({
                     : undefined
                 }
               >
-                <LabelBadge label={label} />
+                <LabelBadge label={label} className="px-2.5 py-1" />
               </LabelContextMenu>
             ))}
           <details
-            className="note-label-picker"
+            className="note-label-picker relative text-xs open:basis-full"
             onKeyDown={(event) => {
               if (event.key === 'Escape' && event.currentTarget.open && !event.defaultPrevented) {
                 event.preventDefault();
@@ -688,11 +704,15 @@ export default function NoteDialog({
               }
             }}
           >
-            <summary tabIndex={0} aria-label={t('label.choose')}>
+            <summary
+              tabIndex={0}
+              aria-label={t('label.choose')}
+              className="flex min-h-8 cursor-pointer list-none items-center gap-1.5 rounded-full px-2 py-1 text-muted hover:bg-hover hover:text-fg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent max-md:min-h-11 [&::-webkit-details-marker]:hidden"
+            >
               <Plus size={14} />
               {t('note.labels')}
             </summary>
-            <div className="note-label-options">
+            <div className="note-label-options mt-2 max-w-full rounded-xl bg-hover p-4">
               <fieldset disabled={readOnly}>
                 <legend className="mb-3 text-xs font-medium text-muted">{t('note.labels')}</legend>
                 <div className="choices mt-2.5 flex flex-wrap gap-x-4 gap-y-2.5">
@@ -722,12 +742,12 @@ export default function NoteDialog({
                               : undefined
                           }
                         >
-                          <LabelBadge label={label} />
+                          <LabelBadge label={label} className="px-2.5 py-1" />
                         </LabelContextMenu>
                       </CheckboxLabel>
                     ))
                   ) : (
-                    <span className="muted">{t('label.empty')}</span>
+                    <span className="text-muted">{t('label.empty')}</span>
                   )}
                 </div>
               </fieldset>
@@ -809,26 +829,30 @@ export default function NoteDialog({
           </Banner>
         )}
         {latest?.syncStatus === 'conflict' && !latest.duplicate && remote && (
-          <section className="conflict-panel">
-            <h3>{t('note.conflict')}</h3>
-            <p>{t('note.conflictHelp')}</p>
-            <div className="conflict-versions">
-              <div>
-                <h4>{t('note.localVersion')}</h4>
-                <strong>{document.title}</strong>
-                <pre>{document.markdown}</pre>
-                <p>
+          <Card className="conflict-panel my-2.5 mb-5">
+            <h3 className="text-base font-semibold">{t('note.conflict')}</h3>
+            <p className="mt-2 mb-4 text-xs text-muted">{t('note.conflictHelp')}</p>
+            <div className="conflict-versions mb-4 grid gap-3 md:grid-cols-2">
+              <div className="min-w-0 rounded-lg border border-line bg-canvas p-3">
+                <h4 className="mb-2 text-xs text-muted">{t('note.localVersion')}</h4>
+                <strong className="text-xs">{document.title}</strong>
+                <pre className="max-h-[180px] overflow-auto font-[inherit] text-xs wrap-anywhere whitespace-pre-wrap">
+                  {document.markdown}
+                </pre>
+                <p className="text-xs text-muted">
                   {t('note.color')}: {t(`color.${document.meta.color}`)} · {t('filter.pinned')}:{' '}
                   {t(document.meta.pinned ? 'filter.pinnedOnly' : 'filter.unpinnedOnly')} ·{' '}
                   {t(document.meta.trashedAt ? 'nav.trash' : document.archived ? 'nav.archive' : 'nav.notes')}{' '}
                   · {t(`filter.${document.meta.kind}`)}
                 </p>
               </div>
-              <div>
-                <h4>{t('note.remoteVersion')}</h4>
-                <strong>{remote.title}</strong>
-                <pre>{remote.markdown}</pre>
-                <p>
+              <div className="min-w-0 rounded-lg border border-line bg-canvas p-3">
+                <h4 className="mb-2 text-xs text-muted">{t('note.remoteVersion')}</h4>
+                <strong className="text-xs">{remote.title}</strong>
+                <pre className="max-h-[180px] overflow-auto font-[inherit] text-xs wrap-anywhere whitespace-pre-wrap">
+                  {remote.markdown}
+                </pre>
+                <p className="text-xs text-muted">
                   {t('note.color')}: {t(`color.${remote.meta.color}`)} · {t('filter.pinned')}:{' '}
                   {t(remote.meta.pinned ? 'filter.pinnedOnly' : 'filter.unpinnedOnly')} ·{' '}
                   {t(remote.meta.trashedAt ? 'nav.trash' : remote.archived ? 'nav.archive' : 'nav.notes')} ·{' '}
@@ -847,12 +871,12 @@ export default function NoteDialog({
                 {t('note.saveCopy')}
               </Button>
             </div>
-          </section>
+          </Card>
         )}
         <Suspense
           fallback={
-            <div className="editor-loading">
-              <LoaderCircle className="spin" size={20} />
+            <div className="editor-loading flex justify-center p-11">
+              <Spinner size={20} />
             </div>
           }
         >
@@ -890,15 +914,17 @@ export default function NoteDialog({
           </Banner>
         )}
         {latest?.error && (
-          <details className="error-details">
+          <details className="error-details mt-5 text-xs text-danger">
             <summary>{t(`error.${latest.error.code}`)}</summary>
-            <p>
+            <p className="wrap-anywhere">
               {latest.error.code} {latest.error.status} {latest.error.requestId}
             </p>
             {latest.error.retryAt && (
-              <p>{t('error.retryAt', { time: new Date(latest.error.retryAt).toLocaleString() })}</p>
+              <p className="wrap-anywhere">
+                {t('error.retryAt', { time: new Date(latest.error.retryAt).toLocaleString() })}
+              </p>
             )}
-            {latest.error.detail && <p>{latest.error.detail}</p>}
+            {latest.error.detail && <p className="wrap-anywhere">{latest.error.detail}</p>}
             <Button
               disabled={!engine}
               onClick={() => void engine?.retry(localId!).catch(() => setSaveError('generic'))}
@@ -913,7 +939,7 @@ export default function NoteDialog({
           </Banner>
         )}
       </div>
-      <footer className="note-editor-footer">
+      <footer className="note-editor-footer flex shrink-0 justify-end gap-1 px-4 pt-1 pb-3 max-md:p-3">
         <IconButton label={t('action.previous')} disabled={!canPrevious} onClick={() => void close(-1)}>
           <ChevronLeft size={18} />
         </IconButton>

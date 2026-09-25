@@ -34,11 +34,13 @@ export function LabelBadge({
   fallback,
   onRemove,
   removeLabel,
+  className,
 }: {
   label?: { name: string; color: string };
   fallback?: string;
   onRemove?(): void;
   removeLabel?: string;
+  className?: string;
 }) {
   const name = label?.name ?? fallback;
   if (!name) return null;
@@ -47,6 +49,7 @@ export function LabelBadge({
       className={cn(
         'label-badge inline-flex max-w-full items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs leading-relaxed text-fg',
         label ? badgeTint : 'is-fallback border-line bg-hover',
+        className,
       )}
       style={labelStyle(label?.color)}
     >

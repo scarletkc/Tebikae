@@ -238,7 +238,7 @@ export default function Sidebar() {
               disabled={!session.engine || busy}
               onClick={() => void ctl.refresh()}
             >
-              <RefreshCw size={18} className={busy ? 'spin' : ''} />
+              <RefreshCw size={18} className={busy ? 'animate-spin motion-reduce:animate-none' : undefined} />
             </IconButton>
           </ContextMenu>
           <PreferencesControls compact />
