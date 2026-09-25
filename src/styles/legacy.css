@@ -232,11 +232,6 @@ hr {
   white-space: nowrap;
   border: 0;
 }
-.inline-icon {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
 .spin {
   animation: spin 1.5s linear infinite;
 }
@@ -279,16 +274,6 @@ hr {
   border: 0;
   background: transparent;
   max-width: 125px;
-}
-.eyebrow {
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 2px;
-  color: var(--muted);
-  text-transform: uppercase;
-  display: flex;
-  align-items: center;
-  gap: 10px;
 }
 .field-help {
   font-size: 12px;
@@ -627,24 +612,6 @@ hr {
   max-width: 1600px;
   width: 100%;
   margin: 0 auto;
-}
-.page-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 25px;
-  margin-bottom: 28px;
-}
-.page-heading h1 {
-  font-size: 34px;
-  letter-spacing: -0.8px;
-  font-weight: 400;
-  margin: 11px 0 8px;
-  line-height: 1.3;
-}
-.page-heading p {
-  font-size: 12px;
-  color: var(--muted);
 }
 .results-toolbar {
   display: flex;
@@ -1284,63 +1251,6 @@ hr {
 .issue-content .button-row {
   margin-top: 25px;
 }
-.settings-page {
-  max-width: 800px;
-}
-.settings-page > .page-heading {
-  display: block;
-}
-.settings-section {
-  border: 1px solid var(--border);
-  border-radius: 13px;
-  background: var(--surface);
-  padding: 25px 28px;
-  margin-bottom: 21px;
-}
-.settings-section h2 {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 19px;
-}
-.settings-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 13px 0;
-}
-.settings-row + .settings-row {
-  border-top: 1px solid var(--border);
-}
-.settings-row label {
-  font-size: 12px;
-}
-.settings-row select {
-  min-width: 130px;
-}
-.settings-section p {
-  font-size: 12px;
-  color: var(--muted);
-  margin-bottom: 13px;
-}
-.settings-section p.repository-name {
-  font-size: 16px;
-  color: var(--text);
-  font-weight: 500;
-}
-.settings-section a {
-  font-size: 12px;
-  display: inline-flex;
-  gap: 7px;
-  align-items: center;
-}
-.settings-section .button-row {
-  margin-top: 20px;
-}
-.settings-section .field-help {
-  font-size: 12px;
-  margin: 15px 0 0;
-}
 .update-toast {
   position: fixed;
   bottom: 25px;
@@ -1432,21 +1342,6 @@ hr {
   .main-content {
     padding: 29px 22px 50px;
   }
-  .page-heading {
-    gap: 15px;
-    align-items: flex-start;
-  }
-  .page-heading h1 {
-    font-size: 29px;
-  }
-  .page-heading p {
-    font-size: 12px;
-    max-width: 300px;
-  }
-  .page-heading .eyebrow {
-    font-size: 12px;
-    letter-spacing: 1.4px;
-  }
   .results-toolbar > div {
     gap: 5px;
   }
@@ -1496,9 +1391,6 @@ hr {
   }
   .mobile-drawer .sidebar-brand {
     padding: 3px 9px 33px;
-  }
-  .settings-section {
-    padding: 22px 20px;
   }
   .floating-editor.note-dialog {
     width: 100%;
@@ -1560,12 +1452,6 @@ hr {
   .main-content {
     padding: 25px 16px 40px;
   }
-  .page-heading h1 {
-    font-size: 26px;
-  }
-  .page-heading p {
-    font-size: 12px;
-  }
   .notes-grid {
     grid-template-columns: 1fr;
   }
@@ -1613,9 +1499,6 @@ hr {
   }
   .date-fields input {
     padding: 10px 7px;
-  }
-  .settings-row select {
-    min-width: 100px;
   }
 }
 .toast-layer {
