@@ -44,7 +44,7 @@ export default function App() {
       )}
       {pwa.updateReady && (
         <div
-          className="update-toast fixed right-4 bottom-4 z-70 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-sm shadow-popover"
+          className="update-toast fixed right-4 bottom-4 z-70 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3 text-sm shadow-popover max-md:bottom-[calc(56px+16px+env(safe-area-inset-bottom))]"
           role="status"
         >
           <span>{t('settings.update')}</span>

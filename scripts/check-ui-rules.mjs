@@ -12,7 +12,7 @@ const ALLOWED_CSS = new Set([
   'src/features/editor/editor.css', // ProseMirror content typography (allowed long term)
 ]);
 // legacy.css may only shrink. Lower this number whenever a migration deletes rules.
-const LEGACY_MAX_LINES = 334;
+const LEGACY_MAX_LINES = 264;
 // Raw colors are allowed only in the token file and where colors are user data (GitHub label colors).
 const RAW_COLOR_ALLOWED = ['src/styles/theme.css', 'src/features/labels/'];
 

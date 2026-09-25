@@ -9,7 +9,11 @@ export default function SelectionToolbar() {
   const { t, multi, selectedNotes, labels, session, mutateNotes } = useWorkspace();
   if (!multi.selectedCount) return null;
   return (
-    <div className="selection-toolbar" role="toolbar" aria-label={t('context.selection')}>
+    <div
+      className="selection-toolbar sticky top-0 z-12 mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface p-3 [@media(pointer:coarse)]:top-auto [@media(pointer:coarse)]:bottom-2 max-[600px]:top-auto max-[600px]:bottom-2"
+      role="toolbar"
+      aria-label={t('context.selection')}
+    >
       <IconButton size="sm" label={t('action.close')} onClick={multi.clear}>
         <X size={16} />
       </IconButton>

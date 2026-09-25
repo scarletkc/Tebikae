@@ -1,28 +1,4 @@
 /* Moved from the former src/app/menus.css and workspace-status.css (non-menu rules). */
-.selection-toolbar {
-  position: sticky;
-  top: 0;
-  z-index: 12;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 12px;
-  margin-bottom: 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-}
-@media (pointer: coarse), (max-width: 600px) {
-  .selection-toolbar {
-    top: auto;
-    bottom: 8px;
-  }
-}
-.main-content:has(.note-group),
-.main-content:has(.filter-chips) {
-  padding-top: 20px;
-}
 
 body:has([role='dialog']) .update-toast {
   display: none;
@@ -186,26 +162,6 @@ hr {
   gap: 3px;
   margin-top: 7px;
 }
-.workspace {
-  display: flex;
-  height: 100dvh;
-  overflow: hidden;
-}
-.workspace-body {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  height: 100dvh;
-  overflow: hidden;
-  transition: margin-left 0.2s ease;
-}
-.main-content {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
 .language-icon-control {
   position: relative;
   display: inline-flex;
@@ -231,12 +187,6 @@ hr {
   width: 100%;
   height: 100%;
   opacity: 0;
-}
-.main-content {
-  padding: 42px 42px 70px;
-  max-width: 1600px;
-  width: 100%;
-  margin: 0 auto;
 }
 .backup-import-file {
   display: grid;
@@ -301,26 +251,6 @@ hr {
 }
 .fatal-error > p {
   margin: 20px 0;
-}
-@media (min-width: 1500px) {
-  .main-content {
-    padding-top: 52px;
-  }
-}
-@media (max-width: 1100px) {
-  .main-content {
-    padding: 32px 26px 55px;
-  }
-}
-@media (max-width: 760px) {
-  .main-content {
-    padding: 29px 22px 50px;
-  }
-}
-@media (max-width: 430px) {
-  .main-content {
-    padding: 25px 16px 40px;
-  }
 }
 @media (prefers-reduced-motion: reduce) {
   *,
