@@ -290,190 +290,6 @@ hr {
   align-items: center;
   gap: 10px;
 }
-.tiny-line {
-  height: 1px;
-  width: 25px;
-  background: var(--accent);
-}
-.welcome-page {
-  max-width: 1440px;
-  margin: 0 auto;
-  padding: 0 6%;
-}
-.welcome-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 33px 0;
-}
-.welcome-main {
-  display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(350px, 0.88fr);
-  gap: 9%;
-  align-items: center;
-  padding: 62px 0 65px;
-}
-.welcome-intro h1 {
-  font-weight: 400;
-  font-size: clamp(38px, 3.75vw, 58px);
-  line-height: 1.2;
-  letter-spacing: -1.8px;
-  white-space: pre-line;
-  margin: 26px 0 20px;
-}
-.welcome-description {
-  max-width: 470px;
-  color: var(--muted);
-  font-size: 15px;
-  line-height: 1.85;
-}
-.sample-notes {
-  position: relative;
-  height: 208px;
-  margin: 34px 0 20px;
-  max-width: 400px;
-}
-.sample-note {
-  width: 213px;
-  height: 159px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  padding: 20px;
-  box-shadow: none;
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  color: var(--accent);
-}
-.sample-sage {
-  background: var(--card-green);
-  transform: rotate(-6deg);
-  left: 10px;
-  top: 7px;
-}
-.sample-sage > span {
-  font-size: 16px;
-  font-style: italic;
-  position: absolute;
-  left: 50px;
-  top: 20px;
-}
-.sample-sage > svg {
-  margin-bottom: 5px;
-}
-.sample-sand {
-  background: var(--card-yellow);
-  transform: rotate(7deg);
-  left: 160px;
-  top: 27px;
-}
-.sample-sand > span {
-  font-size: 17px;
-  margin-bottom: 4px;
-}
-.sample-sand > div {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.ink-line {
-  height: 4px;
-  border-radius: 3px;
-  width: 70%;
-  background: var(--border-strong);
-}
-.ink-line.long {
-  width: 93%;
-}
-.ink-line.short {
-  width: 48%;
-}
-.empty-check {
-  border: 1px solid var(--muted);
-  width: 12px;
-  height: 12px;
-  border-radius: 2px;
-  margin: 0 2px;
-}
-.welcome-features {
-  display: flex;
-  flex-direction: column;
-  gap: 19px;
-  margin-top: 12px;
-}
-.welcome-features > div {
-  display: flex;
-  gap: 15px;
-  align-items: flex-start;
-}
-.welcome-features svg {
-  margin-top: 2px;
-  color: var(--accent);
-}
-.welcome-features h3 {
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 3px;
-}
-.welcome-features p {
-  font-size: 12px;
-  color: var(--muted);
-}
-.welcome-panel {
-  align-self: center;
-}
-.connect-form {
-  display: grid;
-  gap: 24px;
-  padding: 32px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  box-shadow: none;
-}
-.form-symbol {
-  width: 52px;
-  height: 52px;
-  display: grid;
-  place-items: center;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-radius: 15px;
-  margin-bottom: 8px;
-}
-.connect-form-header {
-  display: grid;
-  gap: 8px;
-}
-.connect-form h2 {
-  font-size: 23px;
-  letter-spacing: -0.7px;
-  font-weight: 650;
-}
-.connect-form-header p {
-  color: var(--muted);
-  font-size: 13px;
-}
-.connect-field {
-  display: grid;
-  gap: 8px;
-  min-width: 0;
-}
-.connect-field > label {
-  display: block;
-}
-.connect-actions {
-  display: grid;
-  gap: 16px;
-}
-.connect-actions .error-box {
-  margin: 0;
-}
-.connect-form input:not([type='checkbox']) {
-  height: 44px;
-  font-size: 12px;
-}
 .field-help {
   font-size: 12px;
   color: var(--muted);
@@ -485,64 +301,6 @@ hr {
   align-items: center;
   gap: 3px;
   margin-top: 7px;
-}
-.connect-field .field-help,
-.connect-field .field-help a {
-  margin: 0;
-}
-.privacy-note {
-  display: flex;
-  gap: 9px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.8;
-  border-top: 1px solid var(--border);
-  padding-top: 16px;
-}
-.privacy-note svg {
-  margin-top: 3px;
-}
-.cached-connections {
-  margin-top: 22px;
-  padding: 5px 5px 0;
-}
-.cached-connections h3 {
-  font-size: 12px;
-}
-.cached-connections p {
-  font-size: 12px;
-  color: var(--muted);
-  margin: 7px 0;
-}
-.cached-connection {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 11px 14px;
-  gap: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-  font-size: 12px;
-  margin-top: 7px;
-}
-.cached-connection > span {
-  flex: 1;
-  text-align: left;
-}
-.welcome-footer {
-  border-top: 1px solid var(--border);
-  padding: 25px 0 30px;
-  display: flex;
-  justify-content: space-between;
-  color: var(--muted);
-  font-size: 12px;
-}
-.welcome-footer a {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--muted);
 }
 .workspace {
   display: flex;
@@ -1519,12 +1277,6 @@ hr {
   font-size: 12px;
   color: var(--muted);
 }
-.connect-dialog .connect-form {
-  border: 0;
-  box-shadow: none;
-  border-radius: 0;
-  padding: 0;
-}
 .issue-content > h2 {
   font-size: 25px;
   margin-bottom: 20px;
@@ -1646,69 +1398,8 @@ hr {
   .notes-list {
     grid-template-columns: 1fr;
   }
-  .welcome-page {
-    padding: 0 5%;
-  }
-  .welcome-main {
-    gap: 6%;
-    padding: 42px 0;
-  }
-  .welcome-intro h1 {
-    font-size: 43px;
-  }
-  .connect-form {
-    padding: 24px;
-  }
-  .sample-notes {
-    transform: scale(0.9);
-    transform-origin: left center;
-  }
 }
 @media (max-width: 760px) {
-  .welcome-header {
-    padding: 22px 0;
-  }
-  .welcome-page {
-    padding: 0 24px;
-  }
-  .welcome-main {
-    grid-template-columns: 1fr;
-    gap: 35px;
-    padding: 22px 0 40px;
-  }
-  .welcome-intro h1 {
-    font-size: 40px;
-    margin-top: 20px;
-  }
-  .welcome-description {
-    font-size: 13px;
-    max-width: 500px;
-  }
-  .sample-notes {
-    display: none;
-  }
-  .welcome-features {
-    display: none;
-  }
-  .welcome-panel {
-    max-width: 540px;
-    width: 100%;
-    margin: auto;
-  }
-  .welcome-footer {
-    font-size: 12px;
-    gap: 14px;
-  }
-  .welcome-header .brand {
-    font-size: 23px;
-  }
-  .welcome-header .brand-mark {
-    width: 36px;
-    height: 36px;
-  }
-  .welcome-header .preferences-controls {
-    gap: 3px;
-  }
   .sidebar {
     display: none;
   }
@@ -1853,16 +1544,6 @@ hr {
   }
 }
 @media (max-width: 430px) {
-  .welcome-page {
-    padding: 0 20px;
-  }
-  .welcome-intro h1 {
-    font-size: 35px;
-  }
-  .welcome-header .preferences-controls select {
-    width: 85px;
-    font-size: 12px;
-  }
   .app-topbar {
     padding: 10px 12px;
     gap: 8px;
@@ -1935,9 +1616,6 @@ hr {
   }
   .settings-row select {
     min-width: 100px;
-  }
-  .welcome-footer span {
-    max-width: 230px;
   }
 }
 .toast-layer {

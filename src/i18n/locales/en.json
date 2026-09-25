@@ -65,11 +65,8 @@
     "back": "Back"
   },
   "connect": {
-    "eyebrow": "YOUR NOTES, YOUR REPOSITORY",
-    "title": "A little space for\neverything on your mind.",
-    "intro": "Ideas, everyday lists, and things worth keeping. Give them a home in your own private GitHub repository.",
-    "formTitle": "Make yourself at home",
-    "formIntro": "Connect a private repository to start your notebook.",
+    "intro": "Notes are saved as Issues in your own private GitHub repository.",
+    "formTitle": "Connect a GitHub repository",
     "repository": "GitHub repository",
     "repositoryPlaceholder": "owner / repository or GitHub URL",
     "noRepository": "No repository yet?",
@@ -82,12 +79,6 @@
     "remember": "Remember this connection in this browser",
     "sessionPrivacy": "Your token stays in this tab’s memory and is cleared when you reload or close it. Your notes and drafts stay on this device.",
     "restoring": "Opening your saved notebook…",
-    "feature1": "Yours to keep",
-    "detail1": "Each note is an Issue in your own private repository.",
-    "feature2": "Room for a thought",
-    "detail2": "Write in Markdown, make a list, find it later.",
-    "feature3": "Ready when you are",
-    "detail3": "Local drafts keep your work through interruptions.",
     "cached": "On this device",
     "cacheHelp": "Cached notes are available without a token. They are not protected by a separate local login.",
     "privateOnly": "Use a private repository owned by your GitHub account."
