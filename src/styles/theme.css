@@ -176,6 +176,14 @@
   button {
     color: inherit;
   }
+  /* Tailwind v4 preflight leaves buttons with the default cursor; raw <button>s (card titles, sidebar rows) need the pointer. */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+  p {
+    line-height: 1.7;
+  }
   svg {
     flex-shrink: 0;
   }
