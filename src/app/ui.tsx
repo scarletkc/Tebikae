@@ -16,13 +16,13 @@ import {
 // Kept here so existing imports from app/ui keep working; new code imports from src/ui.
 export { IconButton };
 
-export function Brand() {
+export function Brand({ iconOnly = false }: { iconOnly?: boolean }) {
   return (
-    <div className="brand">
-      <span className="brand-mark">
-        <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={43} height={43} />
+    <div className="brand flex items-center gap-2 text-sm font-semibold">
+      <span className="brand-mark grid size-6 place-items-center">
+        <img src={`${import.meta.env.BASE_URL}icon.svg`} alt="" width={24} height={24} />
       </span>
-      <span>Tebikae</span>
+      {!iconOnly && <span>Tebikae</span>}
     </div>
   );
 }
@@ -204,7 +204,13 @@ export function SortControl({
   );
 }
 
-export function PreferencesControls({ compact = false }: { compact?: boolean }) {
+export function PreferencesControls({
+  compact = false,
+  className,
+}: {
+  compact?: boolean;
+  className?: string;
+}) {
   const prefs = usePreferences();
   const { t } = useTranslation();
   const themeIcons = { system: Monitor, light: Sun, dark: Moon } as const;
@@ -216,7 +222,7 @@ export function PreferencesControls({ compact = false }: { compact?: boolean }) 
     run: () => prefs.setTheme(theme),
   }));
   return (
-    <div className="preferences-controls">
+    <div className={cn('preferences-controls flex items-center gap-2.5', className)}>
       <LanguageControl
         value={prefs.language}
         onChange={prefs.setLanguage}

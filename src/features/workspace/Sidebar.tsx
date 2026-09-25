@@ -27,18 +27,24 @@ const NAV_ITEMS = [
   ['trash', Trash2],
 ] as const;
 
+const navItemClass =
+  'nav-item flex h-8 w-full items-center gap-2 rounded-md px-2 text-start text-sm text-fg no-underline hover:bg-hover hover:no-underline active:bg-active';
+const navItemCurrent = 'bg-active font-medium';
+
 /** Navigation, labels and workspace controls; rendered in the desktop sidebar and the mobile drawer. */
-export default function Sidebar() {
+export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   const ctl = useWorkspace();
   const { t, session, connection, filters, setFilters, notes, labels, counts, busy, online } = ctl;
   const repositoryName = `${connection.owner}/${connection.repo}`;
   const repositoryUrl = safeHref(`https://github.com/${repositoryName}`);
+  const collapsedItem = collapsed && 'justify-center gap-0 px-0';
+  const collapsedText = collapsed && 'hidden';
   return (
     <>
-      <div className="sidebar-brand">
-        <Brand />
+      <div className={cn('sidebar-brand flex h-14 items-center px-2', collapsed && 'justify-center px-0')}>
+        <Brand iconOnly={collapsed} />
       </div>
-      <nav className="main-nav">
+      <nav className="main-nav flex flex-col gap-1">
         {NAV_ITEMS.map(([name, Icon]) => {
           const items: MenuAction[] = [
             {
@@ -85,12 +91,14 @@ export default function Sidebar() {
                 onClick={() => {
                   ctl.resetNavigationState();
                 }}
-                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                className={({ isActive }) =>
+                  cn(navItemClass, isActive && `active ${navItemCurrent}`, collapsedItem)
+                }
               >
                 <Icon size={19} />
-                <span>{t(`nav.${name}`)}</span>
+                <span className={cn('min-w-0 truncate', collapsedText)}>{t(`nav.${name}`)}</span>
                 {name === 'notes' && (
-                  <span className="nav-count">
+                  <span className={cn('nav-count ms-auto text-xs text-muted tabular-nums', collapsedText)}>
                     {notes.filter((n) => !n.current.archived && !n.current.meta.trashedAt).length}
                   </span>
                 )}
@@ -99,15 +107,25 @@ export default function Sidebar() {
           );
         })}
       </nav>
-      <div className="labels-heading">
-        <h2>{t('nav.labels')}</h2>
+      <div
+        className={cn(
+          'labels-heading mx-2 mt-7 mb-1.5 flex items-center justify-start gap-2',
+          collapsed && 'mx-0 mt-5 mb-1.5 justify-center',
+        )}
+      >
+        <h2 className={cn('text-xs font-medium text-muted', collapsedText)}>{t('nav.labels')}</h2>
         {ctl.labelSelectionMode ? (
-          <Button size="sm" className="label-selection-done ms-auto" onClick={ctl.finishLabelSelection}>
+          <Button
+            size="sm"
+            className={cn('label-selection-done ms-auto', collapsedText)}
+            onClick={ctl.finishLabelSelection}
+          >
             {t('label.done')}
           </Button>
         ) : (
           <IconButton
             label={t('label.new')}
+            className="ms-auto"
             disabled={!session.engine || !session.writable}
             onClick={() => ctl.setLabelOpen(true)}
           >
@@ -115,12 +133,17 @@ export default function Sidebar() {
           </IconButton>
         )}
       </div>
-      <div className="label-nav">
+      <div className="label-nav flex min-h-5 w-full min-w-0 flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-auto select-none">
         {!ctl.labelSelectionMode && (
           <>
             <button
               type="button"
-              className={`nav-item ${!filters.labelIds.length && !filters.unlabeledOnly ? 'selected' : ''}`}
+              className={cn(
+                navItemClass,
+                'h-7 text-xs',
+                !filters.labelIds.length && !filters.unlabeledOnly && `selected ${navItemCurrent}`,
+                collapsedItem,
+              )}
               aria-pressed={!filters.labelIds.length && !filters.unlabeledOnly}
               onClick={() => {
                 setFilters({ ...filters, unlabeledOnly: false, labelIds: [] });
@@ -129,11 +152,16 @@ export default function Sidebar() {
               }}
             >
               <Tags size={16} />
-              <span>{t('label.all')}</span>
+              <span className={cn('min-w-0 truncate', collapsedText)}>{t('label.all')}</span>
             </button>
             <button
               type="button"
-              className={`nav-item ${filters.unlabeledOnly ? 'selected' : ''}`}
+              className={cn(
+                navItemClass,
+                'h-7 text-xs',
+                filters.unlabeledOnly && `selected ${navItemCurrent}`,
+                collapsedItem,
+              )}
               aria-pressed={filters.unlabeledOnly}
               onClick={() => {
                 setFilters({ ...filters, unlabeledOnly: true, labelIds: [] });
@@ -142,7 +170,7 @@ export default function Sidebar() {
               }}
             >
               <Tag size={15} />
-              <span>{t('label.unlabeled')}</span>
+              <span className={cn('min-w-0 truncate', collapsedText)}>{t('label.unlabeled')}</span>
             </button>
           </>
         )}
@@ -161,14 +189,24 @@ export default function Sidebar() {
                 onToggleSelection={() => ctl.toggleLabelSelection(label.id)}
               >
                 <div
-                  className={`label-nav-row ${selected ? 'selected' : ''} ${ctl.labelSelectionMode ? 'selection-mode' : ''}`}
+                  className={cn(
+                    'label-nav-row grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-md',
+                    ctl.labelSelectionMode && 'selection-mode grid-cols-[minmax(0,1fr)_auto_auto]',
+                    selected && 'selected bg-active',
+                  )}
                   onClick={() => {
                     if (ctl.labelSelectionMode) ctl.toggleLabelSelection(label.id);
                   }}
                 >
                   <button
                     type="button"
-                    className={`nav-item label-main ${selected ? 'selected' : ''}`}
+                    className={cn(
+                      navItemClass,
+                      'label-main h-7 min-w-0 gap-2 overflow-hidden pe-0 text-xs',
+                      selected && `selected ${navItemCurrent}`,
+                      ctl.labelSelectionMode && 'bg-transparent font-normal',
+                      collapsedItem,
+                    )}
                     aria-label={`${label.name} ${counts[label.id] || 0}`}
                     aria-pressed={selected}
                     onClick={(event) => {
@@ -193,15 +231,28 @@ export default function Sidebar() {
                     }}
                   >
                     <LabelDot color={label.color} />
-                    <span className="label-name" title={label.name}>
+                    <span
+                      className={cn('label-name block min-w-0 truncate', collapsedText)}
+                      title={label.name}
+                    >
                       {label.name}
                     </span>
                   </button>
-                  <span className="nav-count label-count">{counts[label.id] || 0}</span>
+                  <span
+                    className={cn(
+                      'nav-count label-count shrink-0 text-xs whitespace-nowrap text-muted tabular-nums',
+                      collapsedText,
+                    )}
+                  >
+                    {counts[label.id] || 0}
+                  </span>
                   {ctl.labelSelectionMode && (
                     <button
                       type="button"
-                      className={cn(iconButtonVariants({ size: 'xs' }), 'label-filter-toggle')}
+                      className={cn(
+                        iconButtonVariants({ size: 'xs' }),
+                        'label-filter-toggle shrink-0 justify-self-end whitespace-nowrap [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11',
+                      )}
                       aria-label={t('label.toggleSelection', { name: label.name })}
                       aria-pressed={selected}
                       onClick={(event) => {
@@ -217,11 +268,16 @@ export default function Sidebar() {
             );
           })
         ) : (
-          <p className="empty-labels">{t('label.empty')}</p>
+          <p className={cn('empty-labels px-2 py-2 text-xs text-muted', collapsedText)}>{t('label.empty')}</p>
         )}
       </div>
-      <div className="sidebar-bottom">
-        <div className="workspace-preferences">
+      <div className="sidebar-bottom mt-auto pt-6">
+        <div
+          className={cn(
+            'workspace-preferences mb-3 flex items-center justify-between gap-1',
+            collapsed && 'flex-col items-center gap-1.5',
+          )}
+        >
           <ContextMenu
             contextName="refresh"
             items={[
@@ -241,7 +297,7 @@ export default function Sidebar() {
               <RefreshCw size={18} className={busy ? 'animate-spin motion-reduce:animate-none' : undefined} />
             </IconButton>
           </ContextMenu>
-          <PreferencesControls compact />
+          <PreferencesControls compact className="contents" />
           <ContextMenu
             contextName="settings"
             items={[
@@ -286,13 +342,23 @@ export default function Sidebar() {
             },
           ]}
         >
-          <button className="repository-pill" onClick={() => ctl.setConnectOpen(true)}>
-            <span className={`connection-dot ${session.connected ? 'connected' : ''}`} />
-            <span>
-              <strong>{connection.repo}</strong>
-              <small>{connection.owner}</small>
+          <button
+            className={cn(
+              'repository-pill mt-5 flex w-full items-center gap-2.5 rounded-[10px] border border-line bg-canvas px-3 py-3 text-start hover:bg-hover',
+              collapsed && 'justify-center p-2.5',
+            )}
+            onClick={() => ctl.setConnectOpen(true)}
+          >
+            <span
+              className={cn(
+                'connection-dot size-[7px] shrink-0 rounded-full bg-muted',
+                session.connected && 'connected bg-accent shadow-[0_0_0_3px_var(--accent-soft)]',
+              )}
+            />
+            <span className={cn('flex min-w-0 flex-1 flex-col overflow-hidden', collapsedText)}>
+              <strong className="truncate text-xs font-medium">{connection.repo}</strong>
+              <small className="mt-0.5 text-xs text-muted">{connection.owner}</small>
             </span>
-            <ArrowUpRight size={15} />
           </button>
         </ContextMenu>
       </div>
