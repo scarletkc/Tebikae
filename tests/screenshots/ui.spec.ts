@@ -77,9 +77,7 @@ test('editor-table', async ({ page, openEditor, text, capture }) => {
   const editor = await openEditor();
   await editor.locator('td').first().click({ button: 'right' });
   await page.getByRole('menuitem', { name: text('Table', '表格'), exact: true }).hover();
-  await expect(
-    page.getByRole('menuitem', { name: text('Add row below', '在下方插入行'), exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: text('Add row', '插入行'), exact: true })).toBeVisible();
   await capture();
 });
 
