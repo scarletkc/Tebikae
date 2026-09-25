@@ -24,6 +24,7 @@ import packageJson from '../../../package.json';
 import { prepareMarkdownExport, type MarkdownExportSnapshot } from '../../application/markdown-export';
 import MarkdownExportDialog from './MarkdownExportDialog';
 import BackupImportDialog from './BackupImportDialog';
+import { Button } from '../../ui';
 
 export default function Settings({ onConnect, offlineReady }: { onConnect(): void; offlineReady: boolean }) {
   const { t } = useTranslation();
@@ -141,27 +142,29 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
         <p>{t('settings.syncLimit')}</p>
         <div className="button-row">
           {session.connected || session.remembered ? (
-            <button className="button secondary" onClick={() => void session.disconnect().catch(() => {})}>
+            <Button onClick={() => void session.disconnect().catch(() => {})}>
               <LogOut size={16} />
               {t('action.disconnect')}
-            </button>
+            </Button>
           ) : (
-            <button className="button primary" onClick={onConnect}>
+            <Button variant="primary" onClick={onConnect}>
               {t('action.connect')}
-            </button>
+            </Button>
           )}
-          <button className="text-button" onClick={() => void session.leave().catch(() => {})}>
+          <Button variant="link" size="sm" onClick={() => void session.leave().catch(() => {})}>
             {t('action.close')}
-          </button>
+          </Button>
         </div>
       </div>
       <div className="settings-section">
         <h2>{t('nav.issues')}</h2>
         <p>{t('home.issuesDescription')}</p>
-        <Link className="button secondary" to="/issues">
-          <GitBranch size={16} />
-          {t('nav.issues')}
-        </Link>
+        <Button asChild>
+          <Link to="/issues">
+            <GitBranch size={16} />
+            {t('nav.issues')}
+          </Link>
+        </Button>
       </div>
       <div className="settings-section">
         <h2>{t('settings.data')}</h2>
@@ -171,23 +174,15 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
           <p className="banner warning">{t('settings.partial')}</p>
         )}
         <div className="button-row">
-          <button
-            className="button secondary"
-            onClick={() => void exportData().catch(() => setNotice(t('error.generic')))}
-          >
+          <Button onClick={() => void exportData().catch(() => setNotice(t('error.generic')))}>
             <Download size={16} />
             {t('action.export')}
-          </button>
-          <button
-            className="button secondary"
-            disabled={preparingExport || busy}
-            onClick={() => void previewMarkdownExport()}
-          >
+          </Button>
+          <Button disabled={preparingExport || busy} onClick={() => void previewMarkdownExport()}>
             <Download size={16} />
             {t(preparingExport ? 'markdownExport.preparing' : 'markdownExport.title')}
-          </button>
-          <button
-            className="button secondary"
+          </Button>
+          <Button
             onClick={() =>
               void navigator.storage
                 ?.persist?.()
@@ -199,27 +194,19 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
           >
             <HardDrive size={16} />
             {t('settings.persist')}
-          </button>
+          </Button>
         </div>
         <p className="field-help">{t('settings.recoveries')}</p>
-        <button
-          className="button secondary"
-          disabled={busy || !session.writable}
-          onClick={() => setImportOpen(true)}
-        >
+        <Button disabled={busy || !session.writable} onClick={() => setImportOpen(true)}>
           <Upload size={16} />
           {t('backupImport.title')}
-        </button>
+        </Button>
         <hr />
         <p>{t('settings.clearHelp')}</p>
-        <button
-          className="button danger-button"
-          disabled={busy || !session.writable}
-          onClick={() => void clear()}
-        >
+        <Button variant="danger-outline" disabled={busy || !session.writable} onClick={() => void clear()}>
           <Trash2 size={16} />
           {t('settings.clear')}
-        </button>
+        </Button>
       </div>
       <div className="settings-section">
         <h2>{t('settings.about')}</h2>
@@ -229,10 +216,10 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
           <WifiOff size={15} />
           {t(offlineReady ? 'settings.offlineReady' : 'settings.offlinePreparing')}
         </p>
-        <button className="button secondary" disabled={updating} onClick={() => void forceUpdate()}>
+        <Button disabled={updating} onClick={() => void forceUpdate()}>
           <RefreshCw size={16} className={updating ? 'spin' : ''} />
           {t('settings.forceUpdate')}
-        </button>
+        </Button>
         <p className="field-help">{t('settings.forceUpdateHelp')}</p>
         <a href="https://github.com/scarletkc/Tebikae" target="_blank" rel="noopener noreferrer">
           {t('settings.githubLink')} <ExternalLink size={14} />

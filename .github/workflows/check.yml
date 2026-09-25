@@ -68,6 +68,10 @@ jobs:
         if: needs.plan.outputs.run_checks == 'true'
       - run: pnpm lint
         if: needs.plan.outputs.run_checks == 'true'
+      - run: pnpm check:hooks
+        if: needs.plan.outputs.run_checks == 'true'
+      - run: pnpm check:ui
+        if: needs.plan.outputs.run_checks == 'true'
       - run: pnpm format:check
       - run: node --test tests/ci/*.test.mjs
         if: needs.plan.outputs.run_checks == 'true'

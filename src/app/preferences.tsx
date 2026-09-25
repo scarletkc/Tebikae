@@ -36,8 +36,11 @@ export function PreferencesProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const media = matchMedia('(prefers-color-scheme: dark)');
     const apply = () => {
-      document.documentElement.dataset.theme =
-        theme === 'system' ? (media.matches ? 'dark' : 'light') : theme;
+      const root = document.documentElement;
+      root.dataset.theme = theme === 'system' ? (media.matches ? 'dark' : 'light') : theme;
+      // Status bar follows the canvas token; public/theme.js sets the same value before first paint.
+      const canvas = getComputedStyle(root).getPropertyValue('--bg').trim();
+      if (canvas) document.querySelector('meta[name="theme-color"]')?.setAttribute('content', canvas);
     };
     apply();
     media.addEventListener('change', apply);

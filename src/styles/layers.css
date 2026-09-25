@@ -1,0 +1,2 @@
+/* Declares cascade layer order before any other stylesheet loads. Legacy CSS sits below Tailwind utilities. */
+@layer properties, theme, base, legacy, components, utilities;

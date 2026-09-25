@@ -16,6 +16,7 @@ import {
   RefreshCw,
   LoaderCircle,
   X,
+  Check,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -36,6 +37,7 @@ import {
 } from '../../application/commands';
 import { useSession, registerDraftFlusher } from '../../app/session';
 import { IconButton, download } from '../../app/ui';
+import { Button, cn, iconButtonVariants, menuContent, menuItem, menuLabel, menuSeparator } from '../../ui';
 import { db } from '../../storage/db';
 import { safeHref } from '../../security/urls';
 import { usePwaUpdate } from '../../app/pwa';
@@ -488,7 +490,7 @@ export default function NoteDialog({
         <DropdownMenu.Root modal={false}>
           <DropdownMenu.Trigger
             ref={noteMenuTrigger}
-            className="icon-button"
+            className={cn('icon-button', iconButtonVariants(), 'data-[state=open]:bg-active')}
             aria-label={t('context.more')}
             title={t('context.more')}
           >
@@ -496,7 +498,7 @@ export default function NoteDialog({
           </DropdownMenu.Trigger>
           <DropdownMenu.Portal>
             <DropdownMenu.Content
-              className="note-actions-menu"
+              className={cn('note-actions-menu', menuContent, 'min-w-52')}
               align="end"
               sideOffset={8}
               collisionPadding={12}
@@ -567,7 +569,7 @@ export default function NoteDialog({
               {issueUrl && safeHref(issueUrl) && (
                 <DropdownMenu.Item asChild>
                   <a
-                    className="note-action"
+                    className={cn('note-action', menuItem)}
                     href={safeHref(issueUrl)!}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -582,7 +584,7 @@ export default function NoteDialog({
               {latest && !latest.issueId && latest.syncStatus !== 'uncertain' && (
                 <DropdownMenu.Item asChild>
                   <button
-                    className="note-action"
+                    className={cn('note-action', menuItem)}
                     disabled={!writable || saving}
                     onClick={() => {
                       clearTimeout(localTimer.current);
@@ -596,10 +598,12 @@ export default function NoteDialog({
                   </button>
                 </DropdownMenu.Item>
               )}
-              <DropdownMenu.Separator className="note-menu-separator" />
-              <DropdownMenu.Label className="note-menu-caption">{t('note.color')}</DropdownMenu.Label>
+              <DropdownMenu.Separator className={cn('note-menu-separator', menuSeparator)} />
+              <DropdownMenu.Label className={cn('note-menu-caption', menuLabel)}>
+                {t('note.color')}
+              </DropdownMenu.Label>
               <DropdownMenu.RadioGroup
-                className="note-color-options"
+                className="note-color-options flex gap-1.5 px-2 pt-1 pb-2"
                 value={document.meta.color}
                 onValueChange={(color) =>
                   change((d) => ({
@@ -613,11 +617,20 @@ export default function NoteDialog({
                     key={color}
                     value={color}
                     disabled={readOnly}
-                    className={`note-color-option note-${color}`}
+                    className={cn(
+                      'note-color-option',
+                      `note-${color}`,
+                      'grid size-7 cursor-pointer place-items-center rounded-full border border-line text-fg outline-none',
+                      'data-[highlighted]:outline-2 data-[highlighted]:outline-offset-2 data-[highlighted]:outline-accent',
+                      'data-[state=checked]:outline-2 data-[state=checked]:outline-offset-2 data-[state=checked]:outline-accent',
+                      'data-[disabled]:cursor-default data-[disabled]:opacity-40',
+                    )}
                     aria-label={t(`color.${color}`)}
                     title={t(`color.${color}`)}
                   >
-                    <DropdownMenu.ItemIndicator>✓</DropdownMenu.ItemIndicator>
+                    <DropdownMenu.ItemIndicator>
+                      <Check size={14} aria-hidden="true" />
+                    </DropdownMenu.ItemIndicator>
                   </DropdownMenu.RadioItem>
                 ))}
               </DropdownMenu.RadioGroup>
@@ -712,17 +725,16 @@ export default function NoteDialog({
         {pwa.available && (
           <div className="banner">
             <span>{t('settings.update')}</span>
-            <button className="button secondary" onClick={() => void pwa.update().catch(() => {})}>
-              {t('settings.updateAction')}
-            </button>
+            <Button onClick={() => void pwa.update().catch(() => {})}>{t('settings.updateAction')}</Button>
           </div>
         )}
         {latest?.remoteUnavailable && <p className="banner warning">{t('home.unavailable')}</p>}
         {!saving && latest?.syncStatus === 'synced' && latest.current.markdown !== document.markdown && (
           <div className="banner">
             <span>{t('note.remoteUpdated')}</span>
-            <button
-              className="text-button"
+            <Button
+              variant="link"
+              size="sm"
               onClick={async () => {
                 await flush();
                 const fresh = idRef.current ? await db.notes.get([scope, idRef.current]) : undefined;
@@ -734,37 +746,37 @@ export default function NoteDialog({
               }}
             >
               {t('note.loadLatest')}
-            </button>
+            </Button>
           </div>
         )}
         {latest?.duplicate && (
           <div className="banner warning">
             <p>{t('note.duplicate')}</p>
             <p>{t('note.duplicateHelp')}</p>
-            <button
-              className="button secondary"
+            <Button
               disabled={!engine}
               onClick={() => void engine?.resolveDuplicate(localId!).catch(() => setSaveError('generic'))}
             >
               {t('note.resolveDuplicate')}
-            </button>
+            </Button>
           </div>
         )}
         {latest?.syncStatus === 'uncertain' && (
           <div className="banner warning">
             <p>{t('note.uncertain')}</p>
             <div className="button-row">
-              <button
+              <Button
                 disabled={!engine}
-                className="button secondary"
+
                 onClick={() => void engine?.pull(true).catch(() => setSaveError('generic'))}
               >
                 {t('action.checkAgain')}
-              </button>
+              </Button>
               {!latest.issueId && (
-                <button
+                <Button
                   disabled={!engine}
-                  className="text-button"
+                  variant="link"
+                  size="sm"
                   onClick={() => {
                     void confirmDialog({
                       title: t('note.retryWarning'),
@@ -775,7 +787,7 @@ export default function NoteDialog({
                   }}
                 >
                   {t('action.retryCreate')}
-                </button>
+                </Button>
               )}
             </div>
           </div>
@@ -809,19 +821,15 @@ export default function NoteDialog({
               </div>
             </div>
             <div className="button-row">
-              <button
-                className="button secondary"
-                disabled={!writable}
-                onClick={() => void resolve('remote')}
-              >
+              <Button disabled={!writable} onClick={() => void resolve('remote')}>
                 {t('note.useRemote')}
-              </button>
-              <button className="button secondary" disabled={!writable} onClick={() => void resolve('local')}>
+              </Button>
+              <Button disabled={!writable} onClick={() => void resolve('local')}>
                 {t('note.useLocal')}
-              </button>
-              <button className="button secondary" disabled={!writable} onClick={() => void resolve('copy')}>
+              </Button>
+              <Button disabled={!writable} onClick={() => void resolve('copy')}>
                 {t('note.saveCopy')}
-              </button>
+              </Button>
             </div>
           </section>
         )}
@@ -857,12 +865,12 @@ export default function NoteDialog({
         {saveError && (
           <div role="alert" className="error-box">
             <p>{saveError === 'storage' ? t('note.localError') : t(`error.${saveError}`)}</p>
-            <button className="button secondary" onClick={exportCurrent}>
+            <Button className="mt-2.5" onClick={exportCurrent}>
               {t('note.copyEmergency')}
-            </button>
-            <button className="text-button" onClick={() => void persist().catch(() => {})}>
+            </Button>
+            <Button variant="link" size="sm" onClick={() => void persist().catch(() => {})}>
               {t('action.retry')}
-            </button>
+            </Button>
           </div>
         )}
         {latest?.error && (
@@ -875,13 +883,12 @@ export default function NoteDialog({
               <p>{t('error.retryAt', { time: new Date(latest.error.retryAt).toLocaleString() })}</p>
             )}
             {latest.error.detail && <p>{latest.error.detail}</p>}
-            <button
-              className="button secondary"
+            <Button
               disabled={!engine}
               onClick={() => void engine?.retry(localId!).catch(() => setSaveError('generic'))}
             >
               {t('action.retry')}
-            </button>
+            </Button>
           </details>
         )}
         {deleteError && (
@@ -911,7 +918,12 @@ function NoteAction({
 }: React.ComponentProps<typeof IconButton>) {
   return (
     <DropdownMenu.Item asChild disabled={disabled}>
-      <button type="button" className={`note-action ${className}`} onClick={onClick} disabled={disabled}>
+      <button
+        type="button"
+        className={cn('note-action', menuItem, className)}
+        onClick={onClick}
+        disabled={disabled}
+      >
         {children}
         <span>{label}</span>
       </button>

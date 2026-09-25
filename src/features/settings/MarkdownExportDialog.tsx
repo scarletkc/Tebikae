@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download } from 'lucide-react';
-import { Modal, download } from '../../app/ui';
+import { download } from '../../app/ui';
+import { Button, Dialog } from '../../ui';
 import {
   createMarkdownArchive,
   summarizeMarkdownExport,
@@ -38,7 +39,7 @@ export default function MarkdownExportDialog({
     }
   }
   return (
-    <Modal
+    <Dialog
       title={t('markdownExport.title')}
       onClose={() => {
         if (!exporting.current) onClose();
@@ -71,16 +72,16 @@ export default function MarkdownExportDialog({
           </p>
         )}
         <div className="button-row">
-          <button
-            className="button primary"
+          <Button
+            variant="primary"
             disabled={busy || counts.total === 0}
             onClick={() => void exportArchive()}
           >
             <Download size={16} />
             {t(busy ? 'markdownExport.preparing' : 'markdownExport.download')}
-          </button>
+          </Button>
         </div>
       </div>
-    </Modal>
+    </Dialog>
   );
 }

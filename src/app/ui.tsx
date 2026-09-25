@@ -1,11 +1,21 @@
-import * as Dialog from '@radix-ui/react-dialog';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { X, Sun, Moon, Monitor, Languages, Check, ChevronDown, ArrowUpDown } from 'lucide-react';
-import './menus.css';
+import { Sun, Moon, Monitor, Languages, Check, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { type ReactNode } from 'react';
 import { usePreferences } from './preferences';
 import { ContextMenu, type MenuAction } from './ContextMenu';
+import {
+  IconButton,
+  buttonVariants,
+  cn,
+  iconButtonVariants,
+  menuContent,
+  menuIndicator,
+  menuRadioItem,
+} from '../ui';
+
+// Kept here so existing imports from app/ui keep working; new code imports from src/ui.
+export { IconButton };
+
 export function Brand() {
   return (
     <div className="brand">
@@ -16,32 +26,13 @@ export function Brand() {
     </div>
   );
 }
-export function IconButton({
-  label,
-  children,
-  onClick,
-  disabled,
-  className = '',
-}: {
-  label: string;
-  children: ReactNode;
-  onClick?: () => void;
-  disabled?: boolean;
-  className?: string;
-}) {
-  return (
-    <button
-      type="button"
-      className={`icon-button ${className}`}
-      title={label}
-      aria-label={label}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {children}
-    </button>
-  );
-}
+
+/** Text trigger for a single-choice dropdown (sort order, language). */
+const selectTriggerClass = cn(
+  buttonVariants({ variant: 'secondary', size: 'sm' }),
+  'max-w-[180px] justify-between gap-1.5 font-normal data-[state=open]:border-accent data-[state=open]:text-accent',
+);
+
 const LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'zh-CN', label: '简体中文' },
@@ -65,7 +56,11 @@ export function LanguageControl({
   const trigger = (
     <DropdownMenu.Trigger
       id={id}
-      className={mode === 'icon' ? 'icon-button language-menu-trigger-icon' : 'language-menu-trigger'}
+      className={
+        mode === 'icon'
+          ? cn('language-menu-trigger-icon', iconButtonVariants())
+          : cn('language-menu-trigger', selectTriggerClass)
+      }
       title={label}
       aria-label={label}
     >
@@ -86,20 +81,23 @@ export function LanguageControl({
       <DropdownMenu.Root>
         {trigger}
         <DropdownMenu.Portal>
-          <DropdownMenu.Content className="language-menu-content" align="start" sideOffset={6} loop>
+          <DropdownMenu.Content
+            className={cn('language-menu-content', menuContent)}
+            align="start"
+            sideOffset={6}
+            loop
+          >
             <DropdownMenu.RadioGroup value={value} onValueChange={(next) => onChange(next as LanguageValue)}>
               {LANGUAGES.map((language) => (
                 <DropdownMenu.RadioItem
                   key={language.value}
                   value={language.value}
-                  className="language-menu-item"
+                  className={cn('language-menu-item', menuRadioItem)}
                 >
-                  <span className="language-menu-check">
-                    <DropdownMenu.ItemIndicator>
-                      <Check size={15} aria-hidden="true" />
-                    </DropdownMenu.ItemIndicator>
-                  </span>
                   {language.label}
+                  <DropdownMenu.ItemIndicator className={menuIndicator}>
+                    <Check aria-hidden="true" />
+                  </DropdownMenu.ItemIndicator>
                 </DropdownMenu.RadioItem>
               ))}
             </DropdownMenu.RadioGroup>
@@ -125,7 +123,11 @@ export function SortControl({
   const { t } = useTranslation();
   const trigger = (
     <DropdownMenu.Trigger
-      className={mode === 'icon' ? 'icon-button sort-icon-button' : 'sort-menu-trigger'}
+      className={
+        mode === 'icon'
+          ? cn('sort-icon-button', iconButtonVariants({ size: 'sm' }), 'data-[state=open]:bg-active')
+          : cn('sort-menu-trigger', selectTriggerClass)
+      }
       title={t('filter.sort')}
       aria-label={t('filter.sort')}
     >
@@ -133,7 +135,7 @@ export function SortControl({
         <ArrowUpDown size={17} aria-hidden="true" />
       ) : (
         <>
-          <span>{t(`filter.${value}`)}</span>
+          <span className="truncate">{t(`filter.${value}`)}</span>
           <ChevronDown size={14} aria-hidden="true" />
         </>
       )}
@@ -151,15 +153,19 @@ export function SortControl({
       }))}
     >
       <div
-        className={`sort-control-container ${mode === 'icon' ? 'sort-control-icon-mode' : 'sort-control-text-mode'}`}
+        className={cn(
+          'sort-control-container relative inline-flex items-center',
+          mode === 'icon' ? 'sort-control-icon-mode' : 'sort-control-text-mode',
+        )}
       >
+        {/* Native fallback kept for assistive tech and form automation; hidden from view. */}
         <select
           aria-label={t('filter.sort')}
           value={value}
           onChange={(e) => onChange(e.target.value as SortOption)}
           tabIndex={-1}
           aria-hidden="true"
-          className="sort-hidden-select"
+          className="sort-hidden-select pointer-events-none absolute inset-0 -z-1 size-full opacity-0"
         >
           {SORT_OPTIONS.map((sort) => (
             <option key={sort} value={sort}>
@@ -170,16 +176,23 @@ export function SortControl({
         <DropdownMenu.Root>
           {trigger}
           <DropdownMenu.Portal>
-            <DropdownMenu.Content className="sort-menu-content" align="start" sideOffset={6} loop>
+            <DropdownMenu.Content
+              className={cn('sort-menu-content', menuContent)}
+              align="start"
+              sideOffset={6}
+              loop
+            >
               <DropdownMenu.RadioGroup value={value} onValueChange={(next) => onChange(next as SortOption)}>
                 {SORT_OPTIONS.map((sort) => (
-                  <DropdownMenu.RadioItem key={sort} value={sort} className="sort-menu-item">
-                    <span className="sort-menu-check">
-                      <DropdownMenu.ItemIndicator>
-                        <Check size={15} aria-hidden="true" />
-                      </DropdownMenu.ItemIndicator>
-                    </span>
+                  <DropdownMenu.RadioItem
+                    key={sort}
+                    value={sort}
+                    className={cn('sort-menu-item', menuRadioItem)}
+                  >
                     <span>{t(`filter.${sort}`)}</span>
+                    <DropdownMenu.ItemIndicator className={menuIndicator}>
+                      <Check aria-hidden="true" />
+                    </DropdownMenu.ItemIndicator>
                   </DropdownMenu.RadioItem>
                 ))}
               </DropdownMenu.RadioGroup>
@@ -227,44 +240,6 @@ export function PreferencesControls({ compact = false }: { compact?: boolean }) 
         </IconButton>
       </ContextMenu>
     </div>
-  );
-}
-export function Modal({
-  title,
-  children,
-  onClose,
-  className = '',
-}: {
-  title: string;
-  children: ReactNode;
-  onClose: () => void;
-  className?: string;
-}) {
-  const { t } = useTranslation();
-  return (
-    <Dialog.Root
-      open
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
-      <Dialog.Portal>
-        <Dialog.Overlay className="dialog-overlay" />
-        <Dialog.Content
-          className={`dialog ${className}`}
-          aria-describedby={undefined}
-          onInteractOutside={(e) => e.preventDefault()}
-        >
-          <div className="dialog-header">
-            <Dialog.Title>{title}</Dialog.Title>
-            <IconButton label={t('action.close')} onClick={onClose}>
-              <X size={19} />
-            </IconButton>
-          </div>
-          {children}
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
   );
 }
 export function download(name: string, value: string | Blob, type = 'text/plain') {
