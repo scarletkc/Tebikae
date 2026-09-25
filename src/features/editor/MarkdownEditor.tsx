@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useTranslation } from 'react-i18next';
 import { Milkdown, MilkdownProvider, useEditor } from '@milkdown/react';
 import { commandsCtx, editorViewCtx } from '@milkdown/kit/core';
@@ -36,6 +37,7 @@ import {
   ListOrdered,
   Languages,
   Minus,
+  MoreHorizontal,
   Plus,
   Quote,
   Redo2,
@@ -117,6 +119,10 @@ function EditorBody({
   const [linkError, setLinkError] = useState(false);
   const [codeLanguage, setCodeLanguage] = useState('');
   const languageListId = useId();
+  const expandedToolsId = useId();
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const reducedMotion = useReducedMotion();
+  const [selectionPosition, setSelectionPosition] = useState<{ x: number; y: number } | null>(null);
   const [context, setContext] = useState({
     selected: false,
     table: false,
@@ -144,6 +150,85 @@ function EditorBody({
       ),
     [],
   );
+
+  // Observe native selection without replacing Milkdown's selection, focus, or IME handling.
+  useEffect(() => {
+    if (mode !== 'visual' || readOnly || loading) return;
+    let frame = 0;
+    const update = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const selection = window.getSelection();
+        const root = container.current;
+        const body = root?.querySelector('.ProseMirror');
+        if (
+          !root ||
+          !body ||
+          !selection?.rangeCount ||
+          selection.isCollapsed ||
+          !body.contains(selection.anchorNode) ||
+          !body.contains(selection.focusNode) ||
+          document.querySelector('[role="menu"]')
+        ) {
+          setSelectionPosition(null);
+          return;
+        }
+        const rect = selection.getRangeAt(0).getBoundingClientRect();
+        const bounds = root.getBoundingClientRect();
+        const scrollBounds = root.closest('.note-dialog-scroll')?.getBoundingClientRect();
+        if (
+          !rect.width ||
+          (scrollBounds && (rect.bottom < scrollBounds.top + 56 || rect.top > scrollBounds.bottom))
+        ) {
+          setSelectionPosition(null);
+          return;
+        }
+        const toolsBottom =
+          root.querySelector('.editor-toolbar')?.getBoundingClientRect().bottom ?? bounds.top;
+        const above = rect.top - 56;
+        let top = above < toolsBottom + 4 ? rect.bottom + 8 : above;
+        if (scrollBounds) top = Math.min(top, scrollBounds.bottom - 56);
+        setSelectionPosition({
+          x: Math.max(0, Math.min(rect.left + rect.width / 2 - bounds.left - 112, bounds.width - 224)),
+          y: Math.max(0, top - bounds.top),
+        });
+      });
+    };
+    const hide = () => {
+      cancelAnimationFrame(frame);
+      setSelectionPosition(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (
+        event.key === 'Escape' &&
+        container.current?.contains(document.activeElement) &&
+        !document.querySelector('[role="menu"]')
+      ) {
+        const toolbar = container.current?.querySelector('.editor-selection-toolbar');
+        if (toolbar) {
+          event.preventDefault();
+          hide();
+        }
+      }
+    };
+    document.addEventListener('selectionchange', update);
+    document.addEventListener('scroll', hide, true);
+    window.addEventListener('resize', hide);
+    container.current?.addEventListener('contextmenu', hide);
+    container.current?.addEventListener('compositionstart', hide);
+    document.addEventListener('keydown', onKey);
+    const root = container.current;
+    return () => {
+      cancelAnimationFrame(frame);
+      setSelectionPosition(null);
+      document.removeEventListener('selectionchange', update);
+      document.removeEventListener('scroll', hide, true);
+      window.removeEventListener('resize', hide);
+      root?.removeEventListener('contextmenu', hide);
+      root?.removeEventListener('compositionstart', hide);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [mode, readOnly, loading]);
 
   useEffect(() => {
     if (loading) return;
@@ -705,91 +790,119 @@ function EditorBody({
             </select>
             {tool('bold', <Bold />, () => mark('strong'))}
             {tool('italic', <Italic />, () => mark('emphasis'))}
-            {tool('strike', <Strikethrough />, () => mark('strike_through'))}
-            {tool('inlineCode', <Code />, () => mark('inlineCode'))}
-            {tool('link', <Link />, openLink)}
-            <span className="editor-toolbar-divider" />
-            {tool('bulletList', <List />, () => list(false))}
-            {tool('orderedList', <ListOrdered />, () => list(true))}
             {tool('taskList', <CheckSquare />, task)}
-            {tool('indent', <IndentIncrease />, () =>
-              command((ctx) => sinkListItem(ctx.get(editorViewCtx).state.schema.nodes.list_item!)),
-            )}
-            {tool('outdent', <IndentDecrease />, () =>
-              command((ctx) => liftListItem(ctx.get(editorViewCtx).state.schema.nodes.list_item!)),
-            )}
-            {tool('quote', <Quote />, toggleQuote)}
-            {tool('rule', <Minus />, insertRule)}
-            {tool('lineBreak', <CornerDownLeft />, () =>
-              run((ctx) => {
-                const view = ctx.get(editorViewCtx);
-                view.dispatch(
-                  view.state.tr.replaceSelectionWith(view.state.schema.nodes.hardbreak!.create()),
-                );
-              }),
-            )}
-            <span className="editor-toolbar-divider" />
-            {tool('table', <Table />, insertTable)}
-            {tool('addRow', <Rows3 />, () => run((ctx) => ctx.get(commandsCtx).call(addRowAfterCommand.key)))}
-            {tool('addColumn', <Columns3 />, () => command(() => addColumnAfter))}
-            <details className="editor-table-actions">
-              <summary aria-label={t('editor.tableActions')} title={t('editor.tableActions')}>
-                {t('editor.tableMenu')}
-              </summary>
-              <div>
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={removeTableRows}
-                >
-                  {t('editor.deleteRow')}
-                </button>
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => command(() => deleteColumn)}
-                >
-                  {t('editor.deleteColumn')}
-                </button>
-                <button
-                  type="button"
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => command(() => deleteTable)}
-                >
-                  <Trash2 size={14} />
-                  {t('editor.deleteTable')}
-                </button>
-              </div>
-            </details>
-            <span className="editor-toolbar-divider" />
             {tool('undo', <Undo2 />, () => command(() => undo))}
             {tool('redo', <Redo2 />, () => command(() => redo))}
+            <button
+              type="button"
+              className="editor-tool"
+              aria-label={t('editor.moreTools')}
+              title={t('editor.moreTools')}
+              aria-expanded={toolsOpen}
+              aria-controls={expandedToolsId}
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => setToolsOpen((open) => !open)}
+            >
+              <MoreHorizontal />
+            </button>
           </div>
-          <div className="editor-codebar">
-            {tool('codeBlock', <CodeXml />, () =>
-              command((ctx) =>
-                setBlockType(ctx.get(editorViewCtx).state.schema.nodes.code_block!, {
-                  language: codeLanguage.trim(),
-                }),
-              ),
+          <AnimatePresence initial={false}>
+            {toolsOpen && (
+              <motion.div
+                id={expandedToolsId}
+                className="editor-expanded-tools"
+                initial={{ opacity: 0, y: reducedMotion ? 0 : -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: reducedMotion ? 0 : 0.12 }}
+              >
+                <div className="editor-toolbar" role="toolbar" aria-label={t('editor.moreTools')}>
+                  {tool('strike', <Strikethrough />, () => mark('strike_through'))}
+                  {tool('inlineCode', <Code />, () => mark('inlineCode'))}
+                  {tool('link', <Link />, openLink)}
+                  {tool('bulletList', <List />, () => list(false))}
+                  {tool('orderedList', <ListOrdered />, () => list(true))}
+                  {tool('indent', <IndentIncrease />, () =>
+                    command((ctx) => sinkListItem(ctx.get(editorViewCtx).state.schema.nodes.list_item!)),
+                  )}
+                  {tool('outdent', <IndentDecrease />, () =>
+                    command((ctx) => liftListItem(ctx.get(editorViewCtx).state.schema.nodes.list_item!)),
+                  )}
+                  {tool('quote', <Quote />, toggleQuote)}
+                  {tool('rule', <Minus />, insertRule)}
+                  {tool('lineBreak', <CornerDownLeft />, () =>
+                    run((ctx) => {
+                      const view = ctx.get(editorViewCtx);
+                      view.dispatch(
+                        view.state.tr.replaceSelectionWith(view.state.schema.nodes.hardbreak!.create()),
+                      );
+                    }),
+                  )}
+                  <span className="editor-toolbar-divider" />
+                  {tool('table', <Table />, insertTable)}
+                  {tool('addRow', <Rows3 />, () =>
+                    run((ctx) => ctx.get(commandsCtx).call(addRowAfterCommand.key)),
+                  )}
+                  {tool('addColumn', <Columns3 />, () => command(() => addColumnAfter))}
+                  <details className="editor-table-actions">
+                    <summary aria-label={t('editor.tableActions')} title={t('editor.tableActions')}>
+                      {t('editor.tableMenu')}
+                    </summary>
+                    <div>
+                      <button
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={removeTableRows}
+                      >
+                        {t('editor.deleteRow')}
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => command(() => deleteColumn)}
+                      >
+                        {t('editor.deleteColumn')}
+                      </button>
+                      <button
+                        type="button"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => command(() => deleteTable)}
+                      >
+                        <Trash2 size={14} />
+                        {t('editor.deleteTable')}
+                      </button>
+                    </div>
+                  </details>
+                  <span className="editor-toolbar-divider" />
+                </div>
+                <div className="editor-codebar">
+                  {tool('codeBlock', <CodeXml />, () =>
+                    command((ctx) =>
+                      setBlockType(ctx.get(editorViewCtx).state.schema.nodes.code_block!, {
+                        language: codeLanguage.trim(),
+                      }),
+                    ),
+                  )}
+                  <input
+                    aria-label={t('editor.codeLanguage')}
+                    placeholder={t('editor.plainText')}
+                    value={codeLanguage}
+                    list={languageListId}
+                    autoComplete="off"
+                    spellCheck={false}
+                    maxLength={40}
+                    onChange={(event) => setCodeLanguage(cleanCodeLanguage(event.target.value))}
+                  />
+                  <datalist id={languageListId}>
+                    {codeLanguages.map((language) => (
+                      <option key={language} value={language} />
+                    ))}
+                  </datalist>
+                  <span>{t('editor.codeHint')}</span>
+                </div>
+              </motion.div>
             )}
-            <input
-              aria-label={t('editor.codeLanguage')}
-              placeholder={t('editor.plainText')}
-              value={codeLanguage}
-              list={languageListId}
-              autoComplete="off"
-              spellCheck={false}
-              maxLength={40}
-              onChange={(event) => setCodeLanguage(cleanCodeLanguage(event.target.value))}
-            />
-            <datalist id={languageListId}>
-              {codeLanguages.map((language) => (
-                <option key={language} value={language} />
-              ))}
-            </datalist>
-            <span>{t('editor.codeHint')}</span>
-          </div>
+          </AnimatePresence>
           {linkOpen && (
             <form
               className="editor-link-form"
@@ -843,6 +956,38 @@ function EditorBody({
           <Milkdown />
         </ContextMenu>
       </div>
+      {mode === 'visual' && !readOnly && (
+        <AnimatePresence>
+          {selectionPosition && mode === 'visual' && !readOnly && !linkOpen && (
+            <motion.div
+              className="editor-selection-toolbar"
+              role="toolbar"
+              aria-label={t('editor.selectionToolbar')}
+              style={{ left: selectionPosition.x, top: selectionPosition.y }}
+              initial={{ opacity: 0, y: reducedMotion ? 0 : 3 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reducedMotion ? 0 : 0.12 }}
+            >
+              {[
+                { key: 'bold', icon: <Bold />, run: () => mark('strong') },
+                { key: 'italic', icon: <Italic />, run: () => mark('emphasis') },
+                { key: 'strike', icon: <Strikethrough />, run: () => mark('strike_through') },
+                { key: 'inlineCode', icon: <Code />, run: () => mark('inlineCode') },
+                { key: 'link', icon: <Link />, run: openLink },
+              ].map(({ key, icon, run }) => (
+                <ToolButton
+                  key={key}
+                  label={t('editor.selectionAction', { action: t(`editor.${key}`) })}
+                  onClick={run}
+                >
+                  {icon}
+                </ToolButton>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      )}
       {clipboardError && <p role="alert">{t('context.clipboardError')}</p>}
       {mode === 'source' && (
         <TextContextMenu markdown readOnly={readOnly}>

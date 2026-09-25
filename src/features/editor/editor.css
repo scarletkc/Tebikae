@@ -1,16 +1,15 @@
 .markdown-editor {
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  position: relative;
   overflow: visible;
-  background: var(--surface);
+  background: transparent;
   color: var(--text);
 }
 .editor-modebar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 14px;
+  padding: 4px 0 12px;
   gap: 12px;
   color: var(--muted);
   font-size: 0.75rem;
@@ -28,8 +27,13 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 3px;
-  padding: 6px 10px;
-  border-block: 1px solid var(--border);
+  width: fit-content;
+  max-width: 100%;
+  padding: 5px;
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 3px 12px #14251c08;
 }
 .editor-tool {
   display: inline-flex;
@@ -70,8 +74,8 @@
   padding: 6px;
   color: var(--text);
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 5px;
+  border: 0;
+  border-radius: 6px;
 }
 .editor-toolbar-divider {
   width: 1px;
@@ -85,7 +89,7 @@
   flex-wrap: wrap;
   padding: 3px 10px;
   gap: 7px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 0;
 }
 .editor-codebar input {
   width: 120px;
@@ -189,14 +193,14 @@
   box-sizing: border-box;
   min-height: 330px;
   resize: vertical;
-  padding: 20px;
+  padding: 24px 0;
   border: 0;
   background: transparent;
   color: var(--text);
   line-height: 1.7;
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 0.85rem;
-  border-radius: 0 0 12px 12px;
+  border-radius: 8px;
 }
 .editor-source:focus {
   outline: 2px solid var(--accent);
@@ -207,7 +211,7 @@
 }
 .markdown-editor .ProseMirror {
   min-height: 300px;
-  padding: 18px 22px;
+  padding: 28px 0 40px;
   outline: none;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -215,7 +219,7 @@
   caret-color: var(--accent);
 }
 .markdown-editor .ProseMirror:focus-visible {
-  box-shadow: inset 0 0 0 2px var(--accent-soft);
+  box-shadow: none;
 }
 .markdown-preview,
 .markdown-editor .ProseMirror {
@@ -379,7 +383,7 @@
 }
 @media (max-width: 480px) {
   .markdown-editor .ProseMirror {
-    padding: 16px 14px;
+    padding: 24px 0 32px;
   }
   .editor-toolbar {
     padding-inline: 6px;
@@ -412,18 +416,207 @@
   min-width: 0;
 }
 .editor-selection-toolbar {
-  position: sticky;
-  bottom: 8px;
-  z-index: 20;
+  position: absolute;
+  z-index: 25;
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 8px;
+  gap: 2px;
+  width: 224px;
+  padding: 5px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px #101c2426;
 }
-.editor-selection-toolbar button {
-  min-height: 44px;
+.editor-selection-toolbar .editor-tool {
+  flex: 1;
+  height: 36px;
+}
+.editor-expanded-tools {
+  margin-top: 8px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--surface-hover);
+}
+.editor-expanded-tools .editor-toolbar {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.editor-expanded-tools .editor-codebar {
+  padding-inline: 8px;
+}
+.editor-expanded-tools .editor-codebar input {
+  font-size: 13px;
+}
+.editor-link-form {
+  margin-top: 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--surface-hover);
+}
+.editor-notice {
+  margin-block: 12px;
+  border-radius: 10px;
+}
+/* Document typography is scoped to the editor; card previews keep their density. */
+.markdown-editor .ProseMirror {
+  font-size: 16px;
+  line-height: 1.85;
+}
+.markdown-editor .ProseMirror p {
+  margin-block: 0 1.15em;
+}
+.markdown-editor .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: 1.6em 0.65em;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+}
+.markdown-editor .ProseMirror > :first-child {
+  margin-top: 0;
+}
+.markdown-editor .ProseMirror blockquote {
+  padding: 12px 20px;
+  margin-block: 1.5em;
+  border-left: 3px solid color-mix(in srgb, var(--accent) 45%, var(--surface));
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--accent-soft) 50%, transparent);
+}
+.markdown-editor .ProseMirror blockquote > :last-child {
+  margin-bottom: 0;
+}
+.markdown-editor .ProseMirror pre {
+  padding: 18px 20px;
+  border: 0;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-hover) 65%, var(--surface));
+  line-height: 1.7;
+  font-size: 14px;
+}
+.markdown-editor .ProseMirror code {
+  border-radius: 5px;
+  padding: 3px 5px;
+}
+.markdown-editor .ProseMirror pre code {
+  padding: 0;
+}
+.markdown-editor .ProseMirror :is(ul, ol) {
+  margin-block: 1em 1.4em;
+  padding-left: 28px;
+}
+.markdown-editor .ProseMirror li {
+  padding-left: 3px;
+  margin-block: 0.3em;
+}
+.markdown-editor .ProseMirror li > div > p {
+  margin-block: 0.25em;
+}
+.markdown-editor .ProseMirror li[data-item-type='task'] > input {
+  width: 16px;
+  height: 16px;
+  top: 0.4em;
+}
+.markdown-editor .ProseMirror table {
+  margin-block: 1.5em;
+  border-radius: 10px;
+}
+.markdown-editor .ProseMirror :is(th, td) {
+  padding: 12px 16px;
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+}
+.markdown-editor .ProseMirror :is(th, td) p {
+  margin: 0;
+}
+.markdown-editor .ProseMirror hr {
+  width: 100%;
+  margin-block: 32px;
+  border-color: color-mix(in srgb, var(--border) 65%, transparent);
+}
+.code-block-header {
+  border-radius: 12px 12px 0 0;
+  background: color-mix(in srgb, var(--surface-hover) 65%, var(--surface));
+  padding: 8px 12px 0;
+}
+.markdown-editor .editor-code-block pre {
+  border-radius: 0 0 12px 12px;
+}
+@media (max-width: 760px) {
+  .editor-tool {
+    min-width: 36px;
+    height: 44px;
+  }
+  .editor-toolbar {
+    gap: 1px;
+    padding: 3px;
+  }
+  .editor-toolbar select {
+    width: 80px;
+    height: 44px;
+    font-size: 13px;
+  }
+  .editor-selection-toolbar .editor-tool {
+    height: 44px;
+  }
+  .editor-source,
+  .editor-link-form input,
+  .editor-codebar input {
+    font-size: 16px;
+  }
+  .markdown-editor .ProseMirror {
+    line-height: 1.8;
+  }
+  .markdown-editor .ProseMirror pre {
+    padding: 14px;
+  }
+  .code-block-header input {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .markdown-editor *,
+  .note-dialog * {
+    scroll-behavior: auto;
+  }
+}
+
+.markdown-editor .code-block-header label > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.markdown-editor .code-block-header input:not([type='checkbox']) {
+  width: 150px;
+  max-width: 100%;
+  margin: 0;
+  padding: 6px 8px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+.markdown-editor .code-block-header button {
+  font-size: 12px;
+  color: var(--muted);
+  padding: 8px;
+  border-radius: 6px;
+}
+.markdown-editor .code-block-header button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.markdown-editor .editor-code-block pre[data-language]::before {
+  display: none;
+}
+@media (max-width: 760px) {
+  .markdown-editor .code-block-header input:not([type='checkbox']) {
+    font-size: 16px;
+    min-height: 44px;
+  }
+  .markdown-editor .code-block-header button {
+    min-height: 44px;
+  }
 }

@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Archive,
@@ -8,6 +9,8 @@ import {
   Download,
   ExternalLink,
   Pin,
+  MoreHorizontal,
+  Plus,
   RotateCcw,
   Trash2,
   RefreshCw,
@@ -38,7 +41,7 @@ import { safeHref } from '../../security/urls';
 import { usePwaUpdate } from '../../app/pwa';
 import { confirmDialog, isConfirmDialogOpen } from '../../app/confirm';
 import { useIsMobile } from '../../app/useMediaQuery';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 import { LabelBadge } from '../labels';
 import { TextContextMenu } from '../editor/TextContextMenu';
 import { LabelContextMenu } from '../labels/LabelContextMenu';
@@ -60,8 +63,6 @@ const MarkdownEditor = lazy(async () => {
   throw lastError;
 });
 
-export type EditorOrigin = { x: number; y: number; width: number; height: number } | null;
-
 export default function NoteDialog({
   initialNote,
   kind = 'markdown',
@@ -71,7 +72,6 @@ export default function NoteDialog({
   onNavigate,
   canPrevious,
   canNext,
-  origin = null,
 }: {
   initialNote?: LocalNote;
   kind?: NoteKind;
@@ -81,8 +81,6 @@ export default function NoteDialog({
   onNavigate(direction: -1 | 1): void;
   canPrevious: boolean;
   canNext: boolean;
-  /** Bounding rect of the card the editor expands from; null fades in place (new notes). */
-  origin?: EditorOrigin;
 }) {
   const { t } = useTranslation();
   const { connection, engine, writable, connected } = useSession();
@@ -367,8 +365,10 @@ export default function NoteDialog({
   const issueUrl = latest?.base?.url || latest?.lastSeenRemote?.url;
   const remote = latest?.lastSeenRemote && snapshotToDocument(latest.lastSeenRemote);
   const isMobile = useIsMobile();
+  const reducedMotion = useReducedMotion();
   const dialogTitle = initialNote ? t('action.edit') : t('home.newTitle');
   const rootRef = useRef<HTMLDivElement>(null);
+  const noteMenuTrigger = useRef<HTMLButtonElement>(null);
   const closeRef = useRef(close);
   closeRef.current = close;
   // Global Escape closes the editor (menus and nested dialogs handle their own keys first).
@@ -382,6 +382,13 @@ export default function NoteDialog({
         window.document.querySelector('.confirm-overlay, .confirm-dialog, [role="alertdialog"]')
       )
         return;
+      const labelPicker = rootRef.current?.querySelector<HTMLDetailsElement>('.note-label-picker[open]');
+      if (labelPicker) {
+        event.preventDefault();
+        labelPicker.open = false;
+        labelPicker.querySelector('summary')?.focus();
+        return;
+      }
       event.preventDefault();
       void closeRef.current();
     };
@@ -412,12 +419,12 @@ export default function NoteDialog({
         return;
       }
       const active = documentGlobal.activeElement;
-      if (active?.closest('.confirm-dialog, [role="alertdialog"], .confirm-overlay')) {
+      if (active?.closest('.confirm-dialog, [role="alertdialog"], .confirm-overlay, [role="menu"]')) {
         return;
       }
       const focusable = Array.from(
         root.querySelectorAll<HTMLElement>(
-          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
+          'a[href], button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), summary, [contenteditable="true"], [tabindex]:not([tabindex="-1"])',
         ),
       ).filter((element) => element.offsetParent !== null || element === documentGlobal.activeElement);
       if (!focusable.length) return;
@@ -437,15 +444,11 @@ export default function NoteDialog({
       if (!skipAutoFocus) previous?.focus?.({ preventScroll: true });
     };
   }, [skipAutoFocus]);
-  // Expand from the clicked card's rect when available; otherwise fade in place.
-  const motionInitial = origin
-    ? {
-        opacity: 0,
-        scale: 0.7,
-        x: origin.x + origin.width / 2 - window.innerWidth / 2,
-        y: origin.y + origin.height / 2 - window.innerHeight / 2,
-      }
-    : { opacity: 0, scale: isMobile ? 1 : 0.96, y: isMobile ? 24 : 10 };
+  const motionInitial = {
+    opacity: 0,
+    scale: reducedMotion || isMobile ? 1 : 0.985,
+    y: reducedMotion ? 0 : 8,
+  };
   return (
     <motion.div
       ref={rootRef}
@@ -455,23 +458,172 @@ export default function NoteDialog({
       aria-label={dialogTitle}
       initial={motionInitial}
       animate={{ opacity: 1, scale: 1, x: 0, y: 0 }}
-      exit={
-        origin
-          ? { opacity: 0, scale: 0.82, x: origin.x + origin.width / 2 - window.innerWidth / 2, y: 0 }
-          : { opacity: 0, scale: isMobile ? 1 : 0.97, y: isMobile ? 24 : 8 }
-      }
-      transition={{ type: 'spring', stiffness: 380, damping: 34, mass: 1 }}
+      exit={{ opacity: 0, scale: reducedMotion || isMobile ? 1 : 0.99, y: reducedMotion ? 0 : 6 }}
+      transition={{ duration: reducedMotion ? 0 : 0.18, ease: 'easeOut' }}
     >
       <header className="floating-editor-header">
-        {isMobile && (
-          <IconButton label={t('action.back')} onClick={() => void close()}>
-            <ChevronLeft size={20} />
-          </IconButton>
-        )}
-        <h2 className="floating-editor-heading">{dialogTitle}</h2>
-        <IconButton label={t('action.close')} className="floating-editor-close" onClick={() => void close()}>
-          <X size={18} />
+        <IconButton label={t(isMobile ? 'action.back' : 'action.close')} onClick={() => void close()}>
+          {isMobile ? <ChevronLeft size={20} /> : <X size={18} />}
         </IconButton>
+        <div className="note-save-row">
+          <span role="status" className={saveError ? 'danger' : 'muted'}>
+            {saveError
+              ? t('note.localError')
+              : saving
+                ? t('note.savingLocal')
+                : persistedRevision > (latest?.localRevision || 0)
+                  ? t('note.localSaved')
+                  : latest
+                    ? t(`status.${latest.syncStatus}`)
+                    : t('note.blank')}
+          </span>
+          <IconButton
+            label={t('action.save')}
+            disabled={!connected || !writable || !!saveError}
+            onClick={() => void sync()}
+          >
+            <RefreshCw size={17} />
+          </IconButton>
+        </div>
+        <DropdownMenu.Root modal={false}>
+          <DropdownMenu.Trigger
+            ref={noteMenuTrigger}
+            className="icon-button"
+            aria-label={t('context.more')}
+            title={t('context.more')}
+          >
+            <MoreHorizontal size={20} />
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              className="note-actions-menu"
+              align="end"
+              sideOffset={8}
+              collisionPadding={12}
+              loop
+              onCloseAutoFocus={(event) => {
+                if (isConfirmDialogOpen()) event.preventDefault();
+              }}
+            >
+              {document.meta.trashedAt ? (
+                <>
+                  <NoteAction
+                    label={t('action.restore')}
+                    disabled={!writable || deleting || !!latest?.purgeStartedAt}
+                    onClick={() => change((d) => ({ ...d, meta: { ...d.meta, trashedAt: null } }))}
+                  >
+                    <RotateCcw size={18} />
+                  </NoteAction>
+                  <NoteAction
+                    label={t(deleting ? 'note.deleting' : 'action.deleteForever')}
+                    disabled={
+                      !engine ||
+                      !writable ||
+                      !online ||
+                      deleting ||
+                      !localId ||
+                      !!latest?.duplicate ||
+                      !!latest?.remoteUnavailable
+                    }
+                    onClick={() => {
+                      noteMenuTrigger.current?.focus();
+                      void purge();
+                    }}
+                  >
+                    <Trash2 size={18} />
+                  </NoteAction>
+                </>
+              ) : (
+                <>
+                  <NoteAction
+                    label={t(document.meta.pinned ? 'action.unpin' : 'action.pin')}
+                    className={document.meta.pinned ? 'is-pinned' : undefined}
+                    disabled={readOnly}
+                    onClick={() => change((d) => ({ ...d, meta: { ...d.meta, pinned: !d.meta.pinned } }))}
+                  >
+                    <Pin size={18} />
+                  </NoteAction>
+                  <NoteAction
+                    label={t(document.archived ? 'action.unarchive' : 'action.archive')}
+                    disabled={readOnly}
+                    onClick={() => change((d) => ({ ...d, archived: !d.archived }))}
+                  >
+                    {document.archived ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+                  </NoteAction>
+                  <NoteAction
+                    label={t('action.trash')}
+                    disabled={readOnly}
+                    onClick={() =>
+                      change((d) => ({ ...d, meta: { ...d.meta, trashedAt: new Date().toISOString() } }))
+                    }
+                  >
+                    <Trash2 size={18} />
+                  </NoteAction>
+                </>
+              )}
+              <NoteAction label={t('action.exportNote')} onClick={exportCurrent}>
+                <Download size={18} />
+              </NoteAction>
+              {issueUrl && safeHref(issueUrl) && (
+                <DropdownMenu.Item asChild>
+                  <a
+                    className="note-action"
+                    href={safeHref(issueUrl)!}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={t('action.openGithub')}
+                    title={t('action.openGithub')}
+                  >
+                    <ExternalLink size={18} />
+                    <span>{t('action.openGithub')}</span>
+                  </a>
+                </DropdownMenu.Item>
+              )}
+              {latest && !latest.issueId && latest.syncStatus !== 'uncertain' && (
+                <DropdownMenu.Item asChild>
+                  <button
+                    className="note-action"
+                    disabled={!writable || saving}
+                    onClick={() => {
+                      clearTimeout(localTimer.current);
+                      void persistence.current
+                        .then(() => discardDraft(scope, localId!))
+                        .then(onClose)
+                        .catch(() => setSaveError('generic'));
+                    }}
+                  >
+                    {t('action.discard')}
+                  </button>
+                </DropdownMenu.Item>
+              )}
+              <DropdownMenu.Separator className="note-menu-separator" />
+              <DropdownMenu.Label className="note-menu-caption">{t('note.color')}</DropdownMenu.Label>
+              <DropdownMenu.RadioGroup
+                className="note-color-options"
+                value={document.meta.color}
+                onValueChange={(color) =>
+                  change((d) => ({
+                    ...d,
+                    meta: { ...d.meta, color: color as NoteDocument['meta']['color'] },
+                  }))
+                }
+              >
+                {NOTE_COLORS.map((color) => (
+                  <DropdownMenu.RadioItem
+                    key={color}
+                    value={color}
+                    disabled={readOnly}
+                    className={`note-color-option note-${color}`}
+                    aria-label={t(`color.${color}`)}
+                    title={t(`color.${color}`)}
+                  >
+                    <DropdownMenu.ItemIndicator>✓</DropdownMenu.ItemIndicator>
+                  </DropdownMenu.RadioItem>
+                ))}
+              </DropdownMenu.RadioGroup>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </header>
       <div className="note-dialog-scroll">
         <TextContextMenu readOnly={readOnly}>
@@ -484,6 +636,79 @@ export default function NoteDialog({
             onChange={(e) => change((d) => ({ ...d, title: e.target.value }))}
           />
         </TextContextMenu>
+        <div className="note-properties">
+          {labels
+            .filter((label) => document.labelIds.includes(label.id))
+            .map((label) => (
+              <LabelContextMenu
+                key={label.id}
+                label={label}
+                onRemove={
+                  !readOnly
+                    ? () => change((d) => ({ ...d, labelIds: d.labelIds.filter((id) => id !== label.id) }))
+                    : undefined
+                }
+              >
+                <LabelBadge label={label} />
+              </LabelContextMenu>
+            ))}
+          <details
+            className="note-label-picker"
+            onKeyDown={(event) => {
+              if (event.key === 'Escape' && event.currentTarget.open && !event.defaultPrevented) {
+                event.preventDefault();
+                event.currentTarget.open = false;
+                event.currentTarget.querySelector('summary')?.focus();
+              }
+            }}
+          >
+            <summary tabIndex={0} aria-label={t('label.choose')}>
+              <Plus size={14} />
+              {t('note.labels')}
+            </summary>
+            <div className="note-label-options">
+              <fieldset disabled={readOnly}>
+                <legend>{t('note.labels')}</legend>
+                <div className="choices">
+                  {labels.length ? (
+                    labels.map((label) => (
+                      <label key={label.id}>
+                        <input
+                          type="checkbox"
+                          checked={document.labelIds.includes(label.id)}
+                          onChange={() =>
+                            change((d) => ({
+                              ...d,
+                              labelIds: d.labelIds.includes(label.id)
+                                ? d.labelIds.filter((id) => id !== label.id)
+                                : [...d.labelIds, label.id],
+                            }))
+                          }
+                        />
+                        <LabelContextMenu
+                          label={label}
+                          onRemove={
+                            !readOnly && document.labelIds.includes(label.id)
+                              ? () =>
+                                  change((d) => ({
+                                    ...d,
+                                    labelIds: d.labelIds.filter((id) => id !== label.id),
+                                  }))
+                              : undefined
+                          }
+                        >
+                          <LabelBadge label={label} />
+                        </LabelContextMenu>
+                      </label>
+                    ))
+                  ) : (
+                    <span className="muted">{t('label.empty')}</span>
+                  )}
+                </div>
+              </fieldset>
+            </div>
+          </details>
+        </div>
         {pwa.available && (
           <div className="banner">
             <span>{t('settings.update')}</span>
@@ -629,60 +854,6 @@ export default function NoteDialog({
             }}
           />
         </Suspense>
-        <div className="note-properties">
-          <fieldset disabled={readOnly}>
-            <legend>{t('note.color')}</legend>
-            <div className="color-swatches">
-              {NOTE_COLORS.map((color) => (
-                <button
-                  type="button"
-                  key={color}
-                  title={t(`color.${color}`)}
-                  aria-label={t(`color.${color}`)}
-                  aria-pressed={document.meta.color === color}
-                  className={`color-swatch note-${color}`}
-                  onClick={() => change((d) => ({ ...d, meta: { ...d.meta, color } }))}
-                />
-              ))}
-            </div>
-          </fieldset>
-          <fieldset disabled={readOnly}>
-            <legend>{t('note.labels')}</legend>
-            <div className="choices">
-              {labels.length ? (
-                labels.map((label) => (
-                  <label key={label.id}>
-                    <input
-                      type="checkbox"
-                      checked={document.labelIds.includes(label.id)}
-                      onChange={() =>
-                        change((d) => ({
-                          ...d,
-                          labelIds: d.labelIds.includes(label.id)
-                            ? d.labelIds.filter((id) => id !== label.id)
-                            : [...d.labelIds, label.id],
-                        }))
-                      }
-                    />
-                    <LabelContextMenu
-                      label={label}
-                      onRemove={
-                        !readOnly && document.labelIds.includes(label.id)
-                          ? () =>
-                              change((d) => ({ ...d, labelIds: d.labelIds.filter((id) => id !== label.id) }))
-                          : undefined
-                      }
-                    >
-                      <LabelBadge label={label} />
-                    </LabelContextMenu>
-                  </label>
-                ))
-              ) : (
-                <span className="muted">{t('label.empty')}</span>
-              )}
-            </div>
-          </fieldset>
-        </div>
         {saveError && (
           <div role="alert" className="error-box">
             <p>{saveError === 'storage' ? t('note.localError') : t(`error.${saveError}`)}</p>
@@ -720,121 +891,30 @@ export default function NoteDialog({
         )}
       </div>
       <footer className="note-editor-footer">
-        <div className="note-tools">
-          {document.meta.trashedAt ? (
-            <>
-              <IconButton
-                label={t('action.restore')}
-                disabled={!writable || deleting || !!latest?.purgeStartedAt}
-                onClick={() => change((d) => ({ ...d, meta: { ...d.meta, trashedAt: null } }))}
-              >
-                <RotateCcw size={18} />
-              </IconButton>
-              <IconButton
-                label={t(deleting ? 'note.deleting' : 'action.deleteForever')}
-                disabled={
-                  !engine ||
-                  !writable ||
-                  !online ||
-                  deleting ||
-                  !localId ||
-                  !!latest?.duplicate ||
-                  !!latest?.remoteUnavailable
-                }
-                onClick={() => void purge()}
-              >
-                <Trash2 size={18} />
-              </IconButton>
-            </>
-          ) : (
-            <>
-              <IconButton
-                label={t(document.meta.pinned ? 'action.unpin' : 'action.pin')}
-                className={document.meta.pinned ? 'is-pinned' : undefined}
-                disabled={readOnly}
-                onClick={() => change((d) => ({ ...d, meta: { ...d.meta, pinned: !d.meta.pinned } }))}
-              >
-                <Pin size={18} />
-              </IconButton>
-              <IconButton
-                label={t(document.archived ? 'action.unarchive' : 'action.archive')}
-                disabled={readOnly}
-                onClick={() => change((d) => ({ ...d, archived: !d.archived }))}
-              >
-                {document.archived ? <ArchiveRestore size={18} /> : <Archive size={18} />}
-              </IconButton>
-              <IconButton
-                label={t('action.trash')}
-                disabled={readOnly}
-                onClick={() =>
-                  change((d) => ({ ...d, meta: { ...d.meta, trashedAt: new Date().toISOString() } }))
-                }
-              >
-                <Trash2 size={18} />
-              </IconButton>
-            </>
-          )}
-          <IconButton label={t('action.exportNote')} onClick={exportCurrent}>
-            <Download size={18} />
-          </IconButton>
-          {issueUrl && safeHref(issueUrl) && (
-            <a
-              className="icon-button"
-              href={safeHref(issueUrl)!}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={t('action.openGithub')}
-              title={t('action.openGithub')}
-            >
-              <ExternalLink size={18} />
-            </a>
-          )}
-          {latest && !latest.issueId && latest.syncStatus !== 'uncertain' && (
-            <button
-              className="text-button"
-              disabled={!writable || saving}
-              onClick={() => {
-                clearTimeout(localTimer.current);
-                void persistence.current
-                  .then(() => discardDraft(scope, localId!))
-                  .then(onClose)
-                  .catch(() => setSaveError('generic'));
-              }}
-            >
-              {t('action.discard')}
-            </button>
-          )}
-        </div>
-        <div className="note-save-row">
-          <span role="status" className={saveError ? 'danger' : 'muted'}>
-            {saveError
-              ? t('note.localError')
-              : saving
-                ? t('note.savingLocal')
-                : persistedRevision > (latest?.localRevision || 0)
-                  ? t('note.localSaved')
-                  : latest
-                    ? t(`status.${latest.syncStatus}`)
-                    : t('note.blank')}
-          </span>
-          <IconButton
-            label={t('action.save')}
-            disabled={!connected || !writable || !!saveError}
-            onClick={() => void sync()}
-          >
-            <RefreshCw size={17} />
-          </IconButton>
-          <IconButton label={t('action.previous')} disabled={!canPrevious} onClick={() => void close(-1)}>
-            <ChevronLeft size={18} />
-          </IconButton>
-          <IconButton label={t('action.next')} disabled={!canNext} onClick={() => void close(1)}>
-            <ChevronRight size={18} />
-          </IconButton>
-          <button className="button primary" onClick={() => void close()}>
-            {t('action.close')}
-          </button>
-        </div>
+        <IconButton label={t('action.previous')} disabled={!canPrevious} onClick={() => void close(-1)}>
+          <ChevronLeft size={18} />
+        </IconButton>
+        <IconButton label={t('action.next')} disabled={!canNext} onClick={() => void close(1)}>
+          <ChevronRight size={18} />
+        </IconButton>
       </footer>
     </motion.div>
+  );
+}
+
+function NoteAction({
+  label,
+  children,
+  onClick,
+  disabled,
+  className = '',
+}: React.ComponentProps<typeof IconButton>) {
+  return (
+    <DropdownMenu.Item asChild disabled={disabled}>
+      <button type="button" className={`note-action ${className}`} onClick={onClick} disabled={disabled}>
+        {children}
+        <span>{label}</span>
+      </button>
+    </DropdownMenu.Item>
   );
 }

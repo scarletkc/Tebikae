@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { connect, mockGitHub, mockIssue } from './fixtures';
+import { connect, mockGitHub, mockIssue, noteColor } from './fixtures';
 
 test('an open editor preserves a remotely merged body through subsequent property edits', async ({
   page,
@@ -11,7 +11,7 @@ test('an open editor preserves a remotely merged body through subsequent propert
   await expect(page.locator('.ProseMirror')).toBeVisible();
   state.issues[0]!.body = state.issues[0]!.body.replace('Original body', 'New body from GitHub');
   state.issues[0]!.updated_at = new Date().toISOString();
-  await page.getByRole('button', { name: 'Sage', exact: true }).click();
+  await noteColor(page, 'Sage');
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.locator('.note-save-row').getByRole('status')).toHaveText('Synced to GitHub');
   await expect(page.getByRole('button', { name: 'Load the latest version', exact: true })).toBeVisible();
@@ -37,11 +37,12 @@ test('a remote trash change makes the already-open editor read-only after merge'
     '"trashedAt":null',
     '"trashedAt":"2026-09-16T01:00:00.000Z"',
   );
-  await page.getByRole('button', { name: 'Sky', exact: true }).click();
+  await noteColor(page, 'Sky');
   await page.getByRole('button', { name: 'Sync now', exact: true }).click();
   await expect(page.locator('.note-save-row').getByRole('status')).toHaveText('Synced to GitHub');
   await expect(page.locator('.ProseMirror')).toHaveAttribute('contenteditable', 'false');
-  await expect(page.getByRole('button', { name: 'Restore note', exact: true })).toBeEnabled();
+  await page.getByRole('dialog').getByRole('button', { name: 'More actions', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: 'Restore note', exact: true })).toBeEnabled();
   expect(state.issues[0]!.body).toContain('Keep this text');
 });
 

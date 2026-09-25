@@ -254,7 +254,6 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     ids: string[];
     initial?: LocalNote;
     labelIds?: number[];
-    origin?: { x: number; y: number; width: number; height: number } | null;
   } | null>(null);
   const [issue, setIssue] = useState<UnmanagedIssue | null>(null);
   const notes = useLiveQuery(() => db.notes.where('scopeId').equals(scope).toArray(), [scope], []);
@@ -504,7 +503,6 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
       labelIds: filters.unlabeledOnly
         ? []
         : [...new Set(filters.labelIds)].filter((id) => labels.some((label) => label.id === id)),
-      origin: null,
     });
   }
   function report(error: unknown) {
@@ -587,10 +585,9 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
     };
     toast(messages[action], 'success');
   }
-  type EditorOrigin = { x: number; y: number; width: number; height: number };
-  function openNote(note: LocalNote, origin: EditorOrigin | null = null) {
+  function openNote(note: LocalNote) {
     session.engine?.setEditing(note.localId, true);
-    setSelection({ id: note.localId, ids: result.notes.map((n) => n.localId), initial: note, origin });
+    setSelection({ id: note.localId, ids: result.notes.map((n) => n.localId), initial: note });
   }
   function navigateNote(direction: -1 | 1) {
     if (!selection) return;
@@ -600,8 +597,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
   }
   function openWithSequence(note: LocalNote) {
     session.engine?.setEditing(note.localId, true);
-    // Prev/next navigation fades in place instead of expanding from a card.
-    setSelection((old) => ({ id: note.localId, ids: old?.ids || [], initial: note, origin: null }));
+    setSelection((old) => ({ id: note.localId, ids: old?.ids || [], initial: note }));
   }
   function startLabelSelection(labelId: number) {
     setLabelSelectionMode(true);
@@ -1014,13 +1010,7 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
           writable={session.writable}
           canPurge={session.writable && !!session.engine && online && !busy}
           onPurge={() => void purge(note)}
-          onOpen={() => {
-            // Record the card rect so the floating editor can expand from the card.
-            const target = document.activeElement?.closest?.('.note-open') as HTMLElement | null;
-            const card = target?.closest?.('.note-card') as HTMLElement | null;
-            const rect = card?.getBoundingClientRect();
-            openNote(note, rect ? { x: rect.x, y: rect.y, width: rect.width, height: rect.height } : null);
-          }}
+          onOpen={() => openNote(note)}
           onChange={(action) => void change(note, action)}
           menuItems={menuFor(note)}
           selected={multi.isSelected(note.localId)}
@@ -1519,7 +1509,6 @@ function Workspace({ offlineReady }: { offlineReady: boolean }) {
               kind={selection.kind}
               labels={labels}
               initialLabelIds={selection.labelIds}
-              origin={selection.origin ?? null}
               onClose={() => setSelection(null)}
               onNavigate={navigateNote}
               canPrevious={!!selection.id && selection.ids.indexOf(selection.id) > 0}

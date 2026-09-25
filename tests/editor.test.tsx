@@ -310,6 +310,7 @@ describe('editor lifecycle and safe preview', () => {
     await waitFor(() => expect(screen.queryByText(english.loading)).toBeNull());
     fireEvent.change(screen.getByRole('combobox', { name: english.heading }), { target: { value: '3' } });
     expect(container.querySelector('.ProseMirror h3')?.textContent).toBe('Start');
+    fireEvent.click(screen.getByRole('button', { name: english.moreTools }));
     fireEvent.click(screen.getByRole('button', { name: english.table }));
     expect(container.querySelectorAll('.ProseMirror tr')).toHaveLength(3);
     fireEvent.click(screen.getByRole('button', { name: english.addRow }));
@@ -349,6 +350,7 @@ describe('editor lifecycle and safe preview', () => {
       </I18nextProvider>,
     );
     await waitFor(() => expect(screen.queryByText(english.loading)).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: english.moreTools }));
     fireEvent.click(screen.getByRole('button', { name: english.link }));
     fireEvent.change(screen.getByLabelText(english.linkUrl), { target: { value: 'javascript:alert(1)' } });
     fireEvent.click(screen.getByRole('button', { name: english.applyLink }));
@@ -390,6 +392,7 @@ describe('editor lifecycle and safe preview', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: english.showVisual }));
     await waitFor(() => expect(screen.queryByRole('textbox', { name: english.sourceBody })).toBeNull());
+    fireEvent.click(screen.getByRole('button', { name: english.moreTools }));
     fireEvent.change(screen.getByRole('combobox', { name: english.codeLanguage }), {
       target: { value: 'typescript' },
     });

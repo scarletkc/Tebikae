@@ -199,9 +199,12 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(chip.locator('.label-dot')).toHaveCSS('background-color', 'rgb(177, 198, 176)');
     await expect(chip).toHaveCSS('color', textColor);
     await page.getByRole('button', { name: 'Edit note: Weekend ideas', exact: true }).click();
-    const noteBadge = page.locator('.note-properties .label-badge').filter({ hasText: 'Ideas' });
+    const noteBadge = page
+      .locator('.note-properties > .context-target .label-badge')
+      .filter({ hasText: 'Ideas' });
     await expect(noteBadge.locator('.label-dot')).toHaveCSS('background-color', 'rgb(177, 198, 176)');
     await expect(noteBadge).toHaveCSS('color', textColor);
+    await page.getByLabel('Choose labels', { exact: true }).click();
     await expect(
       page.getByRole('dialog').getByRole('checkbox', { name: 'Ideas', exact: true }),
     ).toBeChecked();
