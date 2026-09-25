@@ -105,9 +105,13 @@ function WorkspaceLayout({ offlineReady }: { offlineReady: boolean }) {
                 <h1 className="sr-only">{t(`nav.${route}`)}</h1>
                 {route === 'issues' ? <IssuesView /> : <NotesView />}
                 {ctl.feed.loading && ctl.availableCount <= ctl.limit && (
-                  <div className="feed-skeletons" role="status" aria-label={t('home.loading')}>
+                  <div
+                    className="feed-skeletons grid grid-cols-3 gap-4 py-6"
+                    role="status"
+                    aria-label={t('home.loading')}
+                  >
                     {[0, 1, 2].map((key) => (
-                      <div className="feed-skeleton" key={key} />
+                      <div className="feed-skeleton h-[90px] rounded-xl bg-hover opacity-50" key={key} />
                     ))}
                   </div>
                 )}

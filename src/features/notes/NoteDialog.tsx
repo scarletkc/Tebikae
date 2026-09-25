@@ -37,6 +37,7 @@ import {
 } from '../../application/commands';
 import { useSession, registerDraftFlusher } from '../../app/session';
 import { IconButton, download } from '../../app/ui';
+import { noteColorBg } from './cardColor';
 import {
   Banner,
   Button,
@@ -631,6 +632,7 @@ export default function NoteDialog({
                     className={cn(
                       'note-color-option',
                       `note-${color}`,
+                      noteColorBg[color],
                       'grid size-7 cursor-pointer place-items-center rounded-full border border-line text-fg outline-none',
                       'data-[highlighted]:outline-2 data-[highlighted]:outline-offset-2 data-[highlighted]:outline-accent',
                       'data-[state=checked]:outline-2 data-[state=checked]:outline-offset-2 data-[state=checked]:outline-accent',

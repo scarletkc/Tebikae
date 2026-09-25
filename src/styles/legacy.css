@@ -1,18 +1,4 @@
 /* Moved from the former src/app/menus.css and workspace-status.css (non-menu rules). */
-.note-card {
-  position: relative;
-}
-.note-card.is-selected {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.note-selected-mark {
-  position: absolute;
-  right: 10px;
-  top: 8px;
-  color: var(--accent);
-  font-weight: 700;
-}
 .label-nav-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -36,8 +22,7 @@
   gap: 8px;
   padding-right: 0;
 }
-.label-main > svg,
-.label-main > .label-dot {
+.label-main > svg {
   flex-shrink: 0;
 }
 .label-name {
@@ -217,9 +202,6 @@ hr {
 }
 .muted {
   color: var(--muted);
-}
-.danger {
-  color: var(--danger);
 }
 .sr-only {
   position: absolute;
@@ -513,9 +495,6 @@ hr {
   max-width: 100%;
   flex-shrink: 0;
 }
-.topbar-note-actions .filter-button.is-active {
-  background: var(--accent-soft);
-}
 .topbar-note-actions .view-toggle {
   padding: 3px;
   gap: 2px;
@@ -565,296 +544,14 @@ hr {
   width: 100%;
   margin: 0 auto;
 }
-.results-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
-  color: var(--muted);
-  gap: 10px;
-  margin: 21px 0;
-}
-.results-toolbar > div {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.results-toolbar select {
-  font-size: 12px;
-  padding: 8px 7px;
-  background: transparent;
-  border: 0;
-  max-width: 155px;
-}
-.filter-button {
-  background: transparent;
-  border-color: var(--border);
-  font-size: 12px;
-  padding: 7px 11px;
-  min-height: 33px;
-}
-.filter-button.is-active {
-  background: var(--accent-soft);
-}
-.count-badge {
-  font-size: 12px;
-  display: grid;
-  place-items: center;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: var(--surface);
-}
 .view-toggle {
   display: flex;
   border-left: 1px solid var(--border);
   padding-left: 10px;
   gap: 2px;
 }
-.filter-chips {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 21px;
-}
-.chip {
-  max-width: 100%;
-  min-width: 0;
-  overflow-wrap: anywhere;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 9px;
-  border: 1px solid var(--border);
-  background: var(--accent-soft);
-  border-radius: 20px;
-  font-size: 12px;
-}
-.note-group {
-  margin-bottom: 28px;
-}
-.note-group > h2 {
-  font-size: 12px;
-  letter-spacing: 1.6px;
-  text-transform: uppercase;
-  color: var(--muted);
-  font-weight: 600;
-  margin: 0 0 14px 2px;
-}
-.notes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
-  gap: 18px;
-  align-items: start;
-}
-.note-card {
-  border: 1px solid color-mix(in srgb, var(--border) 90%, transparent);
-  border-radius: 12px;
-  overflow: hidden;
-  transition:
-    box-shadow 0.15s,
-    border-color 0.15s;
-  min-width: 0;
-  break-inside: avoid;
-  background: var(--surface);
-}
-.note-card:hover,
-.note-card:focus-within {
-  box-shadow: var(--shadow-card-hover);
-  border-color: color-mix(in srgb, var(--muted) 40%, var(--border));
-}
-.note-open {
-  display: block;
-  text-align: left;
-  background: transparent;
-  border: 0;
-  padding: 21px 20px 12px;
-  width: 100%;
-  color: var(--text);
-  min-width: 0;
-}
-.note-open h3 {
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 1.6;
-  word-break: break-word;
-}
-.card-title {
-  display: flex;
-  gap: 9px;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 10px;
-}
-.card-title > svg,
-.card-pin-toggle {
-  margin-top: 4px;
-  color: var(--muted);
-}
-.card-pin-toggle {
-  flex-shrink: 0;
-}
-.card-pin-toggle:hover:not(:disabled),
-.card-pin-toggle:focus-visible {
-  color: var(--accent);
-  background: var(--accent-soft);
-}
-.card-pin-toggle svg,
-.is-pinned svg {
-  transform: rotate(45deg);
-  transition: transform 0.15s ease;
-}
-.card-preview {
-  font-size: 12px;
-  line-height: 1.85;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-line-clamp: 9;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  color: var(--text);
-  opacity: 0.88;
-}
-.card-labels {
-  padding: 7px 20px 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-.card-labels > span:not(.label-badge) {
-  padding: 3px 7px;
-  border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
-  background: color-mix(in srgb, var(--surface) 30%, transparent);
-  font-size: 12px;
-  border-radius: 5px;
-  color: var(--muted);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.card-footer {
-  padding: 6px 12px 9px 20px;
-  display: flex;
-  align-items: center;
-  min-height: 43px;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.card-footer > time {
-  font-size: 12px;
-  color: var(--muted);
-  white-space: nowrap;
-}
-.card-actions {
-  display: flex;
-  margin-left: auto;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.note-card:hover .card-actions,
-.note-card:focus-within .card-actions {
-  opacity: 1;
-}
-.card-status {
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  color: var(--muted);
-  gap: 4px;
-}
-.card-status > span {
-  display: none;
-}
-.status-error,
-.status-conflict,
-.status-uncertain {
-  color: var(--danger);
-}
-.card-checklist {
-  padding: 0 20px 9px;
-  display: flex;
-  flex-direction: column;
-  gap: 9px;
-}
-.card-checklist > label {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.55;
-  overflow-wrap: anywhere;
-}
-.card-checklist input {
-  margin: 2px 0 0;
-  width: 14px;
-  height: 14px;
-}
-.checked {
-  text-decoration: line-through;
-  opacity: 0.5;
-}
-.checklist-count {
-  align-self: flex-start;
-  padding: 6px 0 0;
-  font-size: 12px;
-  color: var(--muted);
-  border: 0;
-  background: none;
-}
-.notes-list {
-  grid-template-columns: 1fr;
-}
-.notes-list .note-card {
-  max-width: none;
-  display: grid;
-  grid-template-columns: minmax(220px, 1fr) minmax(120px, 0.6fr);
-  align-items: start;
-}
-.notes-list .card-preview {
-  -webkit-line-clamp: 3;
-}
-.notes-list .card-footer {
-  grid-column: 1/-1;
-  padding-top: 0;
-}
-.notes-list .card-labels {
-  padding-top: 24px;
-  justify-content: flex-end;
-}
-.notes-list .card-checklist {
-  padding-top: 20px;
-}
-.note-default {
-  background-color: var(--card-default);
-}
-.note-yellow {
-  background-color: var(--card-yellow);
-}
-.note-green {
-  background-color: var(--card-green);
-}
-.note-blue {
-  background-color: var(--card-blue);
-}
-.note-purple {
-  background-color: var(--card-purple);
-}
-.note-red {
-  background-color: var(--card-red);
-}
 .mobile-menu {
   display: none;
-}
-.issue-number {
-  font-size: 12px;
-  color: var(--muted);
-  display: block;
-  margin-bottom: 8px;
 }
 .backup-import-file {
   display: grid;
@@ -1059,20 +756,9 @@ hr {
 .fatal-error > p {
   margin: 20px 0;
 }
-@media (hover: none) {
-  .card-actions {
-    opacity: 1;
-  }
-}
 @media (min-width: 1500px) {
   .main-content {
     padding-top: 52px;
-  }
-  .notes-grid {
-    grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
-  }
-  .notes-list {
-    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 1100px) {
@@ -1086,13 +772,6 @@ hr {
   }
   .main-content {
     padding: 32px 26px 55px;
-  }
-  .notes-grid {
-    gap: 14px;
-    grid-template-columns: repeat(auto-fill, minmax(218px, 1fr));
-  }
-  .notes-list {
-    grid-template-columns: 1fr;
   }
 }
 @media (max-width: 760px) {
@@ -1112,47 +791,8 @@ hr {
   .main-content {
     padding: 29px 22px 50px;
   }
-  .results-toolbar > div {
-    gap: 5px;
-  }
-  .results-toolbar select {
-    max-width: 122px;
-    font-size: 12px;
-  }
   .view-toggle {
     padding-left: 5px;
-  }
-  .notes-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-  .note-open {
-    padding: 16px 15px 10px;
-  }
-  .note-open h3 {
-    font-size: 13px;
-  }
-  .card-preview {
-    font-size: 12px;
-    line-height: 1.8;
-  }
-  .card-checklist {
-    padding: 0 15px 8px;
-  }
-  .card-labels {
-    padding: 5px 15px;
-  }
-  .card-footer {
-    padding: 5px 9px 8px 15px;
-  }
-  .card-actions {
-    opacity: 1;
-  }
-  .notes-list {
-    grid-template-columns: 1fr;
-  }
-  .notes-list .note-card {
-    grid-template-columns: minmax(180px, 1fr) minmax(100px, 0.6fr);
   }
   .drawer-close {
     position: absolute;
@@ -1183,12 +823,6 @@ hr {
   .conflict-versions {
     grid-template-columns: 1fr;
   }
-  .filter-chips {
-    gap: 5px;
-  }
-  .chip {
-    font-size: 12px;
-  }
 }
 @media (max-width: 430px) {
   .app-topbar {
@@ -1204,38 +838,6 @@ hr {
   .main-content {
     padding: 25px 16px 40px;
   }
-  .notes-grid {
-    grid-template-columns: 1fr;
-  }
-  .notes-list .note-card {
-    display: block;
-  }
-  .notes-list .card-labels {
-    justify-content: flex-start;
-    padding-top: 4px;
-  }
-  .notes-list .card-checklist {
-    padding-top: 0;
-  }
-  .results-toolbar {
-    align-items: flex-start;
-    font-size: 12px;
-  }
-  .results-toolbar > span {
-    padding-top: 9px;
-  }
-  .results-toolbar > div {
-    gap: 2px;
-  }
-  .results-toolbar .filter-button {
-    font-size: 12px;
-    padding: 6px 8px;
-  }
-  .results-toolbar select {
-    max-width: 108px;
-    padding-left: 3px;
-    padding-right: 3px;
-  }
   .view-toggle {
     gap: 0;
     padding-left: 3px;
@@ -1246,13 +848,6 @@ hr {
   .note-save-row > span {
     min-width: 95px;
   }
-}
-.note-card {
-  transform-origin: center;
-}
-.note-card:active {
-  transform: scale(0.985);
-  transition: transform 0.1s ease;
 }
 @media (prefers-reduced-motion: reduce) {
   *,
