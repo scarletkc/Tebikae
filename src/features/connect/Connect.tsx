@@ -15,6 +15,7 @@ import { Brand, PreferencesControls } from '../../app/ui';
 import { useSession } from '../../app/session';
 import { db } from '../../storage/db';
 import { ApiError } from '../../adapters/github/client';
+import { Button } from '../../ui';
 
 export function ConnectForm({ onConnected }: { onConnected?: () => void }) {
   const { t } = useTranslation();
@@ -116,10 +117,10 @@ export function ConnectForm({ onConnected }: { onConnected?: () => void }) {
             {t(`error.${error || session.notice}`)}
           </p>
         )}
-        <button className="button primary wide" type="submit" disabled={busy}>
+        <Button variant="primary" size="lg" className="w-full" type="submit" disabled={busy}>
           {busy ? <LoaderCircle className="spin" size={18} /> : <GitBranch size={18} />}{' '}
           {t(busy ? 'action.connecting' : 'action.connect')} {!busy && <ArrowRight size={18} />}
-        </button>
+        </Button>
       </div>
       <div className="privacy-note">
         <LockKeyhole size={16} />

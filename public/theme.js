@@ -14,3 +14,7 @@ try {
     ? 'dark'
     : 'light';
 }
+/* Keep the browser/PWA status bar in step with the canvas color (see src/styles/theme.css). */
+document
+  .querySelector('meta[name="theme-color"]')
+  ?.setAttribute('content', document.documentElement.dataset.theme === 'dark' ? '#191919' : '#ffffff');

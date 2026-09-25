@@ -1,622 +1,624 @@
-.markdown-editor {
-  min-width: 0;
-  position: relative;
-  overflow: visible;
-  background: transparent;
-  color: var(--text);
-}
-.editor-modebar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 0 12px;
-  gap: 12px;
-  color: var(--muted);
-  font-size: 0.75rem;
-}
-.editor-mode-toggle {
-  font: inherit;
-  color: var(--accent);
-  background: transparent;
-  border: 0;
-  padding: 5px 0;
-  cursor: pointer;
-}
-.editor-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 3px;
-  width: fit-content;
-  max-width: 100%;
-  padding: 5px;
-  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: 0 3px 12px #14251c08;
-}
-.editor-tool {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 32px;
-  padding: 5px;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--muted);
-  cursor: pointer;
-}
-.editor-tool:hover,
-.editor-tool:focus-visible {
-  background: var(--surface-hover);
-  color: var(--text);
-}
-.editor-tool:focus-visible,
-.editor-mode-toggle:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-.editor-tool:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.editor-tool svg {
-  width: 16px;
-  height: 16px;
-  stroke-width: 1.8;
-}
-.editor-toolbar select {
-  width: 95px;
-  font-size: 0.75rem;
-  padding: 6px;
-  color: var(--text);
-  background: var(--surface);
-  border: 0;
-  border-radius: 6px;
-}
-.editor-toolbar-divider {
-  width: 1px;
-  height: 19px;
-  background: var(--border);
-  margin-inline: 3px;
-}
-.editor-codebar {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  padding: 3px 10px;
-  gap: 7px;
-  border-bottom: 0;
-}
-.editor-codebar input {
-  width: 120px;
-  min-width: 0;
-  font-size: 0.7rem;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  padding: 6px 0;
-}
-.editor-codebar > span {
-  font-size: 0.68rem;
-  color: var(--muted);
-}
-.editor-table-actions {
-  position: relative;
-  font-size: 0.75rem;
-}
-.editor-table-actions summary {
-  list-style: none;
-  cursor: pointer;
-  padding: 5px 8px;
-  color: var(--muted);
-}
-.editor-table-actions > div {
-  position: absolute;
-  right: 0;
-  top: 32px;
-  z-index: 3;
-  display: grid;
-  gap: 3px;
-  min-width: 150px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 6px;
-  box-shadow: var(--shadow);
-}
-.editor-table-actions button {
-  background: transparent;
-  color: var(--text);
-  border: 0;
-  padding: 8px;
-  display: flex;
-  gap: 5px;
-  align-items: center;
-  text-align: start;
-  cursor: pointer;
-}
-.editor-table-actions button:hover {
-  background: var(--surface-hover);
-}
-.editor-link-form {
-  padding: 12px;
-  display: grid;
-  gap: 10px;
-  border-bottom: 1px solid var(--border);
-  font-size: 0.8rem;
-}
-.editor-link-form label {
-  display: grid;
-  gap: 5px;
-}
-.editor-link-form input {
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  padding: 7px;
-  border-radius: 6px;
-}
-.editor-link-form > div {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.editor-link-form button {
-  padding: 6px 10px;
-  border: 1px solid var(--border);
-  color: var(--text);
-  background: var(--surface-hover);
-  border-radius: 5px;
-  cursor: pointer;
-}
-.editor-link-form [role='alert'] {
-  color: var(--danger);
-}
-.editor-notice,
-.editor-loading {
-  margin: 0;
-  padding: 12px 16px;
-  color: var(--muted);
-  font-size: 0.8rem;
-  line-height: 1.55;
-}
-.editor-notice {
-  background: var(--accent-soft);
-}
-.editor-source {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 330px;
-  resize: vertical;
-  padding: 24px 0;
-  border: 0;
-  background: transparent;
-  color: var(--text);
-  line-height: 1.7;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 0.85rem;
-  border-radius: 8px;
-}
-.editor-source:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-.editor-visual[hidden] {
-  display: none;
-}
-.markdown-editor .ProseMirror {
-  min-height: 300px;
-  padding: 28px 0 40px;
-  outline: none;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: normal;
-  caret-color: var(--accent);
-}
-.markdown-editor .ProseMirror:focus-visible {
-  box-shadow: none;
-}
-.markdown-preview,
-.markdown-editor .ProseMirror {
-  color: var(--text);
-  font-size: 0.92rem;
-  line-height: 1.75;
-}
-.markdown-preview > :first-child,
-.markdown-editor .ProseMirror > :first-child {
-  margin-top: 0;
-}
-.markdown-preview > :last-child,
-.markdown-editor .ProseMirror > :last-child {
-  margin-bottom: 0;
-}
-.markdown-preview p,
-.markdown-editor .ProseMirror p {
-  margin-block: 0.4em 0.85em;
-}
-.markdown-preview :is(h1, h2, h3, h4, h5, h6),
-.markdown-editor .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
-  line-height: 1.3;
-  margin-block: 1.2em 0.5em;
-  font-weight: 650;
-}
-.markdown-preview h1,
-.markdown-editor .ProseMirror h1 {
-  font-size: 1.8em;
-}
-.markdown-preview h2,
-.markdown-editor .ProseMirror h2 {
-  font-size: 1.5em;
-}
-.markdown-preview h3,
-.markdown-editor .ProseMirror h3 {
-  font-size: 1.25em;
-}
-.markdown-preview :is(h4, h5, h6),
-.markdown-editor .ProseMirror :is(h4, h5, h6) {
-  font-size: 1em;
-}
-.markdown-preview a,
-.markdown-editor .ProseMirror a {
-  color: var(--accent);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.markdown-preview pre,
-.markdown-editor .ProseMirror pre {
-  padding: 13px 15px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  overflow-x: auto;
-  max-width: 100%;
-  white-space: pre;
-}
-.markdown-preview code,
-.markdown-editor .ProseMirror code {
-  font-size: 0.88em;
-  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-  background: var(--bg);
-  border-radius: 3px;
-  padding: 2px 4px;
-}
-.markdown-preview pre code,
-.markdown-editor .ProseMirror pre code {
-  background: transparent;
-  padding: 0;
-}
-.markdown-editor .ProseMirror pre[data-language]::before {
-  content: attr(data-language);
-  display: block;
-  font-family: inherit;
-  color: var(--muted);
-  font-size: 0.7rem;
-  margin-bottom: 5px;
-}
-.markdown-preview blockquote,
-.markdown-editor .ProseMirror blockquote {
-  border-left: 3px solid var(--accent);
-  margin-inline: 0;
-  padding-left: 16px;
-  color: var(--muted);
-}
-.markdown-preview hr,
-.markdown-editor .ProseMirror hr {
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin-block: 22px;
-}
-.markdown-preview :is(ul, ol),
-.markdown-editor .ProseMirror :is(ul, ol) {
-  padding-left: 26px;
-}
-.markdown-editor .ProseMirror li > div > p {
-  margin-block: 2px;
-}
-.markdown-editor .ProseMirror li[data-item-type='task'] {
-  list-style: none;
-  position: relative;
-}
-.markdown-editor .ProseMirror li[data-item-type='task'] > input {
-  position: absolute;
-  left: -24px;
-  top: 0.43em;
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-.markdown-editor .ProseMirror li[data-checked='true'] > div > p {
-  text-decoration: line-through;
-  color: var(--muted);
-}
-.markdown-preview input[type='checkbox'] {
-  accent-color: var(--accent);
-}
-.markdown-preview table,
-.markdown-editor .ProseMirror table {
-  border-collapse: collapse;
-  display: block;
-  max-width: 100%;
-  overflow-x: auto;
-  margin-block: 1em;
-}
-.markdown-preview :is(th, td),
-.markdown-editor .ProseMirror :is(th, td) {
-  border: 1px solid var(--border);
-  padding: 8px 12px;
-  min-width: 65px;
-  position: relative;
-}
-.markdown-preview th,
-.markdown-editor .ProseMirror th {
-  background: var(--bg);
-  font-weight: 600;
-}
-.markdown-editor .ProseMirror .selectedCell::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: var(--accent-soft);
-  pointer-events: none;
-}
-.editor-image-placeholder {
-  display: inline-block;
-  max-width: 100%;
-  background: var(--bg);
-  border: 1px dashed var(--border);
-  color: var(--muted);
-  border-radius: 5px;
-  padding: 4px 9px;
-  font-size: 0.8em;
-  overflow-wrap: anywhere;
-}
-.markdown-editor .ProseMirror-selectednode {
-  outline: 2px solid var(--accent);
-}
-.markdown-editor ::selection,
-.markdown-preview ::selection {
-  background: var(--accent-soft);
-}
-@media (max-width: 480px) {
-  .markdown-editor .ProseMirror {
-    padding: 24px 0 32px;
+@layer legacy {
+  .markdown-editor {
+    min-width: 0;
+    position: relative;
+    overflow: visible;
+    background: transparent;
+    color: var(--text);
+  }
+  .editor-modebar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 0 12px;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+  .editor-mode-toggle {
+    font: inherit;
+    color: var(--accent);
+    background: transparent;
+    border: 0;
+    padding: 5px 0;
+    cursor: pointer;
   }
   .editor-toolbar {
-    padding-inline: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 3px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 5px;
+    border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: var(--shadow-card-hover);
   }
-  .editor-codebar > span {
-    display: none;
-  }
-}
-.code-block-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 12px;
-  background: var(--surface-hover);
-  border-radius: 8px 8px 0 0;
-}
-.code-block-header input {
-  min-width: 0;
-  width: 160px;
-  max-width: 60%;
-  padding: 4px 8px;
-}
-.code-block-header button {
-  margin-left: auto;
-}
-.editor-code-block pre {
-  margin-top: 0;
-}
-.text-context-target {
-  min-width: 0;
-}
-.editor-selection-toolbar {
-  position: absolute;
-  z-index: 25;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  width: 224px;
-  padding: 5px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px #101c2426;
-}
-.editor-selection-toolbar .editor-tool {
-  flex: 1;
-  height: 36px;
-}
-.editor-expanded-tools {
-  margin-top: 8px;
-  padding: 4px;
-  border-radius: 12px;
-  background: var(--surface-hover);
-}
-.editor-expanded-tools .editor-toolbar {
-  width: 100%;
-  border: 0;
-  background: transparent;
-  box-shadow: none;
-}
-.editor-expanded-tools .editor-codebar {
-  padding-inline: 8px;
-}
-.editor-expanded-tools .editor-codebar input {
-  font-size: 13px;
-}
-.editor-link-form {
-  margin-top: 12px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--surface-hover);
-}
-.editor-notice {
-  margin-block: 12px;
-  border-radius: 10px;
-}
-/* Document typography is scoped to the editor; card previews keep their density. */
-.markdown-editor .ProseMirror {
-  font-size: 16px;
-  line-height: 1.85;
-}
-.markdown-editor .ProseMirror p {
-  margin-block: 0 1.15em;
-}
-.markdown-editor .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
-  margin-block: 1.6em 0.65em;
-  line-height: 1.35;
-  letter-spacing: -0.025em;
-}
-.markdown-editor .ProseMirror > :first-child {
-  margin-top: 0;
-}
-.markdown-editor .ProseMirror blockquote {
-  padding: 12px 20px;
-  margin-block: 1.5em;
-  border-left: 3px solid color-mix(in srgb, var(--accent) 45%, var(--surface));
-  border-radius: 0 10px 10px 0;
-  background: color-mix(in srgb, var(--accent-soft) 50%, transparent);
-}
-.markdown-editor .ProseMirror blockquote > :last-child {
-  margin-bottom: 0;
-}
-.markdown-editor .ProseMirror pre {
-  padding: 18px 20px;
-  border: 0;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface-hover) 65%, var(--surface));
-  line-height: 1.7;
-  font-size: 14px;
-}
-.markdown-editor .ProseMirror code {
-  border-radius: 5px;
-  padding: 3px 5px;
-}
-.markdown-editor .ProseMirror pre code {
-  padding: 0;
-}
-.markdown-editor .ProseMirror :is(ul, ol) {
-  margin-block: 1em 1.4em;
-  padding-left: 28px;
-}
-.markdown-editor .ProseMirror li {
-  padding-left: 3px;
-  margin-block: 0.3em;
-}
-.markdown-editor .ProseMirror li > div > p {
-  margin-block: 0.25em;
-}
-.markdown-editor .ProseMirror li[data-item-type='task'] > input {
-  width: 16px;
-  height: 16px;
-  top: 0.4em;
-}
-.markdown-editor .ProseMirror table {
-  margin-block: 1.5em;
-  border-radius: 10px;
-}
-.markdown-editor .ProseMirror :is(th, td) {
-  padding: 12px 16px;
-  border-color: color-mix(in srgb, var(--border) 70%, transparent);
-}
-.markdown-editor .ProseMirror :is(th, td) p {
-  margin: 0;
-}
-.markdown-editor .ProseMirror hr {
-  width: 100%;
-  margin-block: 32px;
-  border-color: color-mix(in srgb, var(--border) 65%, transparent);
-}
-.code-block-header {
-  border-radius: 12px 12px 0 0;
-  background: color-mix(in srgb, var(--surface-hover) 65%, var(--surface));
-  padding: 8px 12px 0;
-}
-.markdown-editor .editor-code-block pre {
-  border-radius: 0 0 12px 12px;
-}
-@media (max-width: 760px) {
   .editor-tool {
-    min-width: 36px;
-    height: 44px;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 32px;
+    padding: 5px;
+    border: 0;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
   }
-  .editor-toolbar {
-    gap: 1px;
-    padding: 3px;
+  .editor-tool:hover,
+  .editor-tool:focus-visible {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+  .editor-tool:focus-visible,
+  .editor-mode-toggle:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .editor-tool:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+  .editor-tool svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.8;
   }
   .editor-toolbar select {
-    width: 80px;
-    height: 44px;
-    font-size: 13px;
+    width: 95px;
+    font-size: 0.75rem;
+    padding: 6px;
+    color: var(--text);
+    background: var(--surface);
+    border: 0;
+    border-radius: 6px;
   }
-  .editor-selection-toolbar .editor-tool {
-    height: 44px;
+  .editor-toolbar-divider {
+    width: 1px;
+    height: 19px;
+    background: var(--border);
+    margin-inline: 3px;
   }
-  .editor-source,
-  .editor-link-form input,
+  .editor-codebar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    padding: 3px 10px;
+    gap: 7px;
+    border-bottom: 0;
+  }
   .editor-codebar input {
-    font-size: 16px;
+    width: 120px;
+    min-width: 0;
+    font-size: 12px;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    padding: 6px 0;
+  }
+  .editor-codebar > span {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .editor-table-actions {
+    position: relative;
+    font-size: 0.75rem;
+  }
+  .editor-table-actions summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 5px 8px;
+    color: var(--muted);
+  }
+  .editor-table-actions > div {
+    position: absolute;
+    right: 0;
+    top: 32px;
+    z-index: 3;
+    display: grid;
+    gap: 3px;
+    min-width: 150px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px;
+    box-shadow: var(--shadow);
+  }
+  .editor-table-actions button {
+    background: transparent;
+    color: var(--text);
+    border: 0;
+    padding: 8px;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    text-align: start;
+    cursor: pointer;
+  }
+  .editor-table-actions button:hover {
+    background: var(--surface-hover);
+  }
+  .editor-link-form {
+    padding: 12px;
+    display: grid;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.8rem;
+  }
+  .editor-link-form label {
+    display: grid;
+    gap: 5px;
+  }
+  .editor-link-form input {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    padding: 7px;
+    border-radius: 6px;
+  }
+  .editor-link-form > div {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .editor-link-form button {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    color: var(--text);
+    background: var(--surface-hover);
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .editor-link-form [role='alert'] {
+    color: var(--danger);
+  }
+  .editor-notice,
+  .editor-loading {
+    margin: 0;
+    padding: 12px 16px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    line-height: 1.55;
+  }
+  .editor-notice {
+    background: var(--accent-soft);
+  }
+  .editor-source {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 330px;
+    resize: vertical;
+    padding: 24px 0;
+    border: 0;
+    background: transparent;
+    color: var(--text);
+    line-height: 1.7;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 0.85rem;
+    border-radius: 8px;
+  }
+  .editor-source:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  .editor-visual[hidden] {
+    display: none;
   }
   .markdown-editor .ProseMirror {
-    line-height: 1.8;
+    min-height: 300px;
+    padding: 28px 0 40px;
+    outline: none;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    caret-color: var(--accent);
   }
+  .markdown-editor .ProseMirror:focus-visible {
+    box-shadow: none;
+  }
+  .markdown-preview,
+  .markdown-editor .ProseMirror {
+    color: var(--text);
+    font-size: 0.92rem;
+    line-height: 1.75;
+  }
+  .markdown-preview > :first-child,
+  .markdown-editor .ProseMirror > :first-child {
+    margin-top: 0;
+  }
+  .markdown-preview > :last-child,
+  .markdown-editor .ProseMirror > :last-child {
+    margin-bottom: 0;
+  }
+  .markdown-preview p,
+  .markdown-editor .ProseMirror p {
+    margin-block: 0.4em 0.85em;
+  }
+  .markdown-preview :is(h1, h2, h3, h4, h5, h6),
+  .markdown-editor .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+    line-height: 1.3;
+    margin-block: 1.2em 0.5em;
+    font-weight: 650;
+  }
+  .markdown-preview h1,
+  .markdown-editor .ProseMirror h1 {
+    font-size: 1.8em;
+  }
+  .markdown-preview h2,
+  .markdown-editor .ProseMirror h2 {
+    font-size: 1.5em;
+  }
+  .markdown-preview h3,
+  .markdown-editor .ProseMirror h3 {
+    font-size: 1.25em;
+  }
+  .markdown-preview :is(h4, h5, h6),
+  .markdown-editor .ProseMirror :is(h4, h5, h6) {
+    font-size: 1em;
+  }
+  .markdown-preview a,
+  .markdown-editor .ProseMirror a {
+    color: var(--accent);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  .markdown-preview pre,
   .markdown-editor .ProseMirror pre {
-    padding: 14px;
+    padding: 13px 15px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    overflow-x: auto;
+    max-width: 100%;
+    white-space: pre;
+  }
+  .markdown-preview code,
+  .markdown-editor .ProseMirror code {
+    font-size: 0.88em;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    background: var(--bg);
+    border-radius: 3px;
+    padding: 2px 4px;
+  }
+  .markdown-preview pre code,
+  .markdown-editor .ProseMirror pre code {
+    background: transparent;
+    padding: 0;
+  }
+  .markdown-editor .ProseMirror pre[data-language]::before {
+    content: attr(data-language);
+    display: block;
+    font-family: inherit;
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 5px;
+  }
+  .markdown-preview blockquote,
+  .markdown-editor .ProseMirror blockquote {
+    border-left: 3px solid var(--accent);
+    margin-inline: 0;
+    padding-left: 16px;
+    color: var(--muted);
+  }
+  .markdown-preview hr,
+  .markdown-editor .ProseMirror hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin-block: 22px;
+  }
+  .markdown-preview :is(ul, ol),
+  .markdown-editor .ProseMirror :is(ul, ol) {
+    padding-left: 26px;
+  }
+  .markdown-editor .ProseMirror li > div > p {
+    margin-block: 2px;
+  }
+  .markdown-editor .ProseMirror li[data-item-type='task'] {
+    list-style: none;
+    position: relative;
+  }
+  .markdown-editor .ProseMirror li[data-item-type='task'] > input {
+    position: absolute;
+    left: -24px;
+    top: 0.43em;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .markdown-editor .ProseMirror li[data-checked='true'] > div > p {
+    text-decoration: line-through;
+    color: var(--muted);
+  }
+  .markdown-preview input[type='checkbox'] {
+    accent-color: var(--accent);
+  }
+  .markdown-preview table,
+  .markdown-editor .ProseMirror table {
+    border-collapse: collapse;
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    margin-block: 1em;
+  }
+  .markdown-preview :is(th, td),
+  .markdown-editor .ProseMirror :is(th, td) {
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    min-width: 65px;
+    position: relative;
+  }
+  .markdown-preview th,
+  .markdown-editor .ProseMirror th {
+    background: var(--bg);
+    font-weight: 600;
+  }
+  .markdown-editor .ProseMirror .selectedCell::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--accent-soft);
+    pointer-events: none;
+  }
+  .editor-image-placeholder {
+    display: inline-block;
+    max-width: 100%;
+    background: var(--bg);
+    border: 1px dashed var(--border);
+    color: var(--muted);
+    border-radius: 5px;
+    padding: 4px 9px;
+    font-size: 0.8em;
+    overflow-wrap: anywhere;
+  }
+  .markdown-editor .ProseMirror-selectednode {
+    outline: 2px solid var(--accent);
+  }
+  .markdown-editor ::selection,
+  .markdown-preview ::selection {
+    background: var(--accent-soft);
+  }
+  @media (max-width: 480px) {
+    .markdown-editor .ProseMirror {
+      padding: 24px 0 32px;
+    }
+    .editor-toolbar {
+      padding-inline: 6px;
+    }
+    .editor-codebar > span {
+      display: none;
+    }
+  }
+  .code-block-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    background: var(--surface-hover);
+    border-radius: 8px 8px 0 0;
   }
   .code-block-header input {
+    min-width: 0;
+    width: 160px;
+    max-width: 60%;
+    padding: 4px 8px;
+  }
+  .code-block-header button {
+    margin-left: auto;
+  }
+  .editor-code-block pre {
+    margin-top: 0;
+  }
+  .text-context-target {
+    min-width: 0;
+  }
+  .editor-selection-toolbar {
+    position: absolute;
+    z-index: 25;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    width: 224px;
+    padding: 5px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+  }
+  .editor-selection-toolbar .editor-tool {
+    flex: 1;
+    height: 36px;
+  }
+  .editor-expanded-tools {
+    margin-top: 8px;
+    padding: 4px;
+    border-radius: 12px;
+    background: var(--surface-hover);
+  }
+  .editor-expanded-tools .editor-toolbar {
+    width: 100%;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+  .editor-expanded-tools .editor-codebar {
+    padding-inline: 8px;
+  }
+  .editor-expanded-tools .editor-codebar input {
+    font-size: 13px;
+  }
+  .editor-link-form {
+    margin-top: 12px;
+    border: 0;
+    border-radius: 12px;
+    background: var(--surface-hover);
+  }
+  .editor-notice {
+    margin-block: 12px;
+    border-radius: 10px;
+  }
+  /* Document typography is scoped to the editor; card previews keep their density. */
+  .markdown-editor .ProseMirror {
     font-size: 16px;
+    line-height: 1.85;
   }
-}
-@media (prefers-reduced-motion: reduce) {
-  .markdown-editor *,
-  .note-dialog * {
-    scroll-behavior: auto;
+  .markdown-editor .ProseMirror p {
+    margin-block: 0 1.15em;
   }
-}
+  .markdown-editor .ProseMirror :is(h1, h2, h3, h4, h5, h6) {
+    margin-block: 1.6em 0.65em;
+    line-height: 1.35;
+    letter-spacing: -0.025em;
+  }
+  .markdown-editor .ProseMirror > :first-child {
+    margin-top: 0;
+  }
+  .markdown-editor .ProseMirror blockquote {
+    padding: 12px 20px;
+    margin-block: 1.5em;
+    border-left: 3px solid color-mix(in srgb, var(--accent) 45%, var(--surface));
+    border-radius: 0 10px 10px 0;
+    background: color-mix(in srgb, var(--accent-soft) 50%, transparent);
+  }
+  .markdown-editor .ProseMirror blockquote > :last-child {
+    margin-bottom: 0;
+  }
+  .markdown-editor .ProseMirror pre {
+    padding: 18px 20px;
+    border: 0;
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--surface-hover) 65%, var(--surface));
+    line-height: 1.7;
+    font-size: 14px;
+  }
+  .markdown-editor .ProseMirror code {
+    border-radius: 5px;
+    padding: 3px 5px;
+  }
+  .markdown-editor .ProseMirror pre code {
+    padding: 0;
+  }
+  .markdown-editor .ProseMirror :is(ul, ol) {
+    margin-block: 1em 1.4em;
+    padding-left: 28px;
+  }
+  .markdown-editor .ProseMirror li {
+    padding-left: 3px;
+    margin-block: 0.3em;
+  }
+  .markdown-editor .ProseMirror li > div > p {
+    margin-block: 0.25em;
+  }
+  .markdown-editor .ProseMirror li[data-item-type='task'] > input {
+    width: 16px;
+    height: 16px;
+    top: 0.4em;
+  }
+  .markdown-editor .ProseMirror table {
+    margin-block: 1.5em;
+    border-radius: 10px;
+  }
+  .markdown-editor .ProseMirror :is(th, td) {
+    padding: 12px 16px;
+    border-color: color-mix(in srgb, var(--border) 70%, transparent);
+  }
+  .markdown-editor .ProseMirror :is(th, td) p {
+    margin: 0;
+  }
+  .markdown-editor .ProseMirror hr {
+    width: 100%;
+    margin-block: 32px;
+    border-color: color-mix(in srgb, var(--border) 65%, transparent);
+  }
+  .code-block-header {
+    border-radius: 12px 12px 0 0;
+    background: color-mix(in srgb, var(--surface-hover) 65%, var(--surface));
+    padding: 8px 12px 0;
+  }
+  .markdown-editor .editor-code-block pre {
+    border-radius: 0 0 12px 12px;
+  }
+  @media (max-width: 760px) {
+    .editor-tool {
+      min-width: 36px;
+      height: 44px;
+    }
+    .editor-toolbar {
+      gap: 1px;
+      padding: 3px;
+    }
+    .editor-toolbar select {
+      width: 80px;
+      height: 44px;
+      font-size: 13px;
+    }
+    .editor-selection-toolbar .editor-tool {
+      height: 44px;
+    }
+    .editor-source,
+    .editor-link-form input,
+    .editor-codebar input {
+      font-size: 16px;
+    }
+    .markdown-editor .ProseMirror {
+      line-height: 1.8;
+    }
+    .markdown-editor .ProseMirror pre {
+      padding: 14px;
+    }
+    .code-block-header input {
+      font-size: 16px;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .markdown-editor *,
+    .note-dialog * {
+      scroll-behavior: auto;
+    }
+  }
 
-.markdown-editor .code-block-header label > span {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
-.markdown-editor .code-block-header input:not([type='checkbox']) {
-  width: 150px;
-  max-width: 100%;
-  margin: 0;
-  padding: 6px 8px;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 400;
-}
-.markdown-editor .code-block-header button {
-  font-size: 12px;
-  color: var(--muted);
-  padding: 8px;
-  border-radius: 6px;
-}
-.markdown-editor .code-block-header button:hover {
-  background: var(--surface-hover);
-  color: var(--text);
-}
-.markdown-editor .editor-code-block pre[data-language]::before {
-  display: none;
-}
-@media (max-width: 760px) {
+  .markdown-editor .code-block-header label > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
   .markdown-editor .code-block-header input:not([type='checkbox']) {
-    font-size: 16px;
-    min-height: 44px;
+    width: 150px;
+    max-width: 100%;
+    margin: 0;
+    padding: 6px 8px;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 400;
   }
   .markdown-editor .code-block-header button {
-    min-height: 44px;
+    font-size: 12px;
+    color: var(--muted);
+    padding: 8px;
+    border-radius: 6px;
+  }
+  .markdown-editor .code-block-header button:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+  .markdown-editor .editor-code-block pre[data-language]::before {
+    display: none;
+  }
+  @media (max-width: 760px) {
+    .markdown-editor .code-block-header input:not([type='checkbox']) {
+      font-size: 16px;
+      min-height: 44px;
+    }
+    .markdown-editor .code-block-header button {
+      min-height: 44px;
+    }
   }
 }

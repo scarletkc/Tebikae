@@ -1,0 +1,233 @@
+import { CheckSquare, Grid2X2, List, Menu, Pencil, Plus, SlidersHorizontal, X } from 'lucide-react';
+import { defaultFilters } from '../../domain/filters';
+import { usePreferences } from '../../app/preferences';
+import { IconButton, SortControl } from '../../app/ui';
+import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
+import WorkspaceStatus from '../../app/WorkspaceStatus';
+import { useIsMobile } from '../../app/useMediaQuery';
+import { TextContextMenu } from '../editor/TextContextMenu';
+import { filterCount } from '../filters/Filters';
+import { isNoteListRoute } from './routes';
+import { useWorkspace } from './useWorkspaceController';
+import { Button } from '../../ui';
+
+export function WorkspaceStatusControl() {
+  const { notices, route, visibleIssues, result } = useWorkspace();
+  return (
+    <WorkspaceStatus
+      notices={notices}
+      count={
+        route === 'settings' ? undefined : route === 'issues' ? visibleIssues.length : result.notes.length
+      }
+    />
+  );
+}
+
+/** Grid/list switch: a single toggling icon in the compact topbar, two buttons otherwise. */
+export function ViewToggle({ mode }: { mode: 'icon' | 'segmented' }) {
+  const { t, layout } = useWorkspace();
+  const prefs = usePreferences();
+  const items: MenuAction[] = [
+    {
+      label: t('action.grid'),
+      icon: Grid2X2,
+      checked: layout.effectiveLayout === 'grid',
+      keepOpen: false,
+      run: () => prefs.setLayout('grid'),
+    },
+    {
+      label: t('action.list'),
+      icon: List,
+      checked: layout.effectiveLayout === 'list',
+      keepOpen: false,
+      run: () => prefs.setLayout('list'),
+    },
+  ];
+  if (mode === 'icon')
+    return (
+      <ContextMenu contextName="view" items={items}>
+        <IconButton
+          size="sm"
+          className={`view-toggle-button ${prefs.layout === 'grid' ? 'is-grid' : 'is-list'}`}
+          label={t(`action.${prefs.layout}`)}
+          onClick={() => prefs.setLayout(prefs.layout === 'grid' ? 'list' : 'grid')}
+        >
+          {prefs.layout === 'grid' ? <Grid2X2 size={17} /> : <List size={18} />}
+        </IconButton>
+      </ContextMenu>
+    );
+  return (
+    <ContextMenu contextName="view" className="view-toggle flex" items={items}>
+      <IconButton
+        size="sm"
+        className={prefs.layout === 'grid' ? 'selected' : ''}
+        label={t('action.grid')}
+        onClick={() => prefs.setLayout('grid')}
+      >
+        <Grid2X2 size={17} />
+      </IconButton>
+      <IconButton
+        size="sm"
+        className={prefs.layout === 'list' ? 'selected' : ''}
+        label={t('action.list')}
+        onClick={() => prefs.setLayout('list')}
+      >
+        <List size={18} />
+      </IconButton>
+    </ContextMenu>
+  );
+}
+
+/** Primary "new note" action: a labelled topbar button or a floating action button. */
+export function NewNoteMenu({ variant }: { variant: 'button' | 'fab' }) {
+  const { t, session, newNote } = useWorkspace();
+  const items: MenuAction[] = [
+    { label: t('action.new'), icon: Plus, disabled: !session.writable, run: () => newNote() },
+    {
+      label: t('action.newChecklist'),
+      icon: CheckSquare,
+      separator: true,
+      disabled: !session.writable,
+      run: () => newNote('checklist'),
+    },
+  ];
+  if (variant === 'fab')
+    return (
+      <ContextMenu contextName="new-note-fab" items={items}>
+        <Button
+          variant="primary"
+          className="new-note-button fab-new-note fixed right-7 bottom-7 z-30 size-14 rounded-full p-0 shadow-popover max-md:right-5 max-md:bottom-5 [&_svg]:size-5.5"
+          aria-label={t('action.new')}
+          title={t('action.new')}
+          disabled={!session.writable}
+          onClick={() => newNote()}
+        >
+          <Pencil />
+        </Button>
+      </ContextMenu>
+    );
+  return (
+    <ContextMenu contextName="new-note" items={items}>
+      <Button
+        variant="primary"
+        className="new-note-button"
+        disabled={!session.writable}
+        onClick={() => newNote()}
+      >
+        <Plus size={18} />
+        {t('action.new')}
+      </Button>
+    </ContextMenu>
+  );
+}
+
+/** True where the list can create notes (not in the trash or archive views). */
+export function canCreateHere(route: string, view: string) {
+  return isNoteListRoute(route) && route !== 'trash' && view !== 'archive';
+}
+
+function FilterButton() {
+  const { t, filters, setFiltersOpen } = useWorkspace();
+  return (
+    <IconButton
+      size="sm"
+      label={t('action.filter')}
+      className={`filter-open-button ${filterCount(filters) ? 'is-active' : ''}`}
+      onClick={() => setFiltersOpen(true)}
+    >
+      <SlidersHorizontal size={16} />
+    </IconButton>
+  );
+}
+
+export default function Topbar() {
+  const ctl = useWorkspace();
+  const { t, route, view, filters, setFilters, searchInput, setSearchInput, layout } = ctl;
+  const isMobile = useIsMobile();
+  const noteList = isNoteListRoute(route);
+  return (
+    <header ref={layout.topbarRef} className="app-topbar">
+      <div className="search-box">
+        <IconButton
+          size="sm"
+          className={isMobile ? 'mobile-menu nav-toggle-btn' : 'sidebar-toggle nav-toggle-btn'}
+          label={isMobile ? t('nav.menu') : layout.sidebarCollapsed ? t('nav.menu') : t('nav.close')}
+          onClick={() => {
+            if (isMobile) {
+              ctl.setDrawer(true);
+            } else {
+              layout.setSidebarCollapsed((value) => !value);
+            }
+          }}
+        >
+          <Menu size={18} />
+        </IconButton>
+        <TextContextMenu
+          clearLabel={t('context.clearSearch')}
+          clearDisabled={!searchInput}
+          onClear={() => setFilters({ ...filters, query: '' })}
+        >
+          <input
+            ref={ctl.searchRef}
+            aria-label={t('home.search')}
+            placeholder={`${t('home.search')} (Ctrl+K)`}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            onBlur={(e) => {
+              const query = e.currentTarget.value.trim();
+              setSearchInput(query);
+              if (query !== filters.query) setFilters({ ...filters, query });
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) e.currentTarget.blur();
+            }}
+          />
+        </TextContextMenu>
+        {(searchInput || filters.query || filterCount(filters) > 0) && (
+          <IconButton
+            size="sm"
+            label={t('action.clearSearchFilters')}
+            className="search-clear-button"
+            onClick={() => {
+              setSearchInput('');
+              setFilters({ ...defaultFilters, view, sort: filters.sort });
+            }}
+          >
+            <X size={15} />
+          </IconButton>
+        )}
+        {layout.isCompactTopbar ? (
+          noteList ? (
+            <div className="topbar-note-actions search-actions">
+              <WorkspaceStatusControl />
+              <SortControl
+                value={filters.sort}
+                onChange={(sort) => setFilters({ ...filters, sort })}
+                mode="icon"
+              />
+              {!layout.singleColumnOnly && <ViewToggle mode="icon" />}
+              <FilterButton />
+            </div>
+          ) : (
+            <WorkspaceStatusControl />
+          )
+        ) : (
+          noteList && <FilterButton />
+        )}
+      </div>
+      {!layout.isCompactTopbar && noteList && (
+        <div className="topbar-note-actions">
+          <SortControl
+            value={filters.sort}
+            onChange={(sort) => setFilters({ ...filters, sort })}
+            mode="text"
+          />
+          {!layout.singleColumnOnly && <ViewToggle mode="segmented" />}
+          <WorkspaceStatusControl />
+          {route !== 'trash' && view !== 'archive' && <NewNoteMenu variant="button" />}
+        </div>
+      )}
+      {!layout.isCompactTopbar && !noteList && <WorkspaceStatusControl />}
+    </header>
+  );
+}

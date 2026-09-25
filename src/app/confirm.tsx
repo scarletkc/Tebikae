@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import * as AlertDialog from '@radix-ui/react-alert-dialog';
 import { useTranslation } from 'react-i18next';
+import { Button, cn, dialogContentClass, dialogOverlayClass } from '../ui';
 
 type ConfirmOptions = {
   title: string;
@@ -44,13 +45,13 @@ export function ConfirmDialogHost() {
   const { t } = useTranslation();
   const [pending, setPending] = useState<PendingConfirm | null>(null);
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     ask = (options) =>
       new Promise<boolean>((resolve) => {
         const active = document.activeElement as HTMLElement | null;
+        // Menus close before the dialog opens, so fall back to the element that was clicked.
         previousFocusRef.current =
           active && active !== document.body ? active : lastInteractionTarget || active || null;
         isConfirmOpen = true;
@@ -63,12 +64,12 @@ export function ConfirmDialogHost() {
   }, []);
 
   const settle = (value: boolean) => {
+    if (!pending) return;
     isConfirmOpen = false;
-    const resolver = pending?.resolve;
     const prev = previousFocusRef.current;
     previousFocusRef.current = null;
     setPending(null);
-    resolver?.(value);
+    pending.resolve(value);
     requestAnimationFrame(() => {
       prev?.focus?.();
     });
@@ -77,100 +78,57 @@ export function ConfirmDialogHost() {
     }, 16);
   };
 
-  useEffect(() => {
-    if (!pending) return;
-    const timer = setTimeout(() => {
-      confirmRef.current?.focus();
-    }, 0);
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        event.preventDefault();
-        event.stopPropagation();
-        settle(false);
-        return;
-      }
-      if (event.key === 'Tab') {
-        const dialog = dialogRef.current;
-        if (!dialog) return;
-        const focusable = Array.from(
-          dialog.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
-          ),
-        ).filter((element) => element.offsetParent !== null || element === document.activeElement);
-        if (!focusable.length) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-        const first = focusable[0]!;
-        const last = focusable[focusable.length - 1]!;
-        const active = document.activeElement;
-        if (event.shiftKey) {
-          if (active === first || !dialog.contains(active)) {
-            event.preventDefault();
-            event.stopPropagation();
-            last.focus();
-          }
-        } else {
-          if (active === last || !dialog.contains(active)) {
-            event.preventDefault();
-            event.stopPropagation();
-            first.focus();
-          }
-        }
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown, true);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener('keydown', handleKeyDown, true);
-    };
-  }, [pending]);
-
   return (
-    <AnimatePresence>
-      {pending && (
-        <motion.div
-          className="confirm-overlay"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.14 }}
+    <AlertDialog.Root
+      open={!!pending}
+      onOpenChange={(open) => {
+        if (!open) settle(false);
+      }}
+    >
+      <AlertDialog.Portal>
+        <AlertDialog.Overlay
+          className={cn('confirm-overlay', dialogOverlayClass, 'z-55')}
           onClick={() => settle(false)}
+        />
+        <AlertDialog.Content
+          className={cn(
+            'confirm-dialog',
+            dialogContentClass('sm'),
+            'z-55 gap-2 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-6',
+          )}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            confirmRef.current?.focus();
+          }}
+          // Focus goes back to the control that asked, handled in settle().
+          onCloseAutoFocus={(event) => event.preventDefault()}
+          {...(pending?.description ? {} : { 'aria-describedby': undefined })}
         >
-          <motion.div
-            ref={dialogRef}
-            role="alertdialog"
-            aria-modal="true"
-            aria-label={pending.title}
-            className="confirm-dialog"
-            initial={{ opacity: 0, scale: 0.96, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.97, y: 6 }}
-            transition={{ duration: 0.15, ease: 'easeOut' }}
-            onClick={(event) => event.stopPropagation()}
-            tabIndex={-1}
-          >
-            <h2 className="confirm-title">{pending.title}</h2>
-            {pending.description && <p className="confirm-description">{pending.description}</p>}
-            <div className="confirm-actions">
-              <button className="button secondary" onClick={() => settle(false)}>
-                {pending.cancelLabel || t('action.cancel')}
-              </button>
-              <button
-                ref={confirmRef}
-                className={`button ${pending.danger ? 'danger primary' : 'primary'}`}
-                onClick={() => settle(true)}
-              >
-                {pending.confirmLabel || t('action.confirm')}
-              </button>
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
-    </AnimatePresence>
+          {pending && (
+            <>
+              <AlertDialog.Title className="confirm-title text-base font-semibold text-fg [overflow-wrap:anywhere]">
+                {pending.title}
+              </AlertDialog.Title>
+              {pending.description && (
+                <AlertDialog.Description className="confirm-description text-sm text-muted [overflow-wrap:anywhere]">
+                  {pending.description}
+                </AlertDialog.Description>
+              )}
+              <div className="confirm-actions mt-4 flex flex-wrap justify-end gap-2">
+                <Button onClick={() => settle(false)}>{pending.cancelLabel || t('action.cancel')}</Button>
+                <Button
+                  ref={confirmRef}
+                  variant={pending.danger ? 'danger' : 'primary'}
+                  onClick={() => settle(true)}
+                >
+                  {pending.confirmLabel || t('action.confirm')}
+                </Button>
+              </div>
+            </>
+          )}
+        </AlertDialog.Content>
+      </AlertDialog.Portal>
+    </AlertDialog.Root>
   );
 }
 

@@ -92,7 +92,7 @@ export default function NoteCard({
   const updated =
     note.syncStatus === 'synced' ? note.base?.updatedAt || note.localModifiedAt : note.localModifiedAt;
   return (
-    <ContextMenu items={menuItems} className="context-card">
+    <ContextMenu items={menuItems} className="context-card relative block">
       <article
         className={`note-card note-${document.meta.color} ${selected ? 'is-selected' : ''}`}
         tabIndex={0}
@@ -123,6 +123,7 @@ export default function NoteCard({
             </h3>
             {!trashed && document.meta.pinned && (
               <IconButton
+                size="xs"
                 label={t('action.unpin')}
                 className="card-pin-toggle"
                 onClick={() => onChange('pin')}
@@ -205,6 +206,7 @@ export default function NoteCard({
             {trashed ? (
               <>
                 <IconButton
+                  size="xs"
                   label={t('action.restore')}
                   onClick={() => onChange('restore')}
                   disabled={!editable}
@@ -213,6 +215,7 @@ export default function NoteCard({
                 </IconButton>
                 {onPurge && (
                   <IconButton
+                    size="xs"
                     label={t('action.deleteForever')}
                     onClick={onPurge}
                     disabled={!writable || !canPurge}
@@ -224,18 +227,29 @@ export default function NoteCard({
             ) : (
               <>
                 {document.meta.pinned ? null : (
-                  <IconButton label={t('action.pin')} onClick={() => onChange('pin')} disabled={!editable}>
+                  <IconButton
+                    size="xs"
+                    label={t('action.pin')}
+                    onClick={() => onChange('pin')}
+                    disabled={!editable}
+                  >
                     <Pin size={16} />
                   </IconButton>
                 )}
                 <IconButton
+                  size="xs"
                   label={t(document.archived ? 'action.unarchive' : 'action.archive')}
                   onClick={() => onChange('archive')}
                   disabled={!editable}
                 >
                   {document.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
                 </IconButton>
-                <IconButton label={t('action.trash')} onClick={() => onChange('trash')} disabled={!editable}>
+                <IconButton
+                  size="xs"
+                  label={t('action.trash')}
+                  onClick={() => onChange('trash')}
+                  disabled={!editable}
+                >
                   <Trash2 size={16} />
                 </IconButton>
               </>

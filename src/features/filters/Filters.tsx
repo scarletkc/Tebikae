@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { X } from 'lucide-react';
 import { NOTE_COLORS, type Label, type NoteFilters } from '../../domain/types';
 import { defaultFilters } from '../../domain/filters';
-import { Modal } from '../../app/ui';
+import { Button, Dialog } from '../../ui';
 import { LabelBadge, LabelDot, labelStyle } from '../labels';
 
 export function filterCount(f: NoteFilters) {
@@ -93,7 +93,7 @@ export function FiltersDialog({
 }) {
   const { t } = useTranslation();
   return (
-    <Modal title={t('action.filter')} onClose={onClose} className="filters-dialog">
+    <Dialog title={t('action.filter')} onClose={onClose} className="filters-dialog">
       <div className="filter-fields">
         <fieldset>
           <legend>{t('filter.labels')}</legend>
@@ -222,10 +222,8 @@ export function FiltersDialog({
           />
           {t('filter.unsynced')}
         </label>
-        <button className="button secondary" onClick={() => setFilters({ ...defaultFilters, view: f.view })}>
-          {t('action.clear')}
-        </button>
+        <Button onClick={() => setFilters({ ...defaultFilters, view: f.view })}>{t('action.clear')}</Button>
       </div>
-    </Modal>
+    </Dialog>
   );
 }

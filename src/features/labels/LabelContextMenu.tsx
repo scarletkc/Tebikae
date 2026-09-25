@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useTranslation } from 'react-i18next';
 import { Palette, Pencil, Tag, Trash2 } from 'lucide-react';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
-import { Modal } from '../../app/ui';
+import { Button, Dialog } from '../../ui';
 import { confirmDialog } from '../../app/confirm';
 import { useSession } from '../../app/session';
 import { db } from '../../storage/db';
@@ -131,12 +131,12 @@ export function LabelContextMenu({
         {children}
       </ContextMenu>
       {error && (
-        <Modal title={t('error.generic')} onClose={() => setError(false)}>
+        <Dialog title={t('error.generic')} onClose={() => setError(false)} size="sm">
           <p role="alert">{t('error.generic')}</p>
-        </Modal>
+        </Dialog>
       )}
       {rename && (
-        <Modal title={t('context.rename')} onClose={() => setRename(false)}>
+        <Dialog title={t('context.rename')} onClose={() => setRename(false)} size="sm">
           <form
             className="label-form"
             onSubmit={(e) => {
@@ -155,11 +155,11 @@ export function LabelContextMenu({
                 onChange={(e) => setName(e.target.value)}
               />
             </label>
-            <button className="button primary" disabled={disabled || !name.trim()}>
+            <Button type="submit" variant="primary" disabled={disabled || !name.trim()}>
               {t('context.apply')}
-            </button>
+            </Button>
           </form>
-        </Modal>
+        </Dialog>
       )}
     </>
   );

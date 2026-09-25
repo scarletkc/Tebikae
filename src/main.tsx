@@ -1,3 +1,5 @@
+// Must stay first: declares the cascade layer order for every stylesheet.
+import './styles/layers.css';
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { HashRouter } from 'react-router-dom';
@@ -9,6 +11,7 @@ import { ToastProvider } from './app/toast';
 import { ConfirmProvider } from './app/confirm';
 import App from './app/App';
 import './styles/app.css';
+import { Button } from './ui';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -23,9 +26,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
       <main className="fatal-error">
         <h1>Tebikae</h1>
         <p>{i18n.t('error.storage')}</p>
-        <button className="button primary" onClick={() => location.reload()}>
+        <Button variant="primary" onClick={() => location.reload()}>
           {i18n.t('action.retry')}
-        </button>
+        </Button>
       </main>
     ) : (
       this.props.children

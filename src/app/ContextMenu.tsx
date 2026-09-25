@@ -1,9 +1,9 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { type LucideIcon } from 'lucide-react';
+import { ChevronRight, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { isNativeText, useLongPress } from './LongPressTrigger';
-import './menus.css';
+import { Button, cn, menuContent, menuItem, menuItemDanger, menuSeparator } from '../ui';
 
 export interface MenuAction {
   label: string;
@@ -18,10 +18,18 @@ export interface MenuAction {
   swatch?: string;
 }
 
+/** Touch and narrow screens get a wider floating menu (docs/context-menus.md). */
+const coarseMenuWidth =
+  'pointer-coarse:min-w-[min(220px,calc(100vw-16px))] max-[600px]:min-w-[min(220px,calc(100vw-16px))]';
+
 function Icon({ icon: IconComponent, swatch }: Pick<MenuAction, 'icon' | 'swatch'>) {
   if (swatch !== undefined)
     return (
-      <span className="context-icon context-swatch" style={{ backgroundColor: swatch }} aria-hidden="true" />
+      <span
+        className="context-icon context-swatch inline-block size-4 shrink-0 rounded-full border border-line"
+        style={{ backgroundColor: swatch }}
+        aria-hidden="true"
+      />
     );
   return IconComponent ? (
     <IconComponent className="context-icon" size={16} strokeWidth={1.8} aria-hidden="true" />
@@ -74,7 +82,11 @@ function SubContent({ items }: { items: MenuAction[] }) {
   }, []);
 
   return (
-    <Menu.SubContent ref={contentRef} className="context-menu context-submenu" collisionPadding={8}>
+    <Menu.SubContent
+      ref={contentRef}
+      className={cn('context-menu context-submenu', menuContent, coarseMenuWidth)}
+      collisionPadding={8}
+    >
       <Items items={items} />
     </Menu.SubContent>
   );
@@ -82,16 +94,17 @@ function SubContent({ items }: { items: MenuAction[] }) {
 
 function Items({ items }: { items: MenuAction[] }) {
   return items.map((item, index) => (
-    <span key={`${item.label}-${index}`} className="context-item-group">
-      {item.separator && <Menu.Separator className="context-separator" />}
+    <span key={`${item.label}-${index}`} className="context-item-group contents">
+      {item.separator && <Menu.Separator className={cn('context-separator', menuSeparator)} />}
       {item.children ? (
         <Menu.Sub>
-          <Menu.SubTrigger className="context-item" disabled={item.disabled}>
+          <Menu.SubTrigger
+            className={cn('context-item', menuItem, 'data-[state=open]:bg-hover')}
+            disabled={item.disabled}
+          >
             <Icon icon={item.icon} swatch={item.swatch} />
             {item.label}
-            <span className="context-arrow" aria-hidden>
-              ›
-            </span>
+            <ChevronRight className="context-arrow ms-auto" aria-hidden="true" />
           </Menu.SubTrigger>
           <Menu.Portal>
             <SubContent items={item.children} />
@@ -99,7 +112,7 @@ function Items({ items }: { items: MenuAction[] }) {
         </Menu.Sub>
       ) : item.checked !== undefined ? (
         <Menu.CheckboxItem
-          className="context-item"
+          className={cn('context-item', menuItem)}
           checked={item.checked}
           disabled={item.disabled}
           onSelect={(e) => {
@@ -112,7 +125,7 @@ function Items({ items }: { items: MenuAction[] }) {
         </Menu.CheckboxItem>
       ) : (
         <Menu.Item
-          className={`context-item ${item.danger ? 'context-danger' : ''}`}
+          className={cn('context-item', menuItem, item.danger && ['context-danger', menuItemDanger])}
           disabled={item.disabled}
           onSelect={item.run}
         >
@@ -161,7 +174,7 @@ export function ContextMenu({
       modal={false}
     >
       <div
-        className={`context-target ${className}`}
+        className={cn('context-target contents', className)}
         data-context-menu={contextName}
         onContextMenu={(e) => {
           if (e.defaultPrevented || (!items.length && !onPrepare) || !acceptTarget(e.target)) return;
@@ -190,9 +203,9 @@ export function ContextMenu({
       >
         {children}
         {triggerLabel && (
-          <button
+          <Button
             type="button"
-            className="button secondary"
+
             onClick={(e) => {
               e.stopPropagation();
               const rect = e.currentTarget.getBoundingClientRect();
@@ -200,12 +213,12 @@ export function ContextMenu({
             }}
           >
             {triggerLabel}
-          </button>
+          </Button>
         )}
       </div>
       {createPortal(
         <Menu.Trigger
-          className="context-anchor"
+          className="context-anchor pointer-events-none fixed size-0 border-0 p-0"
           aria-hidden
           tabIndex={-1}
           style={{ left: point?.x ?? 0, top: point?.y ?? 0 }}
@@ -214,7 +227,7 @@ export function ContextMenu({
       )}
       <Menu.Portal>
         <Menu.Content
-          className="context-menu"
+          className={cn('context-menu', menuContent, coarseMenuWidth)}
           align="start"
           sideOffset={0}
           collisionPadding={8}

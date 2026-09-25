@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload } from 'lucide-react';
-import { Modal } from '../../app/ui';
+import { Button, Dialog } from '../../ui';
 import { useSession, flushAllDrafts } from '../../app/session';
 import { BackupImportError, IMPORT_MAX_BYTES, parseBackup } from '../../domain/backup-import';
 import { classify } from '../../domain/codec';
@@ -101,8 +101,9 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
     }
   }
   return (
-    <Modal
+    <Dialog
       title={t('backupImport.title')}
+      size="lg"
       className="backup-import-dialog"
       onClose={() => {
         if (!running.current) onClose();
@@ -138,9 +139,9 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
           <div className="backup-import-result">
             <p role="status">{t('backupImport.success', result)}</p>
             <p>{t('backupImport.syncHelp')}</p>
-            <button className="button primary" onClick={onClose}>
+            <Button variant="primary" onClick={onClose}>
               {t('backupImport.done')}
-            </button>
+            </Button>
           </div>
         ) : (
           preview && (
@@ -168,16 +169,17 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                 </details>
               )}
               <div className="button-row">
-                <button
-                  className="text-button"
+                <Button
+                  variant="link"
+                  size="sm"
                   disabled={busy}
                   onClick={() => setSelected(new Set(selectable.map((row) => row.index)))}
                 >
                   {t('backupImport.selectAll')}
-                </button>
-                <button className="text-button" disabled={busy} onClick={() => setSelected(new Set())}>
+                </Button>
+                <Button variant="link" size="sm" disabled={busy} onClick={() => setSelected(new Set())}>
                   {t('backupImport.selectNone')}
-                </button>
+                </Button>
               </div>
               <ul className="backup-import-notes">
                 {rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((row) => (
@@ -210,23 +212,18 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
               </ul>
               {rows.length > PAGE_SIZE && (
                 <div className="button-row">
-                  <button
-                    className="button secondary"
-                    disabled={busy || page === 0}
-                    onClick={() => setPage(page - 1)}
-                  >
+                  <Button disabled={busy || page === 0} onClick={() => setPage(page - 1)}>
                     {t('backupImport.previous')}
-                  </button>
+                  </Button>
                   <span>
                     {t('backupImport.page', { page: page + 1, total: Math.ceil(rows.length / PAGE_SIZE) })}
                   </span>
-                  <button
-                    className="button secondary"
+                  <Button
                     disabled={busy || (page + 1) * PAGE_SIZE >= rows.length}
                     onClick={() => setPage(page + 1)}
                   >
                     {t('backupImport.next')}
-                  </button>
+                  </Button>
                 </div>
               )}
               {missing.length > 0 && (
@@ -244,8 +241,8 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                 </div>
               )}
               <p className="field-help">{t('backupImport.trashHelp')}</p>
-              <button
-                className="button primary"
+              <Button
+                variant="primary"
                 disabled={
                   busy || !session.writable || selected.size === 0 || (missing.length > 0 && !acceptMissing)
                 }
@@ -253,11 +250,11 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
               >
                 <Upload size={16} />
                 {t('backupImport.import', { count: selected.size })}
-              </button>
+              </Button>
             </>
           )
         )}
       </div>
-    </Modal>
+    </Dialog>
   );
 }
