@@ -87,9 +87,7 @@ test('label-menu', async ({ page, openApp, text, capture }) => {
   if (mobile) await page.locator('.mobile-menu').click();
   const navigation = page.locator(mobile ? '.mobile-drawer' : '.sidebar');
   await navigation.locator('.label-nav-row').first().getByRole('button').first().click({ button: 'right' });
-  await expect(
-    page.getByRole('menuitem', { name: text('Rename', '重命名'), exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: text('Rename', '重命名'), exact: true })).toBeVisible();
   await capture();
 });
 
