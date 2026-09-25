@@ -23,9 +23,9 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean
   }
   render() {
     return this.state.failed ? (
-      <main className="fatal-error">
+      <main className="fatal-error px-[8vw] py-[10vh]">
         <h1>Tebikae</h1>
-        <p>{i18n.t('error.storage')}</p>
+        <p className="my-5">{i18n.t('error.storage')}</p>
         <Button variant="primary" onClick={() => location.reload()}>
           {i18n.t('action.retry')}
         </Button>

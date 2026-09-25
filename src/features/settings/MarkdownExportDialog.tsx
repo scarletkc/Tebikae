@@ -47,7 +47,9 @@ export default function MarkdownExportDialog({
     >
       <div className="markdown-export-body" aria-busy={busy}>
         <p>{t('markdownExport.help')}</p>
-        <p className="field-help">{t('markdownExport.coverage')}</p>
+        <p className="field-help mt-2.5 mb-5 text-xs leading-[1.8] text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-[3px]">
+          {t('markdownExport.coverage')}
+        </p>
         <CheckboxLabel>
           <Checkbox
             checked={includeTrash}
@@ -56,11 +58,11 @@ export default function MarkdownExportDialog({
           />
           {t('markdownExport.includeTrash')}
         </CheckboxLabel>
-        <dl className="markdown-export-counts" aria-live="polite">
+        <dl className="markdown-export-counts my-5" aria-live="polite">
           {(['notes', 'archive', 'trash', 'unsynced', 'total'] as const).map((key) => (
-            <div key={key}>
+            <div key={key} className="flex justify-between gap-4 py-1.5 last:font-semibold">
               <dt>{t(`markdownExport.${key}`)}</dt>
-              <dd>{counts[key]}</dd>
+              <dd className="m-0 tabular-nums">{counts[key]}</dd>
             </div>
           ))}
         </dl>
@@ -70,7 +72,7 @@ export default function MarkdownExportDialog({
             {t('markdownExport.failed')}
           </Banner>
         )}
-        <div className="button-row">
+        <div className="button-row flex flex-wrap items-center gap-2.5">
           <Button
             variant="primary"
             disabled={busy || counts.total === 0}

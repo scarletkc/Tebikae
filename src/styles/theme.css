@@ -33,9 +33,6 @@
   --card-blue: #e8f1fb;
   --card-purple: #f1ebfa;
   --card-red: #fdecea;
-  /* Legacy tokens still read by old CSS; remove once nothing references them. */
-  --shadow: 0 16px 48px rgb(0 0 0 / 0.18);
-  --radius: 12px;
 }
 
 :root[data-theme='dark'] {
@@ -66,7 +63,6 @@
   --card-blue: #20303f;
   --card-purple: #2f2a3d;
   --card-red: #3d2626;
-  --shadow: 0 16px 48px rgb(0 0 0 / 0.5);
 }
 
 /* Remove Tailwind's default palette so only project tokens exist (no bg-gray-100 etc.). */
@@ -162,5 +158,57 @@
     border-radius: 2px;
     padding: 0 1px;
     box-decoration-break: clone;
+  }
+  body {
+    min-width: 320px;
+  }
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button,
+  a {
+    touch-action: manipulation;
+  }
+  button {
+    color: inherit;
+  }
+  /* Tailwind v4 preflight leaves buttons with the default cursor; raw <button>s (card titles, sidebar rows) need the pointer. */
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+  p {
+    line-height: 1.7;
+  }
+  svg {
+    flex-shrink: 0;
+  }
+  a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+  /* The update toast must never overlap a modal dialog. */
+  body:has([role='dialog']) .update-toast {
+    display: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      scroll-behavior: auto !important;
+      transition: none !important;
+      animation: none !important;
+    }
   }
 }

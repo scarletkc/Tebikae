@@ -111,18 +111,21 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
     >
       <div className="backup-import-body" aria-busy={busy}>
         <p>{t('backupImport.help')}</p>
-        <p className="field-help">{t('backupImport.coverage')}</p>
+        <p className="field-help mt-2.5 mb-5 text-xs leading-[1.8] text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-[3px]">
+          {t('backupImport.coverage')}
+        </p>
         {!session.writable && (
           <Banner tone="warning" className="banner warning mt-4">
             {t('backupImport.errors.readonly')}
           </Banner>
         )}
         {!result && (
-          <label className="backup-import-file">
+          <label className="backup-import-file my-5 grid gap-2 text-sm font-medium">
             <span>{t('backupImport.file')}</span>
             <input
               type="file"
               accept=".json,application/json"
+              className="w-full max-w-full cursor-pointer rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-fg file:me-3 file:rounded-md file:border-0 file:bg-hover file:px-3 file:py-1 file:text-xs file:font-medium file:text-fg"
               disabled={busy}
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -132,7 +135,11 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
             />
           </label>
         )}
-        {filename && <p className="field-help backup-import-filename">{filename}</p>}
+        {filename && (
+          <p className="field-help mt-2.5 mb-5 text-xs leading-[1.8] text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-[3px] backup-import-filename [overflow-wrap:anywhere]">
+            {filename}
+          </p>
+        )}
         {busy && <p role="status">{t('backupImport.working')}</p>}
         {error && (
           <Banner tone="warning" role="alert" className="banner warning mt-4">
@@ -140,7 +147,7 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
           </Banner>
         )}
         {result ? (
-          <div className="backup-import-result">
+          <div className="backup-import-result mt-4">
             <p role="status">{t('backupImport.success', result)}</p>
             <p>{t('backupImport.syncHelp')}</p>
             <Button variant="primary" onClick={onClose}>
@@ -159,7 +166,7 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                 })}
               </p>
               {preview.invalid.length > 0 && (
-                <details className="backup-import-invalid">
+                <details className="backup-import-invalid [&_li]:[overflow-wrap:anywhere]">
                   <summary>{t('backupImport.invalid', { count: preview.invalid.length })}</summary>
                   <ul>
                     {preview.invalid.slice(0, 20).map((row) => (
@@ -172,7 +179,7 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                   {preview.invalid.length > 20 && <p>{t('backupImport.firstErrors')}</p>}
                 </details>
               )}
-              <div className="button-row">
+              <div className="button-row flex flex-wrap items-center gap-2.5">
                 <Button
                   variant="link"
                   size="sm"
@@ -185,7 +192,7 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                   {t('backupImport.selectNone')}
                 </Button>
               </div>
-              <ul className="backup-import-notes">
+              <ul className="backup-import-notes my-4 list-none p-0 [&>li]:border-b [&>li]:border-line [&>li]:py-3">
                 {rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map((row) => (
                   <li key={row.index}>
                     <CheckboxLabel className="items-start font-medium">
@@ -202,20 +209,22 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                           })
                         }
                       />
-                      <span className="backup-import-note-title">
+                      <span className="backup-import-note-title [overflow-wrap:anywhere]">
                         {row.document.title || t('home.untitled')}
                       </span>
                     </CheckboxLabel>
-                    <p className="field-help">
+                    <p className="field-help my-1 ms-[23px] text-xs leading-[1.8] text-muted">
                       {t(`nav.${classify(row.document)}`)}
                       {row.duplicate ? ` · ${t('backupImport.duplicate')}` : ''}
                     </p>
-                    <p className="backup-import-excerpt">{row.document.markdown.slice(0, 180)}</p>
+                    <p className="backup-import-excerpt ms-[23px] mt-1 text-xs whitespace-pre-wrap text-muted [overflow-wrap:anywhere]">
+                      {row.document.markdown.slice(0, 180)}
+                    </p>
                   </li>
                 ))}
               </ul>
               {rows.length > PAGE_SIZE && (
-                <div className="button-row">
+                <div className="button-row flex flex-wrap items-center gap-2.5">
                   <Button disabled={busy || page === 0} onClick={() => setPage(page - 1)}>
                     {t('backupImport.previous')}
                   </Button>
@@ -243,7 +252,9 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                   </CheckboxLabel>
                 </Banner>
               )}
-              <p className="field-help">{t('backupImport.trashHelp')}</p>
+              <p className="field-help mt-2.5 mb-5 text-xs leading-[1.8] text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-[3px]">
+                {t('backupImport.trashHelp')}
+              </p>
               <Button
                 variant="primary"
                 disabled={

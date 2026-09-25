@@ -98,7 +98,7 @@ export function FiltersDialog({
   return (
     <Dialog title={t('action.filter')} onClose={onClose} className="filters-dialog">
       <div className="filter-fields flex flex-col gap-6">
-        <fieldset>
+        <fieldset className="min-w-0 border-0 p-0">
           <legend className="mb-3 text-xs font-medium text-muted">{t('filter.labels')}</legend>
           <Select
             className="mb-4"
@@ -136,7 +136,7 @@ export function FiltersDialog({
             {t('filter.unlabeled')}
           </CheckboxLabel>
         </fieldset>
-        <fieldset>
+        <fieldset className="min-w-0 border-0 p-0">
           <legend className="mb-3 text-xs font-medium text-muted">{t('filter.colors')}</legend>
           <div className="choices flex flex-wrap gap-x-4 gap-y-2.5">
             {NOTE_COLORS.map((color) => (
@@ -164,7 +164,7 @@ export function FiltersDialog({
             ))}
           </div>
         </fieldset>
-        <fieldset>
+        <fieldset className="min-w-0 border-0 p-0">
           <legend className="mb-3 text-xs font-medium text-muted">{t('filter.kinds')}</legend>
           <div className="choices flex flex-wrap gap-x-4 gap-y-2.5">
             {(['markdown', 'checklist'] as const).map((kind) => (
@@ -197,7 +197,7 @@ export function FiltersDialog({
           )}
         </Field>
         {(['created', 'updated'] as const).map((field) => (
-          <fieldset key={field}>
+          <fieldset key={field} className="min-w-0 border-0 p-0">
             <legend className="mb-3 text-xs font-medium text-muted">{t(`filter.${field}`)}</legend>
             <div className="date-fields grid grid-cols-2 gap-3">
               <Field label={t('filter.from')}>

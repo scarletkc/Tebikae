@@ -137,7 +137,7 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
           {t(session.remembered ? 'settings.tokenStorage' : 'settings.tokenMemory')}
         </p>
         <p className="mt-1 text-xs leading-relaxed text-muted">{t('settings.syncLimit')}</p>
-        <div className="button-row mt-4">
+        <div className="button-row mt-4 flex flex-wrap items-center gap-2.5">
           {session.connected || session.remembered ? (
             <Button onClick={() => void session.disconnect().catch(() => {})}>
               <LogOut size={16} />
