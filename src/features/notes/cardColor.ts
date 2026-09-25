@@ -22,3 +22,12 @@ export const noteColorBg = {
   purple: 'bg-card-purple',
   red: 'bg-card-red',
 } satisfies Record<NoteColor, string>;
+
+/** Header tint for the editor dialog; the default note has no tint. */
+export const editorTint = {
+  yellow: '[--editor-tint:var(--card-yellow)]',
+  green: '[--editor-tint:var(--card-green)]',
+  blue: '[--editor-tint:var(--card-blue)]',
+  purple: '[--editor-tint:var(--card-purple)]',
+  red: '[--editor-tint:var(--card-red)]',
+} satisfies Partial<Record<NoteColor, string>>;

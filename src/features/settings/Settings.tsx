@@ -213,7 +213,10 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
         />
         <SettingRow title={t('settings.forceUpdate')} description={t('settings.forceUpdateHelp')}>
           <Button disabled={updating} onClick={() => void forceUpdate()}>
-            <RefreshCw size={16} className={updating ? 'spin' : ''} />
+            <RefreshCw
+              size={16}
+              className={updating ? 'animate-spin motion-reduce:animate-none' : undefined}
+            />
             {t('settings.forceUpdate')}
           </Button>
         </SettingRow>
