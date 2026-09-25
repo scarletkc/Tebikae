@@ -88,7 +88,7 @@ export function NewNoteMenu({ variant }: { variant: 'button' | 'fab' }) {
       <ContextMenu contextName="new-note-fab" items={items}>
         <Button
           variant="primary"
-          className="new-note-button fab-new-note fixed right-7 bottom-7 z-30 size-14 rounded-full p-0 shadow-popover max-md:right-5 max-md:bottom-5 [&_svg]:size-5.5"
+          className="new-note-button fab-new-note fixed right-7 bottom-7 z-30 size-14 rounded-full p-0 shadow-popover max-md:right-4 max-md:bottom-[calc(56px+16px+env(safe-area-inset-bottom))] [&_svg]:size-5.5"
           aria-label={t('action.new')}
           title={t('action.new')}
           disabled={!session.writable}

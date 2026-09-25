@@ -12,6 +12,7 @@ import Settings from '../settings/Settings';
 import CreateLabelDialog from '../labels/CreateLabelDialog';
 import IssueDialog from '../issues/IssueDialog';
 import Sidebar from './Sidebar';
+import BottomNav from './BottomNav';
 import Topbar, { NewNoteMenu, canCreateHere } from './Topbar';
 import SelectionToolbar from './SelectionToolbar';
 import NotesView from './NotesView';
@@ -38,7 +39,7 @@ function WorkspaceLayout({ offlineReady }: { offlineReady: boolean }) {
   const reduceMotion = useReducedMotion();
   const noteList = isNoteListRoute(route);
   return (
-    <div className="workspace" onContextMenu={preventUndefinedContextMenu}>
+    <div className="workspace flex h-dvh overflow-hidden" onContextMenu={preventUndefinedContextMenu}>
       <motion.aside
         className={cn(
           'sidebar fixed inset-y-0 start-0 z-10 flex h-dvh flex-col overflow-hidden border-e border-line bg-sidebar px-3 pb-4 select-none max-md:hidden',
@@ -61,7 +62,7 @@ function WorkspaceLayout({ offlineReady }: { offlineReady: boolean }) {
         <Sidebar />
       </Sheet>
       <div
-        className="workspace-body"
+        className="workspace-body flex h-dvh min-w-0 flex-1 flex-col overflow-hidden transition-[margin-left] duration-200"
         style={{
           marginLeft: isMobile ? 0 : layout.sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH,
         }}
@@ -90,7 +91,7 @@ function WorkspaceLayout({ offlineReady }: { offlineReady: boolean }) {
         >
           <main
             ref={layout.notesAreaRef}
-            className="main-content"
+            className="main-content mx-auto min-h-0 w-full max-w-[1600px] flex-1 overflow-y-auto overscroll-contain px-[42px] pt-[42px] pb-[70px] has-[.note-group]:pt-5 has-[.filter-chips]:pt-5 max-lg:px-[26px] max-lg:pt-8 max-lg:pb-[55px] max-md:px-[22px] max-md:pt-[29px] max-md:pb-[calc(56px+80px+env(safe-area-inset-bottom))] max-[430px]:px-4 max-[430px]:pt-[25px] xl:pt-[52px]"
             tabIndex={-1}
             onKeyDown={(event) => {
               if (
@@ -149,6 +150,7 @@ function WorkspaceLayout({ offlineReady }: { offlineReady: boolean }) {
         </ContextMenu>
         {layout.isCompactTopbar && canCreateHere(route, view) && <NewNoteMenu variant="fab" />}
       </div>
+      {isMobile && <BottomNav />}
       {ctl.filtersOpen && (
         <FiltersDialog
           filters={ctl.activeFilters}
