@@ -6,6 +6,8 @@ import { FilterChips } from '../filters/Filters';
 import { useWorkspace } from './useWorkspaceController';
 import { Button, EmptyState } from '../../ui';
 
+const groupHeading = 'mb-3.5 ml-0.5 text-xs font-semibold tracking-widest text-muted uppercase';
+
 function Cards({ items }: { items: LocalNote[] }) {
   const ctl = useWorkspace();
   const { multi, session, labels, filters } = ctl;
@@ -74,14 +76,14 @@ export default function NotesView() {
       ) : (
         <>
           {pinned.length > 0 && (
-            <section className="note-group">
-              <h2>{t('home.pinned')}</h2>
+            <section className="note-group mb-7">
+              <h2 className={groupHeading}>{t('home.pinned')}</h2>
               <Cards items={pinned} />
             </section>
           )}
           {others.length > 0 && (
-            <section className="note-group">
-              {pinned.length > 0 && <h2>{t('home.other')}</h2>}
+            <section className="note-group mb-7">
+              {pinned.length > 0 && <h2 className={groupHeading}>{t('home.other')}</h2>}
               <Cards items={others} />
             </section>
           )}

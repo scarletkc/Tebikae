@@ -1,9 +1,9 @@
 import { useTranslation } from 'react-i18next';
-import { X } from 'lucide-react';
 import { NOTE_COLORS, type Label, type NoteFilters } from '../../domain/types';
 import { defaultFilters } from '../../domain/filters';
-import { Button, Checkbox, CheckboxLabel, Dialog, Field, Input, Select, cn } from '../../ui';
+import { Button, Checkbox, CheckboxLabel, Chip, Dialog, Field, Input, Select, cn } from '../../ui';
 import { LabelBadge, LabelDot, labelStyle } from '../labels';
+import { noteColorBg } from '../notes/cardColor';
 
 export function filterCount(f: NoteFilters) {
   return (
@@ -60,21 +60,24 @@ export function FilterChips({
         clear: () => setFilters({ ...f, [key]: undefined }),
       });
   return chips.length ? (
-    <div className="filter-chips">
+    <div className="filter-chips mb-5 flex flex-wrap items-center gap-1.5">
       {chips.map((chip, i) => {
         const label = chip.color === undefined ? undefined : { name: chip.name, color: chip.color };
         return (
-          <button
+          <Chip
             key={i}
-            className={label ? 'chip chip-label' : 'chip'}
+            className={
+              label
+                ? 'chip-label border-[color-mix(in_srgb,var(--label-color)_45%,var(--border))] bg-[color-mix(in_srgb,var(--label-color)_22%,var(--surface))] text-fg'
+                : undefined
+            }
             style={labelStyle(chip.color)}
-            onClick={chip.clear}
-            aria-label={t('filter.remove', { name: chip.name })}
+            onRemove={chip.clear}
+            removeLabel={t('filter.remove', { name: chip.name })}
           >
             {label && <LabelDot color={chip.color} />}
             {chip.name}
-            <X size={12} />
-          </button>
+          </Chip>
         );
       })}
     </div>
@@ -142,6 +145,7 @@ export function FiltersDialog({
                 className={cn(
                   'color-choice flex cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-xs',
                   `note-${color}`,
+                  noteColorBg[color],
                 )}
               >
                 <Checkbox

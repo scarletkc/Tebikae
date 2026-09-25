@@ -1,17 +1,20 @@
 import { useMemo } from 'react';
-import { Pin, Archive, ArchiveRestore, Trash2, RotateCcw, CircleAlert } from 'lucide-react';
+import { Pin, Archive, ArchiveRestore, Trash2, RotateCcw, CircleAlert, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Label, LocalNote } from '../../domain/types';
 import { isSimpleChecklist, parseChecklist } from '../../domain/markdown';
 import { IconButton } from '../../app/ui';
+import { cn } from '../../ui';
 import MarkdownPreview from '../editor/MarkdownPreview';
 import { LabelBadge } from '../labels';
-import './notes.css';
+import { cardColor } from './cardColor';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
 import { LabelContextMenu } from '../labels/LabelContextMenu';
 import { canEditNote } from './actions';
 
 const graphemes = new Intl.Segmenter(undefined, { granularity: 'grapheme' });
+
+const DANGER_STATUSES = new Set(['error', 'conflict', 'uncertain']);
 
 export function Highlight({ query, text }: { query: string; text: string }) {
   const terms = query.toLocaleLowerCase().trim().split(/\s+/u).filter(Boolean);
@@ -94,7 +97,13 @@ export default function NoteCard({
   return (
     <ContextMenu items={menuItems} className="context-card relative block">
       <article
-        className={`note-card note-${document.meta.color} ${selected ? 'is-selected' : ''}`}
+        className={cn(
+          'note-card group relative min-w-0 rounded-xl border border-line p-4 transition-shadow',
+          'hover:shadow-card-hover focus-within:shadow-card-hover active:scale-[0.985]',
+          `note-${document.meta.color}`,
+          cardColor[document.meta.color],
+          selected && 'is-selected ring-2 ring-accent',
+        )}
         tabIndex={0}
         onClickCapture={(e) => {
           if ((e.target as Element).closest('.card-actions, .card-pin-toggle, .label-badge, [role="menu"]'))
@@ -106,15 +115,18 @@ export default function NoteCard({
         }}
       >
         {selected && (
-          <span className="note-selected-mark" aria-label={t('context.selected')}>
-            ✓
+          <span
+            className="note-selected-mark absolute top-2 right-2.5 z-1 text-accent"
+            aria-label={t('context.selected')}
+          >
+            <Check size={16} aria-hidden="true" />
           </span>
         )}
-        <div className="note-summary">
-          <div className="card-title">
-            <h3>
+        <div className="note-summary min-w-0">
+          <div className="card-title mb-2 flex items-start justify-between gap-2">
+            <h3 className="min-w-0">
               <button
-                className="note-open"
+                className="note-open line-clamp-2 w-full border-0 bg-transparent p-0 text-left text-base font-semibold wrap-anywhere after:absolute after:inset-0 after:z-1 after:content-['']"
                 onClick={onOpen}
                 aria-label={`${t('action.edit')}: ${document.title}`}
               >
@@ -125,7 +137,7 @@ export default function NoteCard({
               <IconButton
                 size="xs"
                 label={t('action.unpin')}
-                className="card-pin-toggle"
+                className="card-pin-toggle relative z-2 mt-0.5 shrink-0 [&_svg]:rotate-45"
                 onClick={() => onChange('pin')}
                 disabled={!editable}
               >
@@ -138,28 +150,37 @@ export default function NoteCard({
           )}
         </div>
         {checklist.length > 0 && (
-          <div className="card-checklist">
+          <div className="card-checklist mt-2 flex flex-col gap-2 text-xs">
             {checklist.slice(0, 4).map((item) => (
               <div
-                className="checklist-preview-item"
+                className="checklist-preview-item flex items-start gap-2 wrap-anywhere"
                 key={item.index}
                 style={{ paddingInlineStart: Math.min(item.depth, 3) * 10 }}
               >
-                <span className={`preview-checkbox ${item.checked ? 'is-checked' : ''}`} aria-hidden="true">
-                  {item.checked ? '✓' : ''}
+                <span
+                  className={cn(
+                    'preview-checkbox mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded border border-line-strong',
+                    item.checked && 'is-checked border-accent bg-accent text-accent-fg',
+                  )}
+                  aria-hidden="true"
+                >
+                  {item.checked && <Check size={11} strokeWidth={3} />}
                 </span>
-                <span className={item.checked ? 'checked' : ''}>
+                <span className={cn('line-clamp-2', item.checked && 'checked line-through opacity-60')}>
                   <Highlight query={query} text={item.text} />
                 </span>
               </div>
             ))}
-            <button className="checklist-count" onClick={onOpen}>
+            <button
+              className="checklist-count mt-1 self-start border-0 bg-transparent p-0 text-muted"
+              onClick={onOpen}
+            >
               {t('note.done', { done: checklist.filter((x) => x.checked).length, total: checklist.length })}
             </button>
           </div>
         )}
         {document.labelIds.length > 0 && (
-          <div className="card-labels">
+          <div className="card-labels relative z-2 mt-2 flex w-fit max-w-full flex-wrap gap-1.5">
             {document.labelIds.slice(0, 2).map((id) => {
               const label = labels.find((l) => l.id === id);
               return label && onRemoveLabel ? (
@@ -176,6 +197,7 @@ export default function NoteCard({
             })}
             {document.labelIds.length > 2 && (
               <span
+                className="inline-flex items-center self-center rounded-md border border-line px-1.5 py-0.5 text-xs text-muted"
                 title={document.labelIds
                   .slice(2)
                   .map((id) => labels.find((l) => l.id === id)?.name || `#${id}`)
@@ -186,23 +208,27 @@ export default function NoteCard({
             )}
           </div>
         )}
-        <div className="card-footer">
-          <time dateTime={updated}>
+        <div className="card-footer mt-2 flex min-h-7 flex-wrap items-center gap-1.5">
+          <time dateTime={updated} className="text-xs whitespace-nowrap text-muted">
             {new Intl.DateTimeFormat(i18n.language, { month: 'short', day: 'numeric' }).format(
               new Date(updated),
             )}
           </time>
           {note.syncStatus !== 'synced' && (
             <span
-              className={`card-status status-${note.syncStatus}`}
+              className={cn(
+                'card-status flex items-center gap-1 text-xs',
+                `status-${note.syncStatus}`,
+                DANGER_STATUSES.has(note.syncStatus) ? 'text-danger' : 'text-muted',
+              )}
               title={t(`status.${note.syncStatus}`)}
               aria-label={t(`status.${note.syncStatus}`)}
             >
               <CircleAlert size={13} />
-              <span>{t(`status.${note.syncStatus}`)}</span>
+              <span className="hidden">{t(`status.${note.syncStatus}`)}</span>
             </span>
           )}
-          <div className="card-actions">
+          <div className="card-actions relative z-2 ml-auto flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
             {trashed ? (
               <>
                 <IconButton
