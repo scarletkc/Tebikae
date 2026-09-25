@@ -65,11 +65,8 @@
     "back": "返回"
   },
   "connect": {
-    "eyebrow": "你的笔记，你的仓库",
-    "title": "给脑海里的想法，\n留一个小小的地方。",
-    "intro": "灵感、日常清单，还有值得留下的小事。把它们记在你自己的 GitHub 私人仓库里。",
-    "formTitle": "开始你的笔记本",
-    "formIntro": "连接私人仓库，就可以开始记录。",
+    "intro": "笔记以 Issue 形式保存在你自己的私有 GitHub 仓库中。",
+    "formTitle": "连接 GitHub 仓库",
     "repository": "GitHub 仓库",
     "repositoryPlaceholder": "owner / repository 或 GitHub 仓库网址",
     "noRepository": "还没有仓库？",
@@ -82,12 +79,6 @@
     "remember": "在此浏览器记住连接",
     "sessionPrivacy": "Token 仅保留在当前页面内存，刷新或关闭网页后即清除。本地笔记和草稿仍保存在此设备。",
     "restoring": "正在打开保存的笔记本…",
-    "feature1": "留在你手里",
-    "detail1": "每条笔记，都是你私人仓库里的一条 Issue。",
-    "feature2": "随手记一点",
-    "detail2": "写 Markdown、列清单，需要时再找回来。",
-    "feature3": "随时接着写",
-    "detail3": "先保存本地草稿，断网或刷新后可以继续。",
     "cached": "此设备上的笔记",
     "cacheHelp": "无需 Token 也能打开缓存。它们没有独立的本地登录保护。",
     "privateOnly": "请使用你自己拥有的 GitHub 私人仓库。"

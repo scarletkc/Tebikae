@@ -6,6 +6,18 @@ test('welcome', async ({ openApp, capture }) => {
   await capture();
 });
 
+test('connect-dialog', async ({ page, openApp, capture }) => {
+  await openApp();
+  const mobile = page.viewportSize()!.width < 760;
+  if (mobile) await page.locator('.mobile-menu').click();
+  await page
+    .locator(mobile ? '.mobile-drawer' : '.sidebar')
+    .locator('.repository-pill')
+    .click();
+  await expect(page.locator('.connect-dialog')).toBeVisible();
+  await capture();
+});
+
 test('notes', async ({ page, openApp, capture }) => {
   await openApp();
   await expect(page.locator('.note-card')).toHaveCount(3);
