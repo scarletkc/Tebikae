@@ -132,18 +132,20 @@ export default function ConnectPage() {
   const [error, setError] = useState(false);
   const cached = useLiveQuery(() => db.connections.toArray(), [], []);
   return (
-    <div className="welcome-page flex min-h-dvh flex-col bg-canvas">
+    <div className="welcome-page flex min-h-dvh flex-col bg-canvas md:bg-sidebar">
       <header className="welcome-header flex h-14 items-center justify-between gap-4 px-4 md:px-6">
         <Brand />
         <PreferencesControls />
       </header>
       <main className="welcome-main grid flex-1 place-items-center px-4 py-8">
-        <div className="w-full max-w-sm">
-          <h1 className="text-xl font-semibold">{t('connect.formTitle')}</h1>
-          <p className="welcome-description mt-2 text-sm text-muted">{t('connect.intro')}</p>
-          <div className="mt-6">
-            <ConnectForm />
-          </div>
+        <div className="w-full max-w-sm md:max-w-[26rem]">
+          <section className="md:rounded-2xl md:border md:border-line md:bg-surface md:p-8">
+            <h1 className="text-xl font-semibold">{t('connect.formTitle')}</h1>
+            <p className="welcome-description mt-2 text-sm text-muted">{t('connect.intro')}</p>
+            <div className="mt-6">
+              <ConnectForm />
+            </div>
+          </section>
           {cached.length > 0 && (
             <Card
               title={t('connect.cached')}

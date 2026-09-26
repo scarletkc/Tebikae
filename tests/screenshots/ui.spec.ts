@@ -24,8 +24,29 @@ test('notes', async ({ page, openApp, capture }) => {
   await capture();
 });
 
+test('search-active', async ({ page, openApp, capture }) => {
+  await openApp();
+  await page.locator('.search-box input').fill('plan');
+  await expect(page.locator('.search-clear-button')).toBeVisible();
+  await capture();
+});
+
 test('editor', async ({ openEditor, capture }) => {
   await openEditor();
+  await capture();
+});
+
+test('editor-source', async ({ page, openEditor, text, capture }) => {
+  await openEditor();
+  await page.locator('.editor-mode-toggle').click();
+  const source = page.locator('.editor-source');
+  await source.fill(
+    text(
+      'Source mode keeps Markdown readable.\n\n- [ ] Read a chapter\n\n```ts\nconst x = 1;\n```',
+      '源码模式里的 Markdown 也要好读。\n\n- [ ] 读一章书\n\n```ts\nconst x = 1;\n```',
+    ),
+  );
+  await source.blur();
   await capture();
 });
 

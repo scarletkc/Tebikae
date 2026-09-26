@@ -325,6 +325,63 @@ describe('durable synchronization', () => {
     expect(client.issues[0]!.body).toContain('while open');
   });
 
+  it.each(['queue', 'preflight'] as const)(
+    'keeps reopened drafts local when a close waits for %s',
+    async (stage) => {
+      client.issues = [raw(doc(), 1)];
+      await engine.pull();
+      const note = await firstNote();
+      await saveNote(
+        connection.scopeId,
+        note.localId,
+        { ...note.current, markdown: 'closed draft' },
+        database,
+      );
+      let release!: () => void;
+      let reached!: () => void;
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const started = new Promise<void>((resolve) => {
+        reached = resolve;
+      });
+      let pending: Promise<void> | undefined;
+      if (stage === 'queue') {
+        const getAnchor = client.getAnchor.bind(client);
+        client.getAnchor = async () => {
+          reached();
+          await gate;
+          return getAnchor();
+        };
+        pending = engine.pull();
+      } else {
+        const getIssue = client.getIssue.bind(client);
+        client.getIssue = async (...args) => {
+          reached();
+          await gate;
+          return getIssue(...args);
+        };
+      }
+      const closing = engine.flushNote(note.localId, { allowEditing: false });
+      await started;
+      engine.setEditing(note.localId, true);
+      await saveNote(
+        connection.scopeId,
+        note.localId,
+        { ...note.current, markdown: 'reopened draft' },
+        database,
+      );
+      release();
+      await Promise.all([pending, closing]);
+      expect(client.patches).toHaveLength(0);
+      expect(client.issues[0]!.body).toContain('Original');
+      expect((await firstNote()).current.markdown).toBe('reopened draft');
+      expect(await database.outbox.get([connection.scopeId, note.localId])).toBeDefined();
+      await engine.flushNote(note.localId);
+      expect(client.issues[0]!.body).toContain('reopened draft');
+    },
+  );
+
   it('loads only the newest page at startup, caches subsequent pages and never marks unseen notes unavailable', async () => {
     client.issues = Array.from({ length: 205 }, (_, i) => raw(doc(), i + 1));
     await engine.ingestPage([client.issues[0]!]);

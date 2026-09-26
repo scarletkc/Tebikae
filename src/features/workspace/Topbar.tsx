@@ -159,6 +159,7 @@ export default function Topbar() {
           <Menu size={18} />
         </IconButton>
         <TextContextMenu
+          className="flex min-w-0 flex-1 self-stretch"
           clearLabel={t('context.clearSearch')}
           clearDisabled={!searchInput}
           onClear={() => setFilters({ ...filters, query: '' })}

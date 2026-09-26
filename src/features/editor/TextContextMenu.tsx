@@ -16,6 +16,7 @@ import {
   Undo2,
 } from 'lucide-react';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
+import { cn } from '../../ui';
 
 /** Uses native text editing so selection, IME and browser undo remain intact. */
 export function TextContextMenu({
@@ -25,6 +26,7 @@ export function TextContextMenu({
   clearLabel,
   clearDisabled = false,
   onClear,
+  className,
 }: {
   children: ReactNode;
   markdown?: boolean;
@@ -32,6 +34,7 @@ export function TextContextMenu({
   clearLabel?: string;
   clearDisabled?: boolean;
   onClear?: () => void;
+  className?: string;
 }) {
   const { t } = useTranslation();
   const root = useRef<HTMLDivElement>(null);
@@ -174,7 +177,7 @@ export function TextContextMenu({
   return (
     <div
       ref={root}
-      className="text-context-target"
+      className={cn('text-context-target', className)}
       onSelect={() => {
         const el = input();
         if (document.activeElement !== el) return;
