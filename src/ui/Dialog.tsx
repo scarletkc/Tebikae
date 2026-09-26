@@ -1,18 +1,20 @@
+import * as RadixAlertDialog from '@radix-ui/react-alert-dialog';
 import * as RadixDialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Button } from './Button';
 import { cn } from './cn';
 import { IconButton } from './IconButton';
 
-export const dialogSizes = { sm: 'md:max-w-sm', md: 'md:max-w-lg', lg: 'md:max-w-2xl' } as const;
+const dialogSizes = { sm: 'md:max-w-sm', md: 'md:max-w-lg', lg: 'md:max-w-2xl' } as const;
 export type DialogSize = keyof typeof dialogSizes;
 
-export const dialogOverlayClass =
+const dialogOverlayClass =
   'fixed inset-0 z-50 bg-overlay data-[state=open]:animate-fade-in motion-reduce:animate-none';
 
 /** Bottom sheet below 761px, centered card from 761px up. */
-export function dialogContentClass(size: DialogSize = 'md') {
+function dialogContentClass(size: DialogSize = 'md') {
   return cn(
     'fixed z-50 flex flex-col overflow-hidden bg-surface text-fg shadow-dialog outline-none',
     // Phone: bottom sheet.
@@ -114,5 +116,83 @@ export function Sheet({
         </RadixDialog.Content>
       </RadixDialog.Portal>
     </RadixDialog.Root>
+  );
+}
+
+/**
+ * Confirmation dialog (Radix AlertDialog) above every other dialog. Render it through
+ * confirmDialog() in src/app/confirm.tsx rather than directly.
+ */
+export function ConfirmDialog({
+  open,
+  title,
+  description,
+  confirmLabel,
+  cancelLabel,
+  danger = false,
+  onSettle,
+}: {
+  open: boolean;
+  title: string;
+  description?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+  /** Called with true for the confirm button, false for cancel, Esc or the backdrop. */
+  onSettle(confirmed: boolean): void;
+}) {
+  const { t } = useTranslation();
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  return (
+    <RadixAlertDialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) onSettle(false);
+      }}
+    >
+      <RadixAlertDialog.Portal>
+        <RadixAlertDialog.Overlay
+          className={cn('confirm-overlay', dialogOverlayClass, 'z-55')}
+          onClick={() => onSettle(false)}
+        />
+        <RadixAlertDialog.Content
+          className={cn(
+            'confirm-dialog',
+            dialogContentClass('sm'),
+            'z-55 gap-2 p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] md:pb-6',
+          )}
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            confirmRef.current?.focus();
+          }}
+          // The caller restores focus to the control that asked.
+          onCloseAutoFocus={(event) => event.preventDefault()}
+          {...(description ? {} : { 'aria-describedby': undefined })}
+        >
+          {open && (
+            <>
+              <RadixAlertDialog.Title className="confirm-title text-base font-semibold text-fg [overflow-wrap:anywhere]">
+                {title}
+              </RadixAlertDialog.Title>
+              {description && (
+                <RadixAlertDialog.Description className="confirm-description text-sm text-muted [overflow-wrap:anywhere]">
+                  {description}
+                </RadixAlertDialog.Description>
+              )}
+              <div className="confirm-actions mt-4 flex flex-wrap justify-end gap-2">
+                <Button onClick={() => onSettle(false)}>{cancelLabel || t('action.cancel')}</Button>
+                <Button
+                  ref={confirmRef}
+                  variant={danger ? 'danger' : 'primary'}
+                  onClick={() => onSettle(true)}
+                >
+                  {confirmLabel || t('action.confirm')}
+                </Button>
+              </div>
+            </>
+          )}
+        </RadixAlertDialog.Content>
+      </RadixAlertDialog.Portal>
+    </RadixAlertDialog.Root>
   );
 }

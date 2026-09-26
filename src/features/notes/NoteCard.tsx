@@ -3,9 +3,8 @@ import { Pin, Archive, ArchiveRestore, Trash2, RotateCcw, CircleAlert, Check } f
 import { useTranslation } from 'react-i18next';
 import type { Label, LocalNote } from '../../domain/types';
 import { isSimpleChecklist, parseChecklist } from '../../domain/markdown';
-import { IconButton } from '../../app/ui';
-import { cn } from '../../ui';
-import MarkdownPreview from '../editor/MarkdownPreview';
+import { IconButton, cn } from '../../ui';
+import MarkdownPreview, { PreviewCheckbox } from '../editor/MarkdownPreview';
 import { LabelBadge } from '../labels';
 import { cardColor } from './cardColor';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
@@ -157,15 +156,7 @@ export default function NoteCard({
                 key={item.index}
                 style={{ paddingInlineStart: Math.min(item.depth, 3) * 10 }}
               >
-                <span
-                  className={cn(
-                    'preview-checkbox mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded border border-line-strong',
-                    item.checked && 'is-checked border-accent bg-accent text-accent-fg',
-                  )}
-                  aria-hidden="true"
-                >
-                  {item.checked && <Check size={11} strokeWidth={3} />}
-                </span>
+                <PreviewCheckbox checked={item.checked} className="mt-0.5" />
                 <span className={cn('line-clamp-2', item.checked && 'checked line-through opacity-60')}>
                   <Highlight query={query} text={item.text} />
                 </span>

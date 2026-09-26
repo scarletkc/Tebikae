@@ -293,6 +293,10 @@
     "persistGranted": "Persistent storage granted.",
     "persistDenied": "The browser did not grant persistent storage. Keep a separate export of important drafts.",
     "syncLimit": "GitHub sync runs while the app is open. Closing the app pauses sync.",
+    "closeNotebook": "Close notebook",
+    "closeNotebookHelp": "Save drafts, disconnect and return to the start page. Your notes stay on this device.",
+    "source": "Source code",
+    "license": "Tebikae is free software under the AGPL-3.0 license.",
     "recoveries": "Recovery copies are included in JSON exports."
   },
   "error": {

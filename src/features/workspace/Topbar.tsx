@@ -1,15 +1,15 @@
 import { CheckSquare, Grid2X2, List, Menu, Pencil, Plus, SlidersHorizontal, X } from 'lucide-react';
 import { defaultFilters } from '../../domain/filters';
 import { usePreferences } from '../../app/preferences';
-import { IconButton, SortControl } from '../../app/ui';
+import { SortControl } from '../../app/ui';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
 import WorkspaceStatus from '../../app/WorkspaceStatus';
 import { useIsMobile } from '../../app/useMediaQuery';
 import { TextContextMenu } from '../editor/TextContextMenu';
 import { filterCount } from '../filters/Filters';
-import { isNoteListRoute } from './routes';
+import { hasSearch, isNoteListRoute } from './routes';
 import { useWorkspace } from './useWorkspaceController';
-import { Button, SegmentedControl } from '../../ui';
+import { Button, IconButton, Input, SegmentedControl, cn } from '../../ui';
 
 export function WorkspaceStatusControl() {
   const { notices, route, visibleIssues, result } = useWorkspace();
@@ -124,8 +124,9 @@ function FilterButton() {
   return (
     <IconButton
       size="sm"
+      variant={active ? 'accent' : 'ghost'}
       label={t('action.filter')}
-      className={`filter-open-button ${active ? 'is-active bg-accent-soft! text-accent! hover:bg-accent-soft! hover:text-accent!' : ''}`}
+      className={cn('filter-open-button', active && 'is-active')}
       onClick={() => setFiltersOpen(true)}
     >
       <SlidersHorizontal size={16} />
@@ -133,40 +134,55 @@ function FilterButton() {
   );
 }
 
+/** Opens the mobile drawer, or collapses and expands the desktop sidebar. */
+function NavToggle() {
+  const { t, layout, setDrawer } = useWorkspace();
+  const isMobile = useIsMobile();
+  return (
+    <IconButton
+      size="sm"
+      className={isMobile ? 'mobile-menu nav-toggle-btn' : 'sidebar-toggle nav-toggle-btn'}
+      label={isMobile ? t('nav.menu') : layout.sidebarCollapsed ? t('nav.menu') : t('nav.close')}
+      onClick={() => {
+        if (isMobile) setDrawer(true);
+        else layout.setSidebarCollapsed((value) => !value);
+      }}
+    >
+      <Menu size={18} />
+    </IconButton>
+  );
+}
+
+const topbarClass =
+  'app-topbar sticky top-0 z-20 flex min-h-14 flex-nowrap items-center gap-2 border-b border-line bg-canvas px-4 pt-[env(safe-area-inset-top)] select-none';
+
 export default function Topbar() {
   const ctl = useWorkspace();
   const { t, route, view, filters, setFilters, searchInput, setSearchInput, layout } = ctl;
-  const isMobile = useIsMobile();
   const noteList = isNoteListRoute(route);
+  // Settings has nothing to search: the bar shows the page title instead of the note search.
+  if (!hasSearch(route))
+    return (
+      <header ref={layout.topbarRef} className={topbarClass}>
+        <NavToggle />
+        <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{t(`nav.${route}`)}</h1>
+        <WorkspaceStatusControl />
+      </header>
+    );
   return (
-    <header
-      ref={layout.topbarRef}
-      className="app-topbar sticky top-0 z-20 flex min-h-14 flex-nowrap items-center gap-2 border-b border-line bg-canvas px-4 pt-[env(safe-area-inset-top)] select-none"
-    >
+    <header ref={layout.topbarRef} className={topbarClass}>
       <div className="search-box flex h-10 min-w-0 flex-1 items-center gap-1 rounded-lg border border-transparent bg-hover px-1 focus-within:border-line-strong focus-within:bg-surface">
-        <IconButton
-          size="sm"
-          className={isMobile ? 'mobile-menu nav-toggle-btn' : 'sidebar-toggle nav-toggle-btn'}
-          label={isMobile ? t('nav.menu') : layout.sidebarCollapsed ? t('nav.menu') : t('nav.close')}
-          onClick={() => {
-            if (isMobile) {
-              ctl.setDrawer(true);
-            } else {
-              layout.setSidebarCollapsed((value) => !value);
-            }
-          }}
-        >
-          <Menu size={18} />
-        </IconButton>
+        <NavToggle />
         <TextContextMenu
           className="flex min-w-0 flex-1 self-stretch"
           clearLabel={t('context.clearSearch')}
           clearDisabled={!searchInput}
           onClear={() => setFilters({ ...filters, query: '' })}
         >
-          <input
+          <Input
+            variant="bare"
             ref={ctl.searchRef}
-            className="min-w-0 flex-1 border-0 bg-transparent p-0 text-base outline-none placeholder:text-muted focus:shadow-none md:text-sm"
+            className="flex-1"
             aria-label={t('home.search')}
             placeholder={`${t('home.search')} (Ctrl+K)`}
             value={searchInput}

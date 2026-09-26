@@ -1,7 +1,6 @@
 import { Plus, X } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
-import { IconButton } from '../../app/ui';
-import { Banner, Button, Dialog, Sheet, cn } from '../../ui';
+import { Banner, Button, Dialog, IconButton, Sheet, cn } from '../../ui';
 import { ContextMenu } from '../../app/ContextMenu';
 import { useIsMobile } from '../../app/useMediaQuery';
 import { preventUndefinedContextMenu } from '../../app/useContextMenuGuard';
@@ -182,8 +181,7 @@ function WorkspaceLayout({ offlineReady }: { offlineReady: boolean }) {
             key="editor-layer"
             className={cn(
               'editor-layer fixed inset-0 z-40 flex items-center justify-center',
-              selection.id &&
-                'editor-layer-dim bg-overlay backdrop-blur-[5px] [-webkit-backdrop-filter:blur(5px)]',
+              selection.id && 'editor-layer-dim bg-overlay backdrop-blur-xs',
             )}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

@@ -308,7 +308,10 @@ describe('editor lifecycle and safe preview', () => {
       </I18nextProvider>,
     );
     await waitFor(() => expect(screen.queryByText(english.loading)).toBeNull());
-    fireEvent.change(screen.getByRole('combobox', { name: english.heading }), { target: { value: '3' } });
+    fireEvent.keyDown(screen.getByRole('button', { name: english.heading }), { key: 'Enter' });
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: english.headingLevel.replace('{{level}}', '3') }),
+    );
     expect(container.querySelector('.ProseMirror h3')?.textContent).toBe('Start');
     fireEvent.click(screen.getByRole('button', { name: english.moreTools }));
     fireEvent.click(screen.getByRole('button', { name: english.table }));

@@ -23,16 +23,16 @@ pnpm test:e2e tests/e2e/notes.spec.ts --project=chromium
 
 需要复现静态检查或扩大验证范围时，使用下列命令：
 
-| 目的            | 命令                              |
-| --------------- | --------------------------------- |
-| 类型检查        | `pnpm typecheck`                  |
-| 代码规范        | `pnpm lint`                       |
-| 格式检查        | `pnpm format:check`               |
-| 完整应用单测    | `pnpm test`                       |
-| CI 测试选择规则 | `node --test tests/ci/*.test.mjs` |
-| 测试依赖的类名  | `pnpm check:hooks`                |
-| 界面规范        | `pnpm check:ui`                   |
-| 生产构建        | `pnpm build`                      |
+| 目的                   | 命令                              |
+| ---------------------- | --------------------------------- |
+| 类型检查               | `pnpm typecheck`                  |
+| 代码规范与组件使用门禁 | `pnpm lint`                       |
+| 格式检查               | `pnpm format:check`               |
+| 完整应用单测           | `pnpm test`                       |
+| CI 测试选择规则        | `node --test tests/ci/*.test.mjs` |
+| 测试依赖的类名         | `pnpm check:hooks`                |
+| 界面规范               | `pnpm check:ui`                   |
+| 生产构建               | `pnpm build`                      |
 
 这些命令供按需运行，提交前的验证和截图要求见[贡献指南](../CONTRIBUTING.md#validation)。跨浏览器命令与 CI 选择规则集中在[浏览器测试分层](browser-testing.md)，生产离线场景的复现方法见 [PWA 验收说明](testing-pwa.md)。
 
