@@ -586,6 +586,16 @@
       overflow-x: auto;
       scrollbar-width: none;
     }
+    .editor-modebar > .editor-toolbar > * {
+      flex-shrink: 0;
+    }
+    .editor-modebar > .editor-toolbar .editor-tool {
+      min-width: 32px;
+      width: 32px;
+    }
+    .editor-modebar > .editor-toolbar select {
+      width: auto;
+    }
     .editor-mode-label {
       position: absolute;
       width: 1px;
