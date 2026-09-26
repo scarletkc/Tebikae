@@ -194,6 +194,21 @@
   p {
     line-height: 1.7;
   }
+  /*
+   * On touch devices a long press opens the app's own menus, so native text selection and
+   * callouts stay out of the workspace chrome. Editable text and the note overlay keep them.
+   */
+  @media (pointer: coarse) {
+    .workspace,
+    .workspace * {
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+    .workspace :is(input, textarea, [contenteditable='true'], .editor-layer, .editor-layer *) {
+      -webkit-touch-callout: default;
+      user-select: text;
+    }
+  }
   svg {
     flex-shrink: 0;
   }
