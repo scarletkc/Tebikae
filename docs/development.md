@@ -48,7 +48,7 @@ Vitest 使用真实 Markdown 解析、Milkdown、fake-indexeddb 和 MSW 验证�
 
 ### 品牌图标
 
-品牌图标统一使用 `public/icon.svg` 的折角纸张与 T 图形。连接页、侧栏、手机导航和 favicon 直接引用这份 SVG；PWA 的 192px／512px 图标由它生成。不同主题保留品牌图标自身的配色，功能按钮继续使用各自的操作图标。
+品牌图标统一使用 `public/icon.svg` 的折角图块与 T 图形。连接页、侧栏、手机导航和 favicon 直接引用这份 SVG；PWA 的 192px／512px 图标，以及白底留出安全区的 `icon-maskable-512.png`，都由它生成。不同主题保留品牌图标自身的配色，功能按钮继续使用各自的操作图标。
 
 修改 SVG 后执行 `node scripts/generate-icons.mjs` 重新生成 PWA 图标，需要已安装 Playwright Chromium。
 

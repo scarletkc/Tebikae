@@ -740,28 +740,7 @@ function EditorBody({
   return (
     <div className="markdown-editor" ref={container}>
       <div className="editor-modebar">
-        <span>{t(mode === 'visual' ? 'editor.visual' : 'editor.source')}</span>
-        <button
-          type="button"
-          className="editor-mode-toggle"
-          onClick={() => void switchMode()}
-          disabled={loading || loadFailed}
-        >
-          {t(mode === 'visual' ? 'editor.showSource' : 'editor.showVisual')}
-        </button>
-      </div>
-      {unsupported && mode === 'source' && (
-        <p className="editor-notice" role="status">
-          {t('editor.unsupported')}
-        </p>
-      )}
-      {loadFailed && (
-        <p className="editor-notice" role="status">
-          {t('editor.loadFailed')}
-        </p>
-      )}
-      {mode === 'visual' && !readOnly && (
-        <>
+        {mode === 'visual' && !readOnly && (
           <div className="editor-toolbar" role="toolbar" aria-label={t('editor.toolbar')}>
             <select
               aria-label={t('editor.heading')}
@@ -806,6 +785,32 @@ function EditorBody({
               <MoreHorizontal />
             </button>
           </div>
+        )}
+        <button
+          type="button"
+          className="editor-mode-toggle"
+          title={t(mode === 'visual' ? 'editor.showSource' : 'editor.showVisual')}
+          onClick={() => void switchMode()}
+          disabled={loading || loadFailed}
+        >
+          {mode === 'visual' ? <CodeXml aria-hidden="true" /> : <Type aria-hidden="true" />}
+          <span className="editor-mode-label">
+            {t(mode === 'visual' ? 'editor.showSource' : 'editor.showVisual')}
+          </span>
+        </button>
+      </div>
+      {unsupported && mode === 'source' && (
+        <p className="editor-notice" role="status">
+          {t('editor.unsupported')}
+        </p>
+      )}
+      {loadFailed && (
+        <p className="editor-notice" role="status">
+          {t('editor.loadFailed')}
+        </p>
+      )}
+      {mode === 'visual' && !readOnly && (
+        <>
           <AnimatePresence initial={false}>
             {toolsOpen && (
               <motion.div

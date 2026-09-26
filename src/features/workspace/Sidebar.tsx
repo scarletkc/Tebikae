@@ -191,9 +191,10 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
               >
                 <div
                   className={cn(
-                    'label-nav-row grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-md',
-                    ctl.labelSelectionMode && 'selection-mode grid-cols-[minmax(0,1fr)_auto_auto]',
-                    selected && 'selected bg-active',
+                    'label-nav-row grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2 overflow-hidden rounded-md pe-2 hover:bg-hover',
+                    ctl.labelSelectionMode && 'selection-mode grid-cols-[minmax(0,1fr)_auto_auto] pe-0',
+                    selected && 'selected bg-active hover:bg-active',
+                    collapsed && 'pe-0',
                   )}
                   onClick={() => {
                     if (ctl.labelSelectionMode) ctl.toggleLabelSelection(label.id);
@@ -203,7 +204,7 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
                     type="button"
                     className={cn(
                       navItemClass,
-                      'label-main h-7 min-w-0 gap-2 overflow-hidden pe-0 text-xs',
+                      'label-main h-7 min-w-0 gap-2 overflow-hidden pe-0 text-xs hover:bg-transparent active:bg-transparent',
                       selected && `selected ${navItemCurrent}`,
                       ctl.labelSelectionMode && 'bg-transparent font-normal',
                       collapsedItem,

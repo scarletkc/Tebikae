@@ -9,19 +9,38 @@
   .editor-modebar {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 4px 0 12px;
-    gap: 12px;
-    color: var(--muted);
-    font-size: 0.75rem;
+    gap: 8px;
+    min-height: 36px;
   }
   .editor-mode-toggle {
-    font: inherit;
-    color: var(--accent);
-    background: transparent;
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    gap: 6px;
+    height: 32px;
+    margin: 0 0 0 auto;
+    padding: 0 10px;
     border: 0;
-    padding: 5px 0;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font: inherit;
+    font-size: 0.875rem;
+    white-space: nowrap;
     cursor: pointer;
+  }
+  .editor-mode-toggle:hover {
+    background: var(--surface-hover);
+    color: var(--text);
+  }
+  .editor-mode-toggle:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+  .editor-mode-toggle svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.8;
   }
   .editor-toolbar {
     display: flex;
@@ -30,11 +49,10 @@
     gap: 3px;
     width: fit-content;
     max-width: 100%;
-    padding: 5px;
-    border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
-    border-radius: 12px;
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
     background: var(--surface);
-    box-shadow: var(--shadow-card-hover);
   }
   .editor-tool {
     display: inline-flex;
@@ -192,20 +210,29 @@
     display: block;
     width: 100%;
     box-sizing: border-box;
-    min-height: 330px;
-    resize: vertical;
-    padding: 24px 0;
+    min-height: 300px;
+    margin: 0;
+    padding: 28px 0 40px;
     border: 0;
+    border-radius: 0;
     background: transparent;
     color: var(--text);
-    line-height: 1.7;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-    font-size: 0.85rem;
-    border-radius: 8px;
+    caret-color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    line-height: 1.75;
+    resize: vertical;
   }
-  .editor-source:focus {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
+  @supports (field-sizing: content) {
+    .editor-source {
+      field-sizing: content;
+      resize: none;
+    }
+  }
+  .editor-source:focus,
+  .editor-source:focus-visible {
+    outline: none;
+    box-shadow: none;
   }
   .editor-visual[hidden] {
     display: none;
@@ -281,7 +308,7 @@
   .markdown-preview code,
   .markdown-editor .ProseMirror code {
     font-size: 0.88em;
-    font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-family: var(--font-mono);
     background: var(--bg);
     border-radius: 3px;
     padding: 2px 4px;
@@ -444,6 +471,7 @@
   }
   .editor-expanded-tools .editor-toolbar {
     width: 100%;
+    padding: 0;
     border: 0;
     background: transparent;
     box-shadow: none;
@@ -546,6 +574,26 @@
     border-radius: 0 0 12px 12px;
   }
   @media (max-width: 760px) {
+    .editor-mode-toggle {
+      width: 44px;
+      height: 44px;
+      justify-content: center;
+      padding: 0;
+    }
+    .editor-modebar > .editor-toolbar {
+      flex-wrap: nowrap;
+      min-width: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .editor-mode-label {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
     .editor-tool {
       min-width: 36px;
       height: 44px;
