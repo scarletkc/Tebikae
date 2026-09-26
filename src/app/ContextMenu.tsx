@@ -1,9 +1,9 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
-import { ChevronRight, type LucideIcon } from 'lucide-react';
+import { Check, ChevronRight, Minus, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { isNativeText, useLongPress } from './LongPressTrigger';
-import { Button, cn, menuContent, menuItem, menuItemDanger, menuSeparator } from '../ui';
+import { Button, cn, menuContent, menuIndicator, menuItem, menuItemDanger, menuSeparator } from '../ui';
 
 export interface MenuAction {
   label: string;
@@ -123,6 +123,13 @@ function Items({ items }: { items: MenuAction[] }) {
         >
           <Icon icon={item.icon} swatch={item.swatch} />
           {item.label}
+          <Menu.ItemIndicator className={cn('context-check', menuIndicator)}>
+            {item.checked === 'indeterminate' ? (
+              <Minus className="context-check-mixed" size={16} aria-hidden="true" />
+            ) : (
+              <Check className="context-check-on" size={16} aria-hidden="true" />
+            )}
+          </Menu.ItemIndicator>
         </Menu.CheckboxItem>
       ) : (
         <Menu.Item

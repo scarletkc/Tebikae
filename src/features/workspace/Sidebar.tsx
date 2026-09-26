@@ -4,7 +4,6 @@ import {
   Check,
   ArrowUpRight,
   Copy,
-  FolderOpen,
   NotebookPen,
   Plus,
   RefreshCw,
@@ -14,8 +13,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Brand, PreferencesControls } from '../../app/ui';
-import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
+import { ContextMenu } from '../../app/ContextMenu';
 import { LabelContextMenu } from '../labels/LabelContextMenu';
+import { navMenuItems } from './navMenu';
 import { LabelDot } from '../labels';
 import { safeHref } from '../../security/urls';
 import { useWorkspace } from './useWorkspaceController';
@@ -30,7 +30,7 @@ const NAV_ITEMS = [
 /** Navigation, labels and workspace controls; rendered in the desktop sidebar and the mobile drawer. */
 export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
   const ctl = useWorkspace();
-  const { t, session, connection, filters, setFilters, notes, labels, counts, busy, online } = ctl;
+  const { t, session, connection, filters, setFilters, notes, labels, counts, busy } = ctl;
   const repositoryName = `${connection.owner}/${connection.repo}`;
   const repositoryUrl = safeHref(`https://github.com/${repositoryName}`);
   const collapsedItem = collapsed && 'justify-center gap-0 px-0';
@@ -43,46 +43,8 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
       </div>
       <nav className="main-nav flex flex-col gap-1">
         {NAV_ITEMS.map(([name, Icon]) => {
-          const items: MenuAction[] = [
-            {
-              label: t('action.open'),
-              icon: FolderOpen,
-              run: () => {
-                ctl.resetNavigationState();
-                ctl.navigate(`/${name}`);
-              },
-            },
-            ...(name === 'notes'
-              ? [
-                  {
-                    label: t('action.new'),
-                    icon: Plus,
-                    separator: true,
-                    disabled: !session.writable,
-                    run: () => ctl.newNote(),
-                  },
-                ]
-              : []),
-            ...(name === 'trash'
-              ? [
-                  {
-                    label: t('action.clearTrash'),
-                    icon: Trash2,
-                    separator: true,
-                    danger: true,
-                    disabled:
-                      !notes.some((note) => note.current.meta.trashedAt !== null) ||
-                      !session.writable ||
-                      !session.engine ||
-                      !online ||
-                      busy,
-                    run: () => void ctl.clearTrash(),
-                  },
-                ]
-              : []),
-          ];
           return (
-            <ContextMenu key={name} contextName={`navigation-${name}`} items={items}>
+            <ContextMenu key={name} contextName={`navigation-${name}`} items={navMenuItems(ctl, name)}>
               {/* NavLink adds the `active` class and aria-current="page" on the current page. */}
               <NavItem asChild className={cn(collapsedItem)}>
                 <NavLink
@@ -283,19 +245,7 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
             </IconButton>
           </ContextMenu>
           <PreferencesControls compact className="contents" />
-          <ContextMenu
-            contextName="settings"
-            items={[
-              {
-                label: t('action.openSettings'),
-                icon: SettingsIcon,
-                run: () => {
-                  ctl.navigate('/settings');
-                  ctl.setDrawer(false);
-                },
-              },
-            ]}
-          >
+          <ContextMenu contextName="settings" items={navMenuItems(ctl, 'settings')}>
             <IconButton asChild label={t('nav.settings')}>
               <NavLink to="/settings" onClick={() => ctl.setDrawer(false)}>
                 <SettingsIcon size={18} />

@@ -19,9 +19,10 @@ test('card menu, mixed bulk labels and filtered selection persist through sync',
   const mixed = page.getByRole('menuitemcheckbox', { name: 'Personal', exact: true });
   await expect(mixed).toHaveAttribute('aria-checked', 'mixed');
   await expect(mixed).toHaveCSS('font-weight', '600');
-  await expect(mixed).toHaveCSS('text-decoration-style', 'dashed');
+  await expect(mixed.locator('.context-check .context-check-mixed')).toHaveCount(1);
   await mixed.click();
   await expect(mixed).toHaveAttribute('aria-checked', 'true');
+  await expect(mixed.locator('.context-check .context-check-on')).toHaveCount(1);
   await page.keyboard.press('Escape');
   await expect(cards.first().locator('.note-open')).toBeFocused();
   await page.keyboard.press('Escape');
@@ -45,7 +46,7 @@ test('card menu, mixed bulk labels and filtered selection persist through sync',
   await expect(cards).toHaveCount(2);
 });
 
-test('color and label submenus use swatches and bold checked items', async ({ page, context }) => {
+test('color and label submenus use swatches and check marks on checked items', async ({ page, context }) => {
   await mockGitHub(context);
   await connect(page);
   const weekend = page.locator('.note-card').filter({ hasText: 'Weekend ideas' });
@@ -58,9 +59,9 @@ test('color and label submenus use swatches and bold checked items', async ({ pa
   await page.getByRole('menuitem', { name: 'Labels', exact: true }).hover();
   const personal = page.getByRole('menuitemcheckbox', { name: 'Personal', exact: true });
   await expect(personal.locator('.context-icon.context-swatch')).toHaveCount(1);
-  await expect(personal).toHaveCSS('font-weight', '700');
-  await expect(personal).toHaveCSS('text-decoration-line', 'underline');
-  await expect(page.locator('.context-check')).toHaveCount(0);
+  await expect(personal).toHaveCSS('font-weight', '600');
+  await expect(personal).not.toHaveCSS('text-decoration-line', 'underline');
+  await expect(personal.locator('.context-check .context-check-on')).toHaveCount(1);
 
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
@@ -68,8 +69,12 @@ test('color and label submenus use swatches and bold checked items', async ({ pa
   await page.getByRole('menuitem', { name: 'Color', exact: true }).hover();
   const sand = page.getByRole('menuitemcheckbox', { name: 'Sand', exact: true });
   await expect(sand.locator('.context-icon.context-swatch')).toHaveCount(1);
-  await expect(sand).toHaveCSS('font-weight', '700');
-  await expect(sand).toHaveCSS('text-decoration-line', 'underline');
+  await expect(sand).toHaveCSS('font-weight', '600');
+  await expect(sand).not.toHaveCSS('text-decoration-line', 'underline');
+  await expect(sand.locator('.context-check .context-check-on')).toHaveCount(1);
+  await expect(
+    page.getByRole('menuitemcheckbox', { name: 'Sage', exact: true }).locator('.context-check'),
+  ).toHaveCount(0);
   await expect(page.locator('.context-submenu .context-swatch')).toHaveCount(6);
 });
 
