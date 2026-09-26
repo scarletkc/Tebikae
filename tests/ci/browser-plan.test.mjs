@@ -5,191 +5,295 @@ import { tmpdir } from 'node:os';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import {
-  browserPlan,
-  documentationOnlyForEvent,
-  planForEvent,
-  successCacheKey,
-} from '../../scripts/ci-browser-plan.mjs';
+import { browserPlan, documentationOnlyForEvent, planForEvent } from '../../scripts/ci-browser-plan.mjs';
+import { checksPassed } from '../../scripts/ci-check-result.mjs';
 
 const full = () => browserPlan([], true);
-const project = (paths, browser) => browserPlan(paths).include.find((entry) => entry.browser === browser);
+const pr = { pull_request: { base: { sha: 'base' }, head: { sha: 'head' } } };
+const project = (paths, browser = 'chromium') =>
+  browserPlan(paths).include.find((entry) => entry.browser === browser);
 
-test('logic and mixed documentation/logic changes keep full Chromium plus WebKit smoke', () => {
-  for (const path of ['src/sync/engine.ts', 'src/domain/merge.ts', 'src/adapters/github/client.ts']) {
-    assert.deepEqual(browserPlan(['README.md', path]).include, [
-      { browser: 'chromium', grep: '.', pwa: true },
-      { browser: 'webkit', grep: '@smoke', pwa: false },
-    ]);
+test('tooling and unit tests keep Chromium smoke and PWA, with no unrelated engines', () => {
+  for (const path of [
+    'scripts/ci-browser-plan.mjs',
+    'tests/ci/browser-plan.test.mjs',
+    '.github/workflows/check.yml',
+    'tests/domain.test.ts',
+    'tests/setup.ts',
+    'eslint.config.js',
+    'playwright.screenshots.config.ts',
+  ]) {
+    assert.deepEqual(browserPlan([path]).include, [{ browser: 'chromium', grep: '@smoke', pwa: true }], path);
   }
 });
 
-test('editor changes include engine-specific editor flows and production lazy loading', () => {
-  const selected = project(['src/features/editor/MarkdownEditor.tsx'], 'firefox');
-  assert.match('editor.spec.ts opening the editor', new RegExp(selected.grep));
-  assert.match('reliability.spec.ts storage failure', new RegExp(selected.grep));
-  assert.doesNotMatch('markdown-export.spec.ts export', new RegExp(selected.grep));
-  assert.equal(selected.pwa, true);
+test('shared components and styles select their consumers without full engine matrices', () => {
+  for (const path of [
+    'src/ui/Button.tsx',
+    'src/app/ui.tsx',
+    'src/styles/theme.css',
+    'src/i18n/locales/en.json',
+  ]) {
+    const plan = browserPlan([path]);
+    assert.equal(plan.include.length, 1);
+    assert.notEqual(plan.include[0].grep, '.');
+    for (const file of [
+      'topbar-layout',
+      'note-layout',
+      'editor-canvas',
+      'context-menu',
+      'backup-import',
+      'markdown-export',
+    ])
+      assert.match(`${file}.spec.ts test`, new RegExp(plan.include[0].grep), `${path}: ${file}`);
+  }
 });
 
-test('storage, credentials, PWA and browser locks exercise cross-engine persistence', () => {
+test('editor changes select editing and save races across engines', () => {
+  for (const path of [
+    'src/features/editor/MarkdownEditor.tsx',
+    'src/features/notes/NoteDialog.tsx',
+    'src/domain/markdown.ts',
+    'src/features/workspace/useGlobalShortcuts.ts',
+  ]) {
+    const plan = browserPlan([path]);
+    assert.equal(plan.include.length, 3);
+    for (const selected of plan.include) {
+      assert.equal(selected.pwa, true);
+      for (const file of ['editor', 'editor-canvas', 'editor-save-races', 'notes', 'reliability'])
+        assert.match(`${file}.spec.ts test`, new RegExp(selected.grep));
+      assert.doesNotMatch('markdown-export.spec.ts export', new RegExp(selected.grep));
+    }
+  }
+});
+
+test('persistence, authentication, sync and locks get related cross-engine coverage', () => {
   for (const path of [
     'src/storage/db.ts',
     'src/security/saved-session.ts',
-    'src/app/pwa.ts',
+    'src/sync/engine.ts',
     'src/sync/lock.ts',
+    'src/adapters/github/client.ts',
+    'src/app/session.tsx',
+    'src/app/usePwaLifecycle.ts',
+    'src/features/connect/Connect.tsx',
     'src/application/commands.ts',
-    'src/application/backup-import.ts',
+    'src/domain/merge.ts',
+    'src/domain/codec.ts',
+    'src/domain/types.ts',
+    'src/features/settings/BackupImportDialog.tsx',
+    'tests/pwa/network.ts',
+    'playwright.pwa.config.ts',
   ]) {
-    const selected = project([path], 'firefox');
-    assert.equal(selected.pwa, true);
-    assert.match('session.spec.ts reconnect', new RegExp(selected.grep));
-    assert.match('backup-import.spec.ts rollback', new RegExp(selected.grep));
+    for (const browser of ['chromium', 'webkit', 'firefox']) {
+      const selected = project([path], browser);
+      assert.equal(selected.pwa, true, path);
+      for (const file of [
+        'session',
+        'notes',
+        'reliability',
+        'sync-retry',
+        'backup-import',
+        'workspace-status',
+      ])
+        assert.match(`${file}.spec.ts test`, new RegExp(selected.grep), path);
+    }
   }
 });
 
-test('UI changes cover responsive layouts, editor controls and dialogs', () => {
-  const selected = project(['src/styles/app.css'], 'webkit');
-  for (const file of ['topbar-layout', 'note-layout', 'editor', 'markdown-export', 'backup-import'])
-    assert.match(`${file}.spec.ts`, new RegExp(selected.grep));
-  assert.match('another.spec.ts core @smoke', new RegExp(selected.grep));
+test('feature changes select related Chromium specs', () => {
+  for (const [path, included, excluded] of [
+    ['src/features/filters/Filters.tsx', 'pagination-search', 'backup-import'],
+    ['src/features/labels/LabelBadge.tsx', 'labels', 'editor-save-races'],
+    ['src/features/notes/NoteCard.tsx', 'note-layout', 'session'],
+    ['src/features/workspace/Topbar.tsx', 'topbar-layout', 'backup-import'],
+    ['src/features/settings/MarkdownExportDialog.tsx', 'markdown-export', 'backup-import'],
+  ]) {
+    const plan = browserPlan([path]);
+    assert.equal(plan.include.length, 1);
+    assert.match(`${included}.spec.ts test`, new RegExp(plan.include[0].grep));
+    assert.doesNotMatch(`${excluded}.spec.ts test`, new RegExp(plan.include[0].grep));
+  }
 });
 
-test('changed browser specs run on all engines, with literal file names', () => {
-  const selected = project(['tests/e2e/new+[flow].spec.ts'], 'firefox');
-  assert.match('new+[flow].spec.ts', new RegExp(selected.grep));
-  assert.doesNotMatch('newflow.spec.ts', new RegExp(selected.grep));
-  assert.match('notes.spec.ts core @smoke', new RegExp(selected.grep));
+test('changed specs are literal and bounded, with smoke retained for deleted specs', () => {
+  const selected = project(['tests/e2e/new+[flow].spec.ts']);
+  const pattern = new RegExp(selected.grep);
+  assert.match('chromium tests/e2e/new+[flow].spec.ts title', pattern);
+  assert.match('chromium tests\\e2e\\new+[flow].spec.ts title', pattern);
+  assert.doesNotMatch('newflow.spec.ts title', pattern);
+  assert.doesNotMatch('other-new+[flow].spec.ts title', pattern);
+  assert.match('notes.spec.ts title @smoke', pattern);
+  assert.equal(browserPlan(['tests/e2e/new+[flow].spec.ts']).include.length, 1);
 });
 
-test('assets, dependencies, build, workflow and unknown changes require full coverage', () => {
+test('unknown paths and shared infrastructure fall back to Chromium full with a reason', () => {
   for (const path of [
     'public/icon.svg',
     'package.json',
     'pnpm-lock.yaml',
     'vite.config.ts',
     'index.html',
-    '.github/workflows/check.yml',
+    'playwright.config.ts',
     'tests/e2e/fixtures.ts',
     'src/new-module.ts',
     'docs/example.js',
     'src/content.md',
-  ])
-    assert.deepEqual(browserPlan(['README.md', path]), full(), path);
+  ]) {
+    const plan = browserPlan([path]);
+    assert.deepEqual(plan.include, [{ browser: 'chromium', grep: '.', pwa: true }]);
+    assert.ok(plan.reasons.some((reason) => reason.includes(path)));
+  }
 });
 
-test('manual runs always exercise every engine and production suite', () => {
+test('mixed changes union coverage without expanding unrelated engines to full', () => {
+  const paths = [
+    'README.md',
+    'src/features/editor/engine.ts',
+    'src/security/session.ts',
+    'src/ui/Button.tsx',
+    'unknown',
+  ];
+  assert.equal(project(paths).grep, '.');
+  const firefox = new RegExp(project(paths, 'firefox').grep);
+  assert.match('editor-save-races.spec.ts race', firefox);
+  assert.match('backup-import.spec.ts import', firefox);
+  assert.doesNotMatch('topbar-layout.spec.ts layout', firefox);
+});
+
+test('manual and deployment runs always retain all browsers and PWA', () => {
   assert.deepEqual(
-    planForEvent('workflow_dispatch', {}, () => assert.fail('no diff needed')),
+    planForEvent('workflow_dispatch', {}, () => assert.fail()),
     full(),
+  );
+  for (const event of ['push', 'pull_request', 'workflow_call'])
+    assert.deepEqual(
+      planForEvent(event, pr, () => assert.fail(), true),
+      full(),
+    );
+  assert.deepEqual(
+    full().include.map((entry) => [entry.browser, entry.grep, entry.pwa]),
+    [
+      ['chromium', '.', true],
+      ['webkit', '.', true],
+      ['firefox', '.', true],
+    ],
   );
 });
 
-test('deployment overrides the caller event and changed paths with full coverage', () => {
-  assert.deepEqual(
-    planForEvent('push', { before: 'old', after: 'new' }, () => ['src/domain/codec.ts'], true),
-    full(),
-  );
+test('main pushes never start browser jobs, including first pushes and unavailable history', () => {
+  assert.deepEqual(planForEvent('push', {}, () => assert.fail()).include, []);
 });
 
-test('PR selection uses base/head merge-base; pushes use the complete before/after range', () => {
-  const calls = [];
-  const changed = (...args) => {
-    calls.push(args);
-    return ['src/domain/codec.ts'];
-  };
-  planForEvent('pull_request', { pull_request: { base: { sha: 'base' }, head: { sha: 'head' } } }, changed);
-  planForEvent('push', { before: 'old', after: 'new' }, changed);
-  assert.deepEqual(calls, [
-    ['base', 'head', true],
-    ['old', 'new', false],
-  ]);
-});
-
-test('missing history and first pushes fall back to full coverage', () => {
-  assert.deepEqual(
-    planForEvent('push', { before: '000000', after: 'head' }, () => assert.fail()),
-    full(),
-  );
-  assert.deepEqual(
-    planForEvent('push', { before: 'old', after: 'new' }, () => {
-      throw new Error('missing commit');
+test('PRs use base/head and missing metadata or history increases Chromium coverage', () => {
+  let args;
+  planForEvent('pull_request', pr, (...values) => {
+    args = values;
+    return [];
+  });
+  assert.deepEqual(args, ['base', 'head']);
+  for (const plan of [
+    planForEvent('pull_request', {}, () => assert.fail()),
+    planForEvent('pull_request', pr, () => {
+      throw new Error('missing history');
     }),
-    full(),
-  );
+  ]) {
+    assert.equal(plan.include[0].grep, '.');
+    assert.equal(plan.include.length, 1);
+    assert.equal(plan.reasons.length, 1);
+  }
 });
 
 test('only ordinary prose changes can skip required code validation', () => {
-  const event = { pull_request: { base: { sha: 'base' }, head: { sha: 'head' } } };
   const diff = (path, oldMode = '100644', newMode = '100644', status = 'M') =>
     `:${oldMode} ${newMode} abc123 def456 ${status}\0${path}\0`;
-  const prose = diff('README.md') + diff('docs/guide.md', '000000', '100644', 'A');
-  const classify = (raw) => documentationOnlyForEvent('pull_request', event, () => raw);
-  assert.equal(classify(prose), true);
+  const classify = (raw) => documentationOnlyForEvent('pull_request', pr, () => raw);
+  assert.equal(classify(diff('README.md') + diff('docs/guide.md', '000000', '100644', 'A')), true);
   assert.equal(classify(diff('LICENSE', '100644', '000000', 'D')), true);
-  for (const path of ['src/app.ts', 'src/content.md', 'docs/example.js', '.github/workflows/check.yml'])
-    assert.equal(classify(prose + diff(path)), false, path);
-  for (const mode of ['100755', '120000']) {
-    assert.equal(classify(diff('README.md', '100644', mode)), false);
-    assert.equal(classify(diff('README.md', mode, '000000', 'D')), false);
-  }
+  for (const path of ['src/content.md', 'docs/example.js', '.github/workflows/check.yml'])
+    assert.equal(classify(diff('README.md') + diff(path)), false);
+  for (const mode of ['100755', '120000']) assert.equal(classify(diff('README.md', '100644', mode)), false);
   for (const raw of ['', 'malformed\0README.md\0', ':100644 100644 abc def R100\0old\0new\0'])
     assert.equal(classify(raw), false);
   assert.equal(
-    documentationOnlyForEvent('pull_request', event, () => prose, true),
+    documentationOnlyForEvent('pull_request', pr, () => diff('README.md'), true),
     false,
   );
   assert.equal(
-    documentationOnlyForEvent('workflow_dispatch', event, () => prose),
+    documentationOnlyForEvent('workflow_dispatch', pr, () => diff('README.md')),
     false,
   );
   assert.equal(
-    documentationOnlyForEvent('pull_request', {}, () => prose),
+    documentationOnlyForEvent('pull_request', {}, () => diff('README.md')),
     false,
   );
   assert.equal(
-    documentationOnlyForEvent('pull_request', event, () => {
+    documentationOnlyForEvent('pull_request', pr, () => {
       throw new Error('missing history');
     }),
     false,
   );
 });
 
-test('CLI handles renames, Actions outputs, documentation reuse and deployment overrides', () => {
+test('the required gate rejects every unexpected failure, cancellation or skip', () => {
+  const cases = [
+    {
+      plan: 'success',
+      validate: 'success',
+      browsers: 'success',
+      documentationOnly: 'false',
+      runBrowsers: 'true',
+    },
+    {
+      plan: 'success',
+      validate: 'success',
+      browsers: 'skipped',
+      documentationOnly: 'false',
+      runBrowsers: 'false',
+    },
+    {
+      plan: 'success',
+      validate: 'skipped',
+      browsers: 'skipped',
+      documentationOnly: 'true',
+      runBrowsers: 'false',
+    },
+  ];
+  for (const valid of cases) {
+    assert.equal(checksPassed(valid), true);
+    for (const key of ['plan', 'validate', 'browsers'])
+      for (const state of ['failure', 'cancelled', 'skipped', 'success', undefined])
+        if (state !== valid[key]) assert.equal(checksPassed({ ...valid, [key]: state }), false);
+    for (const key of ['documentationOnly', 'runBrowsers'])
+      assert.equal(checksPassed({ ...valid, [key]: undefined }), false);
+  }
+});
+
+test('CLI handles renames, documentation, main and full verification outputs', () => {
   const root = mkdtempSync(join(tmpdir(), 'tebikae-ci-plan-'));
-  const git = (...args) => execFileSync('git', args, { cwd: root, encoding: 'utf8' }).trim();
-  try {
-    git('init');
-    git('config', 'user.email', 'test@example.invalid');
-    git('config', 'user.name', 'CI test');
-    mkdirSync(join(root, 'src/storage'), { recursive: true });
-    mkdirSync(join(root, 'src/domain'), { recursive: true });
-    writeFileSync(join(root, 'src/storage/cache.ts'), 'export const cache = 1;\n');
-    git('add', '.');
-    git('commit', '-m', 'base');
-    const before = git('rev-parse', 'HEAD');
-    git('mv', 'src/storage/cache.ts', 'src/domain/cache.ts');
-    git('commit', '-m', 'move');
-    const eventPath = join(root, 'event.json');
-    const outputPath = join(root, 'output');
-    writeFileSync(eventPath, JSON.stringify({ before, after: git('rev-parse', 'HEAD') }));
-    const output = execFileSync(
-      process.execPath,
-      [fileURLToPath(new URL('../../scripts/ci-browser-plan.mjs', import.meta.url))],
-      {
+  const git = (...args) =>
+    execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  const script = fileURLToPath(new URL('../../scripts/ci-browser-plan.mjs', import.meta.url));
+  const run = (eventName, event, full = false) => {
+    const eventPath = join(root, 'event.json'),
+      outputPath = join(root, 'outputs'),
+      summary = join(root, 'summary');
+    writeFileSync(eventPath, JSON.stringify(event));
+    writeFileSync(outputPath, '');
+    const result = JSON.parse(
+      execFileSync(process.execPath, [script], {
         cwd: root,
+        encoding: 'utf8',
         env: {
           ...process.env,
-          GITHUB_EVENT_NAME: 'push',
+          GITHUB_EVENT_NAME: eventName,
           GITHUB_EVENT_PATH: eventPath,
           GITHUB_OUTPUT: outputPath,
-          FULL_BROWSER_SUITE: 'false',
+          GITHUB_STEP_SUMMARY: summary,
+          FULL_BROWSER_SUITE: String(full),
         },
-        encoding: 'utf8',
-      },
+      }),
     );
-    const matrix = JSON.parse(output);
-    assert.equal(matrix.include.find((entry) => entry.browser === 'firefox').pwa, true);
     const outputs = Object.fromEntries(
       readFileSync(outputPath, 'utf8')
         .trim()
@@ -199,147 +303,44 @@ test('CLI handles renames, Actions outputs, documentation reuse and deployment o
           return [line.slice(0, separator), line.slice(separator + 1)];
         }),
     );
-    assert.deepEqual(JSON.parse(outputs.matrix), matrix);
-    assert.equal(outputs.reuse_allowed, 'false');
-    const deployment = execFileSync(
-      process.execPath,
-      [fileURLToPath(new URL('../../scripts/ci-browser-plan.mjs', import.meta.url))],
-      {
-        cwd: root,
-        env: {
-          ...process.env,
-          GITHUB_EVENT_NAME: 'push',
-          GITHUB_EVENT_PATH: eventPath,
-          GITHUB_OUTPUT: join(root, 'deployment-output'),
-          FULL_BROWSER_SUITE: 'true',
-        },
-        encoding: 'utf8',
-      },
-    );
-    assert.deepEqual(JSON.parse(deployment), full());
-    const prOutput = join(root, 'pr-output');
-    let prBase = before;
-    const runPR = (overrides = {}) => {
-      writeFileSync(
-        eventPath,
-        JSON.stringify({ pull_request: { base: { sha: prBase }, head: { sha: git('rev-parse', 'HEAD') } } }),
-      );
-      writeFileSync(prOutput, '');
-      execFileSync(
-        process.execPath,
-        [fileURLToPath(new URL('../../scripts/ci-browser-plan.mjs', import.meta.url))],
-        {
-          cwd: root,
-          env: {
-            ...process.env,
-            GITHUB_EVENT_NAME: 'pull_request',
-            GITHUB_EVENT_PATH: eventPath,
-            GITHUB_OUTPUT: prOutput,
-            GITHUB_REF: 'refs/pull/12/merge',
-            GITHUB_WORKFLOW: 'Check',
-            ImageOS: 'ubuntu24',
-            ImageVersion: '20260917',
-            FULL_BROWSER_SUITE: 'false',
-            ...overrides,
-          },
-          encoding: 'utf8',
-        },
-      );
-      return Object.fromEntries(
-        readFileSync(prOutput, 'utf8')
-          .trim()
-          .split('\n')
-          .map((line) => {
-            const separator = line.indexOf('=');
-            return [line.slice(0, separator), line.slice(separator + 1)];
-          }),
-      );
-    };
-    const initial = runPR();
-    assert.equal(initial.reuse_allowed, 'true');
-    assert.equal(initial.documentation_only, 'false');
-    writeFileSync(join(root, 'README.md'), 'Documentation update\n');
+    assert.deepEqual(JSON.parse(outputs.matrix), { include: result.include });
+    assert.ok(readFileSync(summary, 'utf8').includes('Browser coverage'));
+    return outputs;
+  };
+  try {
+    git('init');
+    git('config', 'user.email', 'test@example.invalid');
+    git('config', 'user.name', 'CI test');
+    mkdirSync(join(root, 'src/storage'), { recursive: true });
+    writeFileSync(join(root, 'src/storage/db.ts'), 'export const value = 1;\n');
+    git('add', '.');
+    git('commit', '-m', 'base');
+    const base = git('rev-parse', 'HEAD');
+    git('mv', 'src/storage/db.ts', 'src/renamed.ts');
+    git('commit', '-m', 'rename');
+    const event = { pull_request: { base: { sha: base }, head: { sha: git('rev-parse', 'HEAD') } } };
+    const result = run('pull_request', event);
+    assert.equal(result.run_browsers, 'true');
+    assert.equal(JSON.parse(result.matrix).include.length, 3);
+    assert.equal(result.full, 'false');
+    assert.equal(run('push', {}).run_browsers, 'false');
+    assert.equal(run('push', {}, true).full, 'true');
+    assert.equal(run('workflow_dispatch', {}).full, 'true');
+    const docBase = git('rev-parse', 'HEAD');
+    writeFileSync(join(root, 'README.md'), 'Documentation\n');
     git('add', 'README.md');
     git('commit', '-m', 'docs');
-    assert.equal(runPR().cache_key, initial.cache_key);
-    writeFileSync(join(root, 'src/domain/cache.ts'), 'export const cache = 2;\n');
-    git('add', 'src/domain/cache.ts');
-    git('commit', '-m', 'code');
-    assert.notEqual(runPR().cache_key, initial.cache_key);
-    assert.equal(runPR({ FULL_BROWSER_SUITE: 'true' }).reuse_allowed, 'false');
-    assert.equal(runPR({ ImageVersion: '' }).reuse_allowed, 'false');
-    prBase = git('rev-parse', 'HEAD');
-    writeFileSync(join(root, 'README.md'), 'Only documentation changes\n');
-    git('add', 'README.md');
-    git('commit', '-m', 'prose only');
-    assert.equal(runPR().documentation_only, 'true');
-    assert.equal(runPR().reuse_allowed, 'false');
-    assert.equal(runPR({ FULL_BROWSER_SUITE: 'true' }).documentation_only, 'false');
+    const docs = { pull_request: { base: { sha: docBase }, head: { sha: git('rev-parse', 'HEAD') } } };
+    assert.equal(run('pull_request', docs).documentation_only, 'true');
+    assert.equal(run('pull_request', docs).run_browsers, 'false');
+    assert.equal(run('pull_request', docs, true).documentation_only, 'false');
     git('update-index', '--chmod=+x', 'README.md');
     git('commit', '-m', 'executable markdown');
-    assert.equal(runPR().documentation_only, 'false');
+    docs.pull_request.head.sha = git('rev-parse', 'HEAD');
+    assert.equal(run('pull_request', docs).documentation_only, 'false');
   } finally {
     assert.equal(dirname(resolve(root)), resolve(tmpdir()));
     assert.ok(basename(root).startsWith('tebikae-ci-plan-'));
     rmSync(root, { recursive: true, force: true });
   }
-});
-
-const entry = (path, hash = 'a', mode = '100644') => `${mode} blob ${hash.repeat(40)}\t${path}\0`;
-const identity = {
-  tree: entry('src/app/App.tsx') + entry('pnpm-lock.yaml') + entry('README.md'),
-  matrix: browserPlan(['src/app/App.tsx']),
-  base: 'base-sha',
-  scope: 'Check:refs/pull/12/merge',
-  runtime: ['v24', 'linux', 'x64', 'ubuntu24', '20260917'],
-};
-
-test('prose-only changes reuse the same code result identity', () => {
-  assert.equal(
-    successCacheKey(identity),
-    successCacheKey({
-      ...identity,
-      tree:
-        entry('src/app/App.tsx') +
-        entry('pnpm-lock.yaml') +
-        entry('README.md', 'b') +
-        entry('docs/new-guide.md'),
-    }),
-  );
-});
-
-test('code, dependencies, workflows, tests and runtime Markdown invalidate a cached result', () => {
-  for (const path of [
-    'src/app/App.tsx',
-    'pnpm-lock.yaml',
-    '.github/workflows/check.yml',
-    'tests/e2e/notes.spec.ts',
-    'src/content.md',
-  ]) {
-    const before = { ...identity, tree: entry(path) };
-    assert.notEqual(successCacheKey(before), successCacheKey({ ...before, tree: entry(path, 'b') }), path);
-  }
-  assert.notEqual(successCacheKey(identity), successCacheKey({ ...identity, tree: entry('pnpm-lock.yaml') }));
-});
-
-test('base updates, another PR, runner changes and wider coverage invalidate reuse', () => {
-  for (const change of [
-    { base: 'new-main' },
-    { scope: 'Check:refs/pull/13/merge' },
-    { runtime: ['v24', 'linux', 'x64', 'ubuntu24', '20260918'] },
-    { matrix: full() },
-  ])
-    assert.notEqual(successCacheKey(identity), successCacheKey({ ...identity, ...change }));
-});
-
-test('executable Markdown, symlinks and missing provenance are not reusable prose', () => {
-  for (const mode of ['100755', '120000']) {
-    const before = { ...identity, tree: entry('README.md', 'a', mode) };
-    assert.notEqual(
-      successCacheKey(before),
-      successCacheKey({ ...before, tree: entry('README.md', 'b', mode) }),
-    );
-  }
-  assert.throws(() => successCacheKey({ ...identity, base: '' }), /Missing cache identity/);
-  assert.throws(() => successCacheKey({ ...identity, tree: 'invalid entry' }), /Invalid Git tree/);
 });
