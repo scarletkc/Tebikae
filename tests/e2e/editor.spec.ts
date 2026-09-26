@@ -87,6 +87,17 @@ test('task, code, link and table tools modify real Milkdown documents', async ({
   await page.getByRole('menuitem', { name: 'Delete table', exact: true }).click();
   await expect(page.locator('.ProseMirror table')).toHaveCount(0);
   await expect(page.getByRole('menu')).toHaveCount(0);
+  // Closing the menu returns focus to the document, unless a click outside focused another control.
+  const tableActions = page.getByRole('button', { name: 'More table actions', exact: true });
+  await tableActions.click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(page.locator('.ProseMirror')).toBeFocused();
+  await tableActions.click();
+  const title = page.getByRole('dialog').getByLabel('Title', { exact: true });
+  await title.click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+  await expect(title).toBeFocused();
   await page.getByRole('button', { name: 'Insert or edit link', exact: true }).click();
   await page.getByLabel('Link address', { exact: true }).fill('javascript:alert(1)');
   await page.getByRole('button', { name: 'Apply link', exact: true }).click();

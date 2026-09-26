@@ -913,8 +913,11 @@ function EditorBody({
                         loop
                         className="editor-table-menu"
                         onCloseAutoFocus={(event) => {
-                          // Back to the document rather than the trigger; the editor may be gone by now.
+                          // Back to the document rather than the trigger, unless a click outside the
+                          // menu already focused another control. The editor may be gone by now.
                           event.preventDefault();
+                          const active = document.activeElement;
+                          if (active && active !== document.body && !active.closest('[role="menu"]')) return;
                           container.current
                             ?.querySelector<HTMLElement>('.ProseMirror')
                             ?.focus({ preventScroll: true });
