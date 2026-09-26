@@ -70,7 +70,8 @@ test('task, code, link and table tools modify real Milkdown documents', async ({
   await page.getByRole('button', { name: 'Insert code block or update its language', exact: true }).click();
   await expect(page.locator('.ProseMirror pre')).toHaveAttribute('data-language', 'typescript');
   await expect(page.locator('.ProseMirror pre')).toContainText('const message = "中文";');
-  await page.getByRole('combobox', { name: 'Text style', exact: true }).selectOption('0');
+  await page.getByRole('button', { name: 'Text style', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Paragraph', exact: true }).click();
   await page.getByRole('button', { name: 'Insert table', exact: true }).click();
   await expect(page.locator('.ProseMirror tr')).toHaveCount(3);
   await page.getByRole('button', { name: 'Add row below', exact: true }).click();

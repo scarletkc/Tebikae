@@ -190,7 +190,8 @@ test('Chinese dark mobile preview remains scrollable and keyboard dismissal work
   await connect(page);
   await openImport(page);
   await page.getByRole('dialog').getByRole('button', { name: 'Close', exact: true }).click();
-  await page.locator('#theme-setting').selectOption('dark');
+  await page.locator('#theme-setting').click();
+  await page.getByRole('menuitemradio', { name: 'Dark', exact: true }).click();
   await page.locator('#language-setting').click();
   await page.getByRole('menuitemradio', { name: '简体中文', exact: true }).click();
   await page.getByRole('button', { name: '导入 JSON 备份', exact: true }).scrollIntoViewIfNeeded();

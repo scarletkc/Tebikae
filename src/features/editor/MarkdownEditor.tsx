@@ -23,6 +23,7 @@ import { addRowAfterCommand, insertTableCommand } from '@milkdown/kit/preset/gfm
 import {
   Bold,
   CheckSquare,
+  ChevronDown,
   ClipboardPaste,
   Code,
   CodeXml,
@@ -57,6 +58,21 @@ import { createMarkdownEditor } from './engine';
 import { MarkdownSession } from './session';
 import { cleanCodeLanguage, codeLanguages, openCodeLanguagePicker } from './code-language';
 import { convertList } from './list-commands';
+import {
+  Banner,
+  Button,
+  Field,
+  IconButton,
+  Input,
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuTrigger,
+  Textarea,
+  Toolbar,
+  ToolbarDivider,
+  cn,
+} from '../../ui';
 import './editor.css';
 
 export interface MarkdownEditorProps {
@@ -72,21 +88,22 @@ interface ToolbarButtonProps {
   children: ReactNode;
   onClick: () => void;
   disabled?: boolean;
+  className?: string;
 }
 
-function ToolButton({ label, children, onClick, disabled }: ToolbarButtonProps) {
+function ToolButton({ label, children, onClick, disabled, className }: ToolbarButtonProps) {
   return (
-    <button
-      type="button"
-      className="editor-tool"
-      title={label}
-      aria-label={label}
+    <IconButton
+      size="sm"
+      label={label}
       disabled={disabled}
+      // 32px wide so the whole toolbar fits a phone, 44px tall for touch.
+      className={cn('editor-tool max-md:h-11 [&_svg]:size-4', className)}
       onMouseDown={(event) => event.preventDefault()}
       onClick={onClick}
     >
       {children}
-    </button>
+    </IconButton>
   );
 }
 
@@ -738,76 +755,89 @@ function EditorBody({
     item('redo', () => command(() => redo)),
   ];
   return (
-    <div className="markdown-editor" ref={container}>
-      <div className="editor-modebar">
+    <div className="markdown-editor relative min-w-0 text-fg" ref={container}>
+      <div className="editor-modebar flex min-h-9 items-center gap-2">
         {mode === 'visual' && !readOnly && (
-          <div className="editor-toolbar" role="toolbar" aria-label={t('editor.toolbar')}>
-            <select
-              aria-label={t('editor.heading')}
-              disabled={loading}
-              defaultValue=""
-              onChange={(event) => {
-                const level = Number(event.target.value);
-                command((ctx) =>
-                  setBlockType(
-                    ctx.get(editorViewCtx).state.schema.nodes[level ? 'heading' : 'paragraph']!,
-                    level ? { level } : undefined,
-                  ),
-                );
-                event.target.value = '';
-              }}
-            >
-              <option value="" disabled>
-                {t('editor.heading')}
-              </option>
-              <option value="0">{t('editor.paragraph')}</option>
-              {[1, 2, 3, 4, 5, 6].map((level) => (
-                <option key={level} value={level}>
-                  {t('editor.headingLevel', { level })}
-                </option>
-              ))}
-            </select>
+          <Toolbar
+            className="editor-toolbar max-md:min-w-0 max-md:flex-nowrap max-md:overflow-x-auto max-md:[scrollbar-width:none] max-md:*:shrink-0"
+            aria-label={t('editor.toolbar')}
+          >
+            <Menu modal={false}>
+              <MenuTrigger disabled={loading}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="editor-heading gap-1 px-2 font-normal text-muted hover:text-fg data-[state=open]:text-fg max-md:h-11"
+                  onMouseDown={(event) => event.preventDefault()}
+                >
+                  {t('editor.heading')}
+                  <ChevronDown aria-hidden="true" />
+                </Button>
+              </MenuTrigger>
+              <MenuContent
+                align="start"
+                loop
+                // run() moves focus back into the document after the command.
+                onCloseAutoFocus={(event) => event.preventDefault()}
+              >
+                {[0, 1, 2, 3, 4, 5, 6].map((level) => (
+                  <MenuItem
+                    key={level}
+                    onSelect={() =>
+                      command((ctx) =>
+                        setBlockType(
+                          ctx.get(editorViewCtx).state.schema.nodes[level ? 'heading' : 'paragraph']!,
+                          level ? { level } : undefined,
+                        ),
+                      )
+                    }
+                  >
+                    {level ? t('editor.headingLevel', { level }) : t('editor.paragraph')}
+                  </MenuItem>
+                ))}
+              </MenuContent>
+            </Menu>
             {tool('bold', <Bold />, () => mark('strong'))}
             {tool('italic', <Italic />, () => mark('emphasis'))}
             {tool('taskList', <CheckSquare />, task)}
             {tool('undo', <Undo2 />, () => command(() => undo))}
             {tool('redo', <Redo2 />, () => command(() => redo))}
-            <button
-              type="button"
-              className="editor-tool"
-              aria-label={t('editor.moreTools')}
-              title={t('editor.moreTools')}
+            <IconButton
+              size="sm"
+              className="editor-tool max-md:h-11 [&_svg]:size-4"
+              label={t('editor.moreTools')}
               aria-expanded={toolsOpen}
               aria-controls={expandedToolsId}
               onMouseDown={(event) => event.preventDefault()}
               onClick={() => setToolsOpen((open) => !open)}
             >
               <MoreHorizontal />
-            </button>
-          </div>
+            </IconButton>
+          </Toolbar>
         )}
-        <button
-          type="button"
-          className="editor-mode-toggle"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="editor-mode-toggle ms-auto gap-1.5 px-2.5 font-normal text-muted hover:text-fg max-md:size-11 max-md:px-0"
           title={t(mode === 'visual' ? 'editor.showSource' : 'editor.showVisual')}
           onClick={() => void switchMode()}
           disabled={loading || loadFailed}
         >
           {mode === 'visual' ? <CodeXml aria-hidden="true" /> : <Type aria-hidden="true" />}
-          <span className="editor-mode-label">
+          <span className="editor-mode-label max-md:sr-only">
             {t(mode === 'visual' ? 'editor.showSource' : 'editor.showVisual')}
           </span>
-        </button>
+        </Button>
       </div>
       {unsupported && mode === 'source' && (
-        <p className="editor-notice" role="status">
+        <Banner role="status" className="editor-notice my-3">
           {t('editor.unsupported')}
-        </p>
+        </Banner>
       )}
       {loadFailed && (
-        <p className="editor-notice" role="status">
+        <Banner role="status" className="editor-notice my-3">
           {t('editor.loadFailed')}
-        </p>
+        </Banner>
       )}
       {mode === 'visual' && !readOnly && (
         <>
@@ -815,13 +845,13 @@ function EditorBody({
             {toolsOpen && (
               <motion.div
                 id={expandedToolsId}
-                className="editor-expanded-tools"
+                className="editor-expanded-tools mt-2 rounded-lg border border-line bg-surface p-0.5"
                 initial={{ opacity: 0, y: reducedMotion ? 0 : -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: reducedMotion ? 0 : 0.12 }}
               >
-                <div className="editor-toolbar" role="toolbar" aria-label={t('editor.moreTools')}>
+                <Toolbar className="editor-toolbar w-full border-0 p-0" aria-label={t('editor.moreTools')}>
                   {tool('strike', <Strikethrough />, () => mark('strike_through'))}
                   {tool('inlineCode', <Code />, () => mark('inlineCode'))}
                   {tool('link', <Link />, openLink)}
@@ -843,44 +873,57 @@ function EditorBody({
                       );
                     }),
                   )}
-                  <span className="editor-toolbar-divider" />
+                  <ToolbarDivider />
                   {tool('table', <Table />, insertTable)}
                   {tool('addRow', <Rows3 />, () =>
                     run((ctx) => ctx.get(commandsCtx).call(addRowAfterCommand.key)),
                   )}
                   {tool('addColumn', <Columns3 />, () => command(() => addColumnAfter))}
-                  <details className="editor-table-actions">
-                    <summary aria-label={t('editor.tableActions')} title={t('editor.tableActions')}>
-                      {t('editor.tableMenu')}
-                    </summary>
-                    <div>
-                      <button
-                        type="button"
+                  <details className="editor-table-actions relative">
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="sm"
+                      className="list-none px-2 font-normal text-muted hover:text-fg [&::-webkit-details-marker]:hidden"
+                    >
+                      <summary aria-label={t('editor.tableActions')} title={t('editor.tableActions')}>
+                        {t('editor.tableMenu')}
+                        <ChevronDown aria-hidden="true" />
+                      </summary>
+                    </Button>
+                    <div className="absolute end-0 top-full z-10 mt-1 grid min-w-40 gap-0.5 rounded-xl border border-line bg-surface p-1 shadow-popover">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="justify-start font-normal"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={removeTableRows}
                       >
                         {t('editor.deleteRow')}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="justify-start font-normal"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => command(() => deleteColumn)}
                       >
                         {t('editor.deleteColumn')}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="justify-start font-normal text-danger hover:bg-danger-soft"
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={() => command(() => deleteTable)}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 />
                         {t('editor.deleteTable')}
-                      </button>
+                      </Button>
                     </div>
                   </details>
-                  <span className="editor-toolbar-divider" />
-                </div>
-                <div className="editor-codebar">
+                </Toolbar>
+                <div className="editor-codebar flex flex-wrap items-center gap-2 px-1 py-1">
                   {tool('codeBlock', <CodeXml />, () =>
                     command((ctx) =>
                       setBlockType(ctx.get(editorViewCtx).state.schema.nodes.code_block!, {
@@ -888,7 +931,8 @@ function EditorBody({
                       }),
                     ),
                   )}
-                  <input
+                  <Input
+                    className="h-8 w-36"
                     aria-label={t('editor.codeLanguage')}
                     placeholder={t('editor.plainText')}
                     value={codeLanguage}
@@ -903,45 +947,50 @@ function EditorBody({
                       <option key={language} value={language} />
                     ))}
                   </datalist>
-                  <span>{t('editor.codeHint')}</span>
+                  <span className="text-xs text-muted max-md:hidden">{t('editor.codeHint')}</span>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
           {linkOpen && (
             <form
-              className="editor-link-form"
+              className="editor-link-form mt-3 grid gap-3 rounded-lg border border-line bg-surface p-3"
               onSubmit={(event) => {
                 event.preventDefault();
                 applyLink();
               }}
             >
-              <label>
-                {t('editor.linkText')}
-                <input value={linkText} onChange={(event) => setLinkText(event.target.value)} />
-              </label>
-              <label>
-                {t('editor.linkUrl')}
-                <input
-                  autoFocus
-                  value={linkUrl}
-                  placeholder="https://"
-                  onChange={(event) => {
-                    setLinkUrl(event.target.value);
-                    setLinkError(false);
-                  }}
-                  aria-invalid={linkError}
-                />
-              </label>
-              {linkError && <span role="alert">{t('editor.invalidUrl')}</span>}
-              <div>
-                <button type="submit">{t('editor.applyLink')}</button>
-                <button type="button" onClick={() => applyLink(true)}>
+              <Field label={t('editor.linkText')}>
+                {(id) => (
+                  <Input id={id} value={linkText} onChange={(event) => setLinkText(event.target.value)} />
+                )}
+              </Field>
+              <Field label={t('editor.linkUrl')} error={linkError ? t('editor.invalidUrl') : undefined}>
+                {(id, describedBy) => (
+                  <Input
+                    id={id}
+                    autoFocus
+                    value={linkUrl}
+                    placeholder="https://"
+                    aria-describedby={describedBy}
+                    aria-invalid={linkError}
+                    onChange={(event) => {
+                      setLinkUrl(event.target.value);
+                      setLinkError(false);
+                    }}
+                  />
+                )}
+              </Field>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" variant="primary" size="sm">
+                  {t('editor.applyLink')}
+                </Button>
+                <Button size="sm" onClick={() => applyLink(true)}>
                   {t('editor.removeLink')}
-                </button>
-                <button type="button" onClick={() => setLinkOpen(false)}>
+                </Button>
+                <Button size="sm" onClick={() => setLinkOpen(false)}>
                   {t('editor.cancel')}
-                </button>
+                </Button>
               </div>
             </form>
           )}
@@ -965,7 +1014,7 @@ function EditorBody({
         <AnimatePresence>
           {selectionPosition && mode === 'visual' && !readOnly && !linkOpen && (
             <motion.div
-              className="editor-selection-toolbar"
+              className="editor-selection-toolbar absolute z-20 flex w-56 items-center gap-0.5 rounded-xl border border-line bg-surface p-1 shadow-popover"
               role="toolbar"
               aria-label={t('editor.selectionToolbar')}
               style={{ left: selectionPosition.x, top: selectionPosition.y }}
@@ -983,6 +1032,7 @@ function EditorBody({
               ].map(({ key, icon, run }) => (
                 <ToolButton
                   key={key}
+                  className="h-9 flex-1 max-md:h-11"
                   label={t('editor.selectionAction', { action: t(`editor.${key}`) })}
                   onClick={run}
                 >
@@ -993,11 +1043,16 @@ function EditorBody({
           )}
         </AnimatePresence>
       )}
-      {clipboardError && <p role="alert">{t('context.clipboardError')}</p>}
+      {clipboardError && (
+        <Banner tone="danger" role="alert" className="my-3">
+          {t('context.clipboardError')}
+        </Banner>
+      )}
       {mode === 'source' && (
         <TextContextMenu markdown readOnly={readOnly}>
-          <textarea
-            className="editor-source"
+          <Textarea
+            variant="bare"
+            className="editor-source block min-h-75 resize-y rounded-none pt-7 pb-10 font-mono text-base/7 caret-accent md:text-sm/6 supports-[field-sizing:content]:resize-none supports-[field-sizing:content]:field-sizing-content"
             aria-label={t('editor.sourceBody')}
             value={source}
             readOnly={readOnly}
@@ -1012,7 +1067,7 @@ function EditorBody({
         </TextContextMenu>
       )}
       {loading && (
-        <p role="status" className="editor-loading">
+        <p role="status" className="editor-loading px-4 py-3 text-sm text-muted">
           {t('editor.loading')}
         </p>
       )}

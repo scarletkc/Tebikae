@@ -293,6 +293,10 @@
     "persistGranted": "浏览器已允许持久存储。",
     "persistDenied": "浏览器未允许持久存储，请另外导出重要草稿。",
     "syncLimit": "GitHub 同步在应用打开时运行，关闭应用会暂停同步。",
+    "closeNotebook": "关闭笔记本",
+    "closeNotebookHelp": "保存草稿、断开连接并返回首页。笔记仍保留在此设备上。",
+    "source": "源代码",
+    "license": "Tebikae 是基于 AGPL-3.0 许可证的自由软件。",
     "recoveries": "恢复副本包含在 JSON 导出文件中。"
   },
   "error": {

@@ -3,7 +3,7 @@ import { flushAllDrafts } from '../../app/session';
 import { isConfirmDialogOpen } from '../../app/confirm';
 import { isNoteListRoute } from './routes';
 
-/** Cmd/Ctrl+K focuses search; Cmd/Ctrl+N saves the open draft and starts a new note. */
+/** Cmd/Ctrl+K focuses search (where there is one); Cmd/Ctrl+N saves the open draft and starts a new note. */
 export function useGlobalShortcuts(options: {
   searchRef: RefObject<HTMLInputElement | null>;
   route: string;
@@ -23,9 +23,11 @@ export function useGlobalShortcuts(options: {
       const { searchRef, route, writable, dialogOpen, flushEngine, newNote } = latest.current;
       const key = event.key.toLowerCase();
       if (key === 'k') {
+        // Settings has no search field; leave the key to the browser there.
+        if (!searchRef.current) return;
         event.preventDefault();
-        searchRef.current?.focus();
-        searchRef.current?.select();
+        searchRef.current.focus();
+        searchRef.current.select();
       } else if (key === 'n' && isNoteListRoute(route)) {
         if (!writable) return;
         if (dialogOpen || isConfirmDialogOpen()) return;

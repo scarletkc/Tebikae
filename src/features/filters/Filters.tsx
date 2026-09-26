@@ -100,15 +100,18 @@ export function FiltersDialog({
       <div className="filter-fields flex flex-col gap-6">
         <fieldset className="min-w-0 border-0 p-0">
           <legend className="mb-3 text-xs font-medium text-muted">{t('filter.labels')}</legend>
-          <Select
-            className="mb-4"
-            aria-label={t('filter.labels')}
-            value={f.labelMatch}
-            onChange={(e) => setFilters({ ...f, labelMatch: e.target.value as 'all' | 'any' })}
-          >
-            <option value="all">{t('filter.allLabels')}</option>
-            <option value="any">{t('filter.anyLabels')}</option>
-          </Select>
+          <div className="mb-4">
+            <Select
+              className="w-full"
+              label={t('filter.labels')}
+              value={f.labelMatch}
+              onChange={(labelMatch) => setFilters({ ...f, labelMatch })}
+              options={[
+                { value: 'all', label: t('filter.allLabels') },
+                { value: 'any', label: t('filter.anyLabels') },
+              ]}
+            />
+          </div>
           <div className="choices flex flex-wrap gap-x-4 gap-y-2.5">
             {labels.map((label) => (
               <CheckboxLabel key={label.id}>
@@ -185,15 +188,17 @@ export function FiltersDialog({
         </fieldset>
         <Field label={t('filter.pinned')}>
           {(id) => (
-            <Select
+            <Select<NoteFilters['pinned']>
               id={id}
+              className="w-full"
               value={f.pinned}
-              onChange={(e) => setFilters({ ...f, pinned: e.target.value as NoteFilters['pinned'] })}
-            >
-              <option value="all">{t('filter.any')}</option>
-              <option value="pinned">{t('filter.pinnedOnly')}</option>
-              <option value="unpinned">{t('filter.unpinnedOnly')}</option>
-            </Select>
+              onChange={(pinned) => setFilters({ ...f, pinned })}
+              options={[
+                { value: 'all', label: t('filter.any') },
+                { value: 'pinned', label: t('filter.pinnedOnly') },
+                { value: 'unpinned', label: t('filter.unpinnedOnly') },
+              ]}
+            />
           )}
         </Field>
         {(['created', 'updated'] as const).map((field) => (

@@ -81,8 +81,8 @@ test('the settings force-update button clears caches, reloads and keeps the save
   await page.locator('.sidebar').getByRole('link', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Update Tebikae', exact: true }).click();
   await page.waitForURL(/v=/, { timeout: 30_000 });
-  // The remembered session restores the workspace without the connect form.
-  await expect(page.getByRole('textbox', { name: 'Search your notes' })).toBeVisible({
+  // The remembered session restores the workspace (still on Settings) without the connect form.
+  await expect(page.locator('.settings-page')).toBeVisible({
     timeout: 30_000,
   });
   await expect

@@ -127,6 +127,19 @@ export function SettingRow({
   );
 }
 
+/** Bordered strip that groups small icon buttons (segmented controls, the editor toolbar). */
+const buttonGroupClass =
+  'inline-flex max-w-full items-center gap-0.5 rounded-lg border border-line bg-surface p-0.5';
+
+/** Row of related tools, e.g. text formatting. Fill it with IconButton size="sm" and ToolbarDivider. */
+export function Toolbar({ className, ...props }: ComponentProps<'div'>) {
+  return <div role="toolbar" className={cn(buttonGroupClass, 'flex-wrap', className)} {...props} />;
+}
+
+export function ToolbarDivider({ className }: { className?: string }) {
+  return <span aria-hidden="true" className={cn('mx-1 h-5 w-px shrink-0 bg-line', className)} />;
+}
+
 /** Mutually exclusive icon toggles, e.g. grid/list. */
 export function SegmentedControl<T extends string>({
   value,
@@ -140,7 +153,7 @@ export function SegmentedControl<T extends string>({
   className?: string;
 }) {
   return (
-    <div className={cn('inline-flex gap-0.5 rounded-lg border border-line bg-surface p-0.5', className)}>
+    <div className={cn(buttonGroupClass, className)}>
       {options.map((option) => (
         <IconButton
           key={option.value}

@@ -1,3 +1,4 @@
+import { Slot } from '@radix-ui/react-slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import type { ComponentProps, ReactNode } from 'react';
 import { cn } from './cn';
@@ -8,13 +9,17 @@ export const iconButtonVariants = cva(
     'transition-colors hover:bg-hover hover:text-fg active:bg-active',
     'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
     'disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted',
-    'aria-pressed:bg-active aria-pressed:text-fg [&.selected]:bg-active [&.selected]:text-fg',
+    // Selected looks: toggles (aria-pressed), open menus and panels, and the current page's nav link.
+    'aria-pressed:bg-active aria-pressed:text-fg aria-expanded:bg-active aria-expanded:text-fg [&.selected]:bg-active [&.selected]:text-fg',
+    'data-[state=open]:bg-active data-[state=open]:text-fg aria-[current=page]:bg-active aria-[current=page]:text-fg',
   ],
   {
     variants: {
       variant: {
         ghost: 'bg-transparent',
         secondary: 'border border-line bg-surface',
+        /** Highlights a control whose setting is in effect, e.g. the filter button with active filters. */
+        accent: 'bg-accent-soft text-accent hover:bg-accent-soft hover:text-accent',
       },
       size: {
         xs: 'size-7',
@@ -32,14 +37,29 @@ export type IconButtonProps = Omit<ComponentProps<'button'>, 'children'> &
     label: string;
     /** Toggle state; sets aria-pressed. Leave undefined for plain actions. */
     pressed?: boolean;
+    /** Render the single child element (e.g. a router <NavLink>) with icon-button styles. */
+    asChild?: boolean;
     children: ReactNode;
   };
 
-/** Square icon-only button. Always carries `title` and `aria-label`. */
-export function IconButton({ label, pressed, variant, size, className, type, ...props }: IconButtonProps) {
+/**
+ * Square icon-only button. Always carries `title` and `aria-label`. Menu triggers wrap it:
+ * <MenuTrigger><IconButton label=…>…</IconButton></MenuTrigger>.
+ */
+export function IconButton({
+  label,
+  pressed,
+  variant,
+  size,
+  className,
+  type,
+  asChild,
+  ...props
+}: IconButtonProps) {
+  const Component = asChild ? Slot : 'button';
   return (
-    <button
-      type={type ?? 'button'}
+    <Component
+      type={asChild ? undefined : (type ?? 'button')}
       title={label}
       aria-label={label}
       aria-pressed={pressed}

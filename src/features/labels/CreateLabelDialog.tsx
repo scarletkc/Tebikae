@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Button, Dialog, Field, Input } from '../../ui';
+import { Button, ColorInput, Dialog, Field, Input } from '../../ui';
 import { useSession } from '../../app/session';
 
 export default function CreateLabelDialog({
@@ -53,15 +53,7 @@ export default function CreateLabelDialog({
           )}
         </Field>
         <Field label={t('label.color')}>
-          {(id) => (
-            <input
-              id={id}
-              type="color"
-              className="h-9 w-14 cursor-pointer rounded-lg border border-line-strong bg-surface p-1"
-              value={color}
-              onChange={(e) => setColor(e.target.value)}
-            />
-          )}
+          {(id) => <ColorInput id={id} value={color} onChange={(e) => setColor(e.target.value)} />}
         </Field>
         <Button type="submit" variant="primary" className="self-start" disabled={busy || !session.engine}>
           {t('action.create')}

@@ -1,6 +1,6 @@
 import * as Menu from '@radix-ui/react-dropdown-menu';
 import { ChevronRight, type LucideIcon } from 'lucide-react';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { isNativeText, useLongPress } from './LongPressTrigger';
 import { Button, cn, menuContent, menuItem, menuItemDanger, menuSeparator } from '../ui';
@@ -26,8 +26,9 @@ function Icon({ icon: IconComponent, swatch }: Pick<MenuAction, 'icon' | 'swatch
   if (swatch !== undefined)
     return (
       <span
-        className="context-icon context-swatch inline-block size-4 shrink-0 rounded-full border border-line"
-        style={{ backgroundColor: swatch }}
+        className="context-icon context-swatch inline-block size-4 shrink-0 rounded-full border border-line bg-(--swatch)"
+        // Label colors are user data, so the swatch color travels as a custom property.
+        style={{ '--swatch': swatch } as CSSProperties}
         aria-hidden="true"
       />
     );

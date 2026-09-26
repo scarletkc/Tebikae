@@ -2,21 +2,65 @@ import { useId, type ComponentProps, type ReactElement, type ReactNode } from 'r
 import { cn } from './cn';
 
 /** Text-like control look. 16px on phones (no iOS focus zoom), 14px from 761px. */
-export const controlClass =
+const controlClass =
   'm-0 h-9 w-full min-w-0 rounded-lg border border-line-strong bg-surface px-3 py-0 text-base text-fg md:text-sm ' +
   'placeholder:text-muted focus:border-accent focus:outline-2 focus:outline-offset-0 focus:outline-accent/30 ' +
   'disabled:cursor-not-allowed disabled:opacity-60';
 
-export function Input({ className, ...props }: ComponentProps<'input'>) {
-  return <input className={cn(controlClass, className)} {...props} />;
+/** No box at all: for text that is typed in place, such as the search field or a note title. */
+const bareClass =
+  'm-0 w-full min-w-0 border-0 bg-transparent p-0 text-base text-fg outline-none placeholder:text-muted md:text-sm';
+
+type ControlVariant = 'default' | 'bare';
+
+export function Input({
+  className,
+  variant = 'default',
+  ...props
+}: ComponentProps<'input'> & { variant?: ControlVariant }) {
+  return <input className={cn(variant === 'bare' ? bareClass : controlClass, className)} {...props} />;
 }
 
-export function Textarea({ className, ...props }: ComponentProps<'textarea'>) {
-  return <textarea className={cn(controlClass, 'h-auto min-h-20 py-2', className)} {...props} />;
+export function Textarea({
+  className,
+  variant = 'default',
+  ...props
+}: ComponentProps<'textarea'> & { variant?: ControlVariant }) {
+  return (
+    <textarea
+      className={cn(variant === 'bare' ? bareClass : cn(controlClass, 'h-auto min-h-20 py-2'), className)}
+      {...props}
+    />
+  );
 }
 
-export function Select({ className, ...props }: ComponentProps<'select'>) {
-  return <select className={cn(controlClass, 'cursor-pointer pe-8', className)} {...props} />;
+/** File picker with the control look; the browse button inherits the kit's secondary style. */
+export function FileInput({ className, ...props }: Omit<ComponentProps<'input'>, 'type'>) {
+  return (
+    <input
+      type="file"
+      className={cn(
+        controlClass,
+        'h-auto cursor-pointer py-1.5 text-sm file:me-3 file:h-7 file:cursor-pointer file:rounded-md file:border-0 file:bg-hover file:px-3 file:text-xs file:font-medium file:text-fg',
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+/** Native color picker (label colors are user data, so the value is a raw hex color). */
+export function ColorInput({ className, ...props }: Omit<ComponentProps<'input'>, 'type'>) {
+  return (
+    <input
+      type="color"
+      className={cn(
+        'm-0 h-9 w-14 cursor-pointer rounded-lg border border-line-strong bg-surface p-1 disabled:cursor-not-allowed disabled:opacity-60',
+        className,
+      )}
+      {...props}
+    />
+  );
 }
 
 /** Native checkbox tinted with the accent color. Wrap it with its text in <CheckboxLabel>. */

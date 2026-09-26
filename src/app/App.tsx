@@ -4,12 +4,11 @@ import { useLocation } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useSession } from './session';
 import { PwaUpdateContext } from './pwa';
-import { IconButton } from './ui';
 import { usePwaLifecycle } from './usePwaLifecycle';
 import { useContextMenuGuard } from './useContextMenuGuard';
 import ConnectPage from '../features/connect/Connect';
 import Workspace from '../features/workspace/Workspace';
-import { Button } from '../ui';
+import { Button, IconButton } from '../ui';
 
 // Development-only UI kit preview at /#/__ui; removed from production builds.
 const Gallery = import.meta.env.DEV ? lazy(() => import('../ui/Gallery')) : null;

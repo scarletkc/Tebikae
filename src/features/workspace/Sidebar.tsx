@@ -13,13 +13,13 @@ import {
   Tags,
   Trash2,
 } from 'lucide-react';
-import { Brand, IconButton, PreferencesControls } from '../../app/ui';
+import { Brand, PreferencesControls } from '../../app/ui';
 import { ContextMenu, type MenuAction } from '../../app/ContextMenu';
 import { LabelContextMenu } from '../labels/LabelContextMenu';
 import { LabelDot } from '../labels';
 import { safeHref } from '../../security/urls';
 import { useWorkspace } from './useWorkspaceController';
-import { Button, cn, iconButtonVariants } from '../../ui';
+import { Button, IconButton, cn } from '../../ui';
 
 const NAV_ITEMS = [
   ['notes', NotebookPen],
@@ -249,21 +249,18 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
                     {counts[label.id] || 0}
                   </span>
                   {ctl.labelSelectionMode && (
-                    <button
-                      type="button"
-                      className={cn(
-                        iconButtonVariants({ size: 'xs' }),
-                        'label-filter-toggle shrink-0 justify-self-end whitespace-nowrap [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11',
-                      )}
-                      aria-label={t('label.toggleSelection', { name: label.name })}
-                      aria-pressed={selected}
+                    <IconButton
+                      size="xs"
+                      className="label-filter-toggle justify-self-end pointer-coarse:size-11"
+                      label={t('label.toggleSelection', { name: label.name })}
+                      pressed={selected}
                       onClick={(event) => {
                         event.stopPropagation();
                         ctl.toggleLabelSelection(label.id);
                       }}
                     >
                       {selected ? <Check size={16} /> : <Plus size={16} />}
-                    </button>
+                    </IconButton>
                   )}
                 </div>
               </LabelContextMenu>
@@ -313,15 +310,11 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
               },
             ]}
           >
-            <NavLink
-              to="/settings"
-              onClick={() => ctl.setDrawer(false)}
-              title={t('nav.settings')}
-              aria-label={t('nav.settings')}
-              className={({ isActive }) => cn(iconButtonVariants(), isActive && 'selected')}
-            >
-              <SettingsIcon size={18} />
-            </NavLink>
+            <IconButton asChild label={t('nav.settings')}>
+              <NavLink to="/settings" onClick={() => ctl.setDrawer(false)}>
+                <SettingsIcon size={18} />
+              </NavLink>
+            </IconButton>
           </ContextMenu>
         </div>
         <ContextMenu
@@ -346,15 +339,15 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
         >
           <button
             className={cn(
-              'repository-pill mt-5 flex w-full items-center gap-2.5 rounded-[10px] border border-line bg-canvas px-3 py-3 text-start hover:bg-hover',
+              'repository-pill mt-5 flex w-full items-center gap-2.5 rounded-lg border border-line bg-canvas px-3 py-3 text-start hover:bg-hover',
               collapsed && 'justify-center p-2.5',
             )}
             onClick={() => ctl.setConnectOpen(true)}
           >
             <span
               className={cn(
-                'connection-dot size-[7px] shrink-0 rounded-full bg-muted',
-                session.connected && 'connected bg-accent shadow-[0_0_0_3px_var(--accent-soft)]',
+                'connection-dot size-2 shrink-0 rounded-full bg-muted',
+                session.connected && 'connected bg-accent ring-3 ring-accent-soft',
               )}
             />
             <span className={cn('flex min-w-0 flex-1 flex-col overflow-hidden', collapsedText)}>
