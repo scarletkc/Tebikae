@@ -136,11 +136,19 @@ test('manifest, build metadata and CLI distinguish reusable and unusable artifac
     assert.doesNotThrow(() => validateBuild(root, identity));
     assert.equal(cli('probe').status, 0);
     assert.match(readFileSync(output, 'utf8'), /reused=true/);
+    // Re-running only the deploy job of a self-verified run raises the attempt past the record.
+    writeManifest(verification({ ...identity, runAttempt: '1' }));
+    assert.equal(validateBuild(root, identity).runAttempt, '1');
+    const retried = cli('validate');
+    assert.equal(retried.status, 0);
+    assert.match(retried.stdout, /runs\/12\/attempts\/1/);
     for (const patch of [
       { schemaVersion: 0 },
       { sha: 'b'.repeat(40) },
       { runId: '13' },
-      { runAttempt: '1' },
+      { runAttempt: '3' },
+      { runAttempt: '0' },
+      { runAttempt: 1 },
       { workflow: '.github/workflows/other.yml' },
       { builds: { '/': 'dist' } },
       { browsers: [{ browser: 'chromium', grep: '.', pwa: true }] },

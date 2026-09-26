@@ -25,9 +25,18 @@ export function verification({ sha, runId, runAttempt }) {
   };
 }
 
+/** Returns the verification record; `identity.runAttempt` is the latest attempt it may come from. */
 export function validateBuild(directory, identity) {
-  const expected = verification(identity);
+  verification(identity);
   const manifest = JSON.parse(readFileSync(join(directory, 'browser-verification.json'), 'utf8'));
+  // Re-running only later jobs, such as a failed deploy, keeps the artifact an earlier attempt of
+  // the same run verified. A later attempt can only replace it after passing full verification again.
+  const earlier =
+    /^[1-9]\d*$/.test(manifest.runAttempt) && Number(manifest.runAttempt) <= Number(identity.runAttempt);
+  const expected = verification({
+    ...identity,
+    runAttempt: earlier ? manifest.runAttempt : identity.runAttempt,
+  });
   if (JSON.stringify(manifest) !== JSON.stringify(expected))
     throw new Error('Full verification does not match the target commit, run or configuration');
   for (const path of Object.values(buildPaths)) {
@@ -39,6 +48,7 @@ export function validateBuild(directory, identity) {
     )
       throw new Error(`Build metadata or entrypoint does not match: ${path}`);
   }
+  return expected;
 }
 
 export async function findVerifiedBuild({ request, repository, sha, now = Date.now() }) {
@@ -117,10 +127,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     }
   } else if (command === 'validate' || command === 'probe') {
     try {
-      validateBuild(process.argv[3] || '.', identity);
+      const verified = validateBuild(process.argv[3] || '.', identity);
       output('reused', 'true');
       summary(
-        `Full verification: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${identity.runId}/attempts/${identity.runAttempt}`,
+        `Full verification: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${verified.runId}/attempts/${verified.runAttempt}`,
       );
     } catch (error) {
       if (command === 'validate') throw error;
