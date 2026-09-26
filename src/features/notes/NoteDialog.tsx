@@ -488,11 +488,11 @@ export default function NoteDialog({
         <IconButton label={t(isMobile ? 'action.back' : 'action.close')} onClick={() => void close()}>
           {isMobile ? <ChevronLeft size={20} /> : <X size={18} />}
         </IconButton>
-        <div className="note-save-row flex min-w-0 flex-1 items-center justify-end gap-1.5 max-[430px]:flex-wrap">
+        <div className="note-save-row flex min-w-0 flex-1 items-center justify-end gap-1.5 max-xs:flex-wrap">
           <span
             role="status"
             className={cn(
-              'min-w-0 text-xs wrap-anywhere max-[430px]:min-w-[95px]',
+              'min-w-0 text-xs wrap-anywhere max-xs:min-w-24',
               saveError ? 'text-danger' : 'text-muted',
             )}
           >
@@ -654,7 +654,7 @@ export default function NoteDialog({
             onChange={(e) => change((d) => ({ ...d, title: e.target.value }))}
           />
         </TextContextMenu>
-        <div className="note-properties mb-7 flex min-h-[30px] flex-wrap items-center gap-2 max-md:mb-5.5">
+        <div className="note-properties mb-7 flex min-h-7.5 flex-wrap items-center gap-2 max-md:mb-5.5">
           {labels
             .filter((label) => document.labelIds.includes(label.id))
             .map((label) => (
@@ -811,7 +811,7 @@ export default function NoteDialog({
               <div className="min-w-0 rounded-lg border border-line bg-canvas p-3">
                 <h4 className="mb-2 text-xs text-muted">{t('note.localVersion')}</h4>
                 <strong className="text-xs">{document.title}</strong>
-                <pre className="max-h-[180px] overflow-auto font-sans text-xs wrap-anywhere whitespace-pre-wrap">
+                <pre className="max-h-45 overflow-auto font-sans text-xs wrap-anywhere whitespace-pre-wrap">
                   {document.markdown}
                 </pre>
                 <p className="text-xs text-muted">
@@ -824,7 +824,7 @@ export default function NoteDialog({
               <div className="min-w-0 rounded-lg border border-line bg-canvas p-3">
                 <h4 className="mb-2 text-xs text-muted">{t('note.remoteVersion')}</h4>
                 <strong className="text-xs">{remote.title}</strong>
-                <pre className="max-h-[180px] overflow-auto font-sans text-xs wrap-anywhere whitespace-pre-wrap">
+                <pre className="max-h-45 overflow-auto font-sans text-xs wrap-anywhere whitespace-pre-wrap">
                   {remote.markdown}
                 </pre>
                 <p className="text-xs text-muted">

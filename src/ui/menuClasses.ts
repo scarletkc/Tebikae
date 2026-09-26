@@ -21,7 +21,7 @@ export const menuItem =
   'relative flex min-h-8 w-full cursor-default select-none items-center gap-2 rounded-md border-0 bg-transparent px-2 py-1.5 ' +
   'text-start text-sm text-fg no-underline outline-none data-[highlighted]:bg-hover ' +
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
-  'pointer-coarse:min-h-11 max-[600px]:min-h-11 ' +
+  'pointer-coarse:min-h-11 max-sm:min-h-11 ' +
   '[&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted data-[highlighted]:[&_svg]:text-current ' +
   'data-[state=checked]:font-bold data-[state=checked]:underline data-[state=checked]:decoration-[1.5px] data-[state=checked]:underline-offset-3 ' +
   'data-[state=indeterminate]:font-semibold data-[state=indeterminate]:underline data-[state=indeterminate]:decoration-dashed data-[state=indeterminate]:decoration-[1.5px] data-[state=indeterminate]:underline-offset-3';

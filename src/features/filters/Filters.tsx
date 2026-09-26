@@ -190,6 +190,7 @@ export function FiltersDialog({
           {(id) => (
             <Select<NoteFilters['pinned']>
               id={id}
+              label={t('filter.pinned')}
               className="w-full"
               value={f.pinned}
               onChange={(pinned) => setFilters({ ...f, pinned })}

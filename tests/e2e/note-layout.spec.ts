@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { closeDialog, connect, mockGitHub, mockIssue } from './fixtures';
+import { closeDialog, connect, mockGitHub, mockIssue, sortBy } from './fixtures';
 
 const bodies = [
   '慢慢记录，随时回看。',
@@ -23,7 +23,7 @@ for (const width of [390, 1280]) {
       ),
     );
     await connect(page);
-    await page.locator('.topbar-note-actions select').selectOption('title');
+    await sortBy(page, 'Title');
     const cards = page.locator('.note-card');
     await expect(cards).toHaveCount(12);
     await expect(cards.locator('.note-open a, .note-open input')).toHaveCount(0);

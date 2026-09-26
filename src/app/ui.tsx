@@ -115,11 +115,6 @@ export function SortControl({
         className={mode === 'icon' ? 'sort-icon-button' : 'sort-menu-trigger max-w-45'}
         contentClassName="sort-menu-content"
         itemClassName="sort-menu-item"
-        nativeMirror
-        containerClassName={cn(
-          'sort-control-container',
-          mode === 'icon' ? 'sort-control-icon-mode' : 'sort-control-text-mode',
-        )}
       />
     </ContextMenu>
   );

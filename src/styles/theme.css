@@ -108,7 +108,14 @@
     ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', 'PingFang SC', 'Microsoft YaHei',
     'Noto Sans SC', monospace;
 
-  /* md matches useIsMobile() (max-width: 760px) exactly. */
+  /*
+   * The only breakpoints (Tailwind's defaults are removed). Use max-xs: … xl: instead of
+   * max-[430px]: and similar; `pnpm lint` rejects arbitrary breakpoints.
+   * md matches useIsMobile() (max-width: 760px) exactly: max-md: is "phone layout".
+   */
+  --breakpoint-*: initial;
+  --breakpoint-xs: 430px;
+  --breakpoint-sm: 600px;
   --breakpoint-md: 761px;
   --breakpoint-lg: 1100px;
   --breakpoint-xl: 1500px;

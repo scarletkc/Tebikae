@@ -90,7 +90,7 @@ function WorkspaceLayout({ offlineReady }: { offlineReady: boolean }) {
         >
           <main
             ref={layout.notesAreaRef}
-            className="main-content mx-auto min-h-0 w-full max-w-[1600px] flex-1 overflow-y-auto overscroll-contain px-[42px] pt-[42px] pb-[70px] has-[.note-group]:pt-5 has-[.filter-chips]:pt-5 max-lg:px-[26px] max-lg:pt-8 max-lg:pb-[55px] max-md:px-[22px] max-md:pt-[29px] max-md:pb-[calc(56px+80px+env(safe-area-inset-bottom))] max-[430px]:px-4 max-[430px]:pt-[25px] xl:pt-[52px]"
+            className="main-content mx-auto min-h-0 w-full max-w-400 flex-1 overflow-y-auto overscroll-contain px-10 pt-10 pb-18 has-[.note-group]:pt-5 has-[.filter-chips]:pt-5 max-lg:px-6 max-lg:pt-8 max-lg:pb-14 max-md:px-5 max-md:pt-7 max-md:pb-[calc(56px+80px+env(safe-area-inset-bottom))] max-xs:px-4 max-xs:pt-6 xl:pt-13"
             tabIndex={-1}
             onKeyDown={(event) => {
               if (
@@ -118,7 +118,7 @@ function WorkspaceLayout({ offlineReady }: { offlineReady: boolean }) {
                     aria-label={t('home.loading')}
                   >
                     {[0, 1, 2].map((key) => (
-                      <div className="feed-skeleton h-[90px] rounded-xl bg-hover opacity-50" key={key} />
+                      <div className="feed-skeleton h-22.5 rounded-xl bg-hover opacity-50" key={key} />
                     ))}
                   </div>
                 )}

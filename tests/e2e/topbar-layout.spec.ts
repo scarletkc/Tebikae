@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { closeDialog, confirmPrompt, mockIssue, mockGitHub, connect } from './fixtures';
+import { closeDialog, confirmPrompt, mockIssue, mockGitHub, connect, sortBy, sortTrigger } from './fixtures';
 
 const notes = Array.from({ length: 30 }, (_, i) =>
   mockIssue(100 + i, `合成笔记 ${i + 1}`, `第 ${i + 1} 条合成内容，用于检查列表滚动。`.repeat(3), {
@@ -40,7 +40,7 @@ for (const width of [320, 390, 768, 1100, 1280]) {
         await expect(topbar.locator('.new-note-button:not(.fab-new-note)')).toBeVisible();
       }
       await expect(page.locator('.note-card')).toHaveCount(25);
-      const controls = topbar.locator('button:visible, input, select');
+      const controls = topbar.locator('button:visible, input');
       const checkBounds = async () => {
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
         for (const control of await controls.all()) {
@@ -150,7 +150,7 @@ for (const scenario of [
     await connect(page);
     const topbar = page.locator('.app-topbar');
     await expect(topbar.locator('.search-clear-button')).toHaveCount(0);
-    await topbar.locator('select').selectOption('title');
+    await sortBy(page, 'Title');
     await topbar.getByRole('button', { name: 'List view', exact: true }).click();
     await page.getByRole('link', { name: 'Archive', exact: true }).click();
     await page.evaluate((scenario) => {
@@ -174,7 +174,7 @@ for (const scenario of [
     await expect(topbar.locator('.search-box input')).toHaveValue('');
     await expect(topbar.locator('.filter-open-button')).not.toHaveClass(/is-active/);
     await expect(page.locator('.filter-chips')).toHaveCount(0);
-    await expect(topbar.locator('select')).toHaveValue('title');
+    await expect(sortTrigger(page)).toHaveAccessibleName('Sort by, Title');
     await expect(page).toHaveURL(/#\/archive$/);
     await expect(topbar.getByRole('button', { name: 'List view', exact: true })).toHaveClass(/selected/);
     await expect(page.locator('.notes-list .note-card')).toHaveCount(1);
@@ -213,8 +213,8 @@ test('topbar actions preserve filtering, sorting, views and route-specific contr
   await expect(topbar.locator('.count-badge')).toHaveCount(0);
   await expect(page.locator('.filter-chips > button:not(.chip)')).toHaveCount(0);
   await expect(page.locator('.note-card')).toHaveCount(1);
-  await topbar.locator('select').selectOption('title');
-  await expect(topbar.locator('select')).toHaveValue('title');
+  await sortBy(page, 'Title');
+  await expect(sortTrigger(page)).toHaveAccessibleName('Sort by, Title');
   await topbar.getByRole('button', { name: 'List view', exact: true }).click();
   await expect(page.locator('.notes-list')).toBeVisible();
   await topbar.getByRole('button', { name: 'Grid view', exact: true }).click();

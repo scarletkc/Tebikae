@@ -138,7 +138,7 @@ export default function ConnectPage() {
         <PreferencesControls />
       </header>
       <main className="welcome-main grid flex-1 place-items-center px-4 py-8">
-        <div className="w-full max-w-sm md:max-w-[26rem]">
+        <div className="w-full max-w-sm md:max-w-104">
           <section className="md:rounded-2xl md:border md:border-line md:bg-surface md:p-8">
             <h1 className="text-xl font-semibold">{t('connect.formTitle')}</h1>
             <p className="welcome-description mt-2 text-sm text-muted">{t('connect.intro')}</p>

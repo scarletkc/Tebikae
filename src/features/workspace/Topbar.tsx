@@ -160,6 +160,7 @@ export default function Topbar() {
   const ctl = useWorkspace();
   const { t, route, view, filters, setFilters, searchInput, setSearchInput, layout } = ctl;
   const noteList = isNoteListRoute(route);
+  const searchLabel = t(route === 'issues' ? 'home.searchIssues' : 'home.search');
   // Settings has nothing to search: the bar shows the page title instead of the note search.
   if (!hasSearch(route))
     return (
@@ -183,8 +184,8 @@ export default function Topbar() {
             variant="bare"
             ref={ctl.searchRef}
             className="flex-1"
-            aria-label={t('home.search')}
-            placeholder={`${t('home.search')} (Ctrl+K)`}
+            aria-label={searchLabel}
+            placeholder={`${searchLabel} (Ctrl+K)`}
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             onBlur={(e) => {

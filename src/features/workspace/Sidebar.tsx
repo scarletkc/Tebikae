@@ -19,17 +19,13 @@ import { LabelContextMenu } from '../labels/LabelContextMenu';
 import { LabelDot } from '../labels';
 import { safeHref } from '../../security/urls';
 import { useWorkspace } from './useWorkspaceController';
-import { Button, IconButton, cn } from '../../ui';
+import { Button, IconButton, NavItem, cn } from '../../ui';
 
 const NAV_ITEMS = [
   ['notes', NotebookPen],
   ['archive', Archive],
   ['trash', Trash2],
 ] as const;
-
-const navItemClass =
-  'nav-item flex h-8 w-full items-center gap-2 rounded-md px-2 text-start text-sm text-fg no-underline hover:bg-hover hover:no-underline active:bg-active';
-const navItemCurrent = 'bg-active font-medium';
 
 /** Navigation, labels and workspace controls; rendered in the desktop sidebar and the mobile drawer. */
 export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) {
@@ -87,23 +83,23 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
           ];
           return (
             <ContextMenu key={name} contextName={`navigation-${name}`} items={items}>
-              <NavLink
-                to={`/${name}`}
-                onClick={() => {
-                  ctl.resetNavigationState();
-                }}
-                className={({ isActive }) =>
-                  cn(navItemClass, isActive && `active ${navItemCurrent}`, collapsedItem)
-                }
-              >
-                <Icon size={19} />
-                <span className={cn('min-w-0 truncate', collapsedText)}>{t(`nav.${name}`)}</span>
-                {name === 'notes' && (
-                  <span className={cn('nav-count ms-auto text-xs text-muted tabular-nums', collapsedText)}>
-                    {notes.filter((n) => !n.current.archived && !n.current.meta.trashedAt).length}
-                  </span>
-                )}
-              </NavLink>
+              {/* NavLink adds the `active` class and aria-current="page" on the current page. */}
+              <NavItem asChild className={cn(collapsedItem)}>
+                <NavLink
+                  to={`/${name}`}
+                  onClick={() => {
+                    ctl.resetNavigationState();
+                  }}
+                >
+                  <Icon size={19} />
+                  <span className={cn('min-w-0 truncate', collapsedText)}>{t(`nav.${name}`)}</span>
+                  {name === 'notes' && (
+                    <span className={cn('nav-count ms-auto text-xs text-muted tabular-nums', collapsedText)}>
+                      {notes.filter((n) => !n.current.archived && !n.current.meta.trashedAt).length}
+                    </span>
+                  )}
+                </NavLink>
+              </NavItem>
             </ContextMenu>
           );
         })}
@@ -137,14 +133,9 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
       <div className="label-nav flex min-h-5 w-full min-w-0 flex-1 flex-col gap-0.5 overflow-x-hidden overflow-y-auto select-none">
         {!ctl.labelSelectionMode && (
           <>
-            <button
-              type="button"
-              className={cn(
-                navItemClass,
-                'h-7 text-xs',
-                !filters.labelIds.length && !filters.unlabeledOnly && `selected ${navItemCurrent}`,
-                collapsedItem,
-              )}
+            <NavItem
+              size="sm"
+              className={cn(!filters.labelIds.length && !filters.unlabeledOnly && 'selected', collapsedItem)}
               aria-pressed={!filters.labelIds.length && !filters.unlabeledOnly}
               onClick={() => {
                 setFilters({ ...filters, unlabeledOnly: false, labelIds: [] });
@@ -154,15 +145,10 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
             >
               <Tags size={16} />
               <span className={cn('min-w-0 truncate', collapsedText)}>{t('label.all')}</span>
-            </button>
-            <button
-              type="button"
-              className={cn(
-                navItemClass,
-                'h-7 text-xs',
-                filters.unlabeledOnly && `selected ${navItemCurrent}`,
-                collapsedItem,
-              )}
+            </NavItem>
+            <NavItem
+              size="sm"
+              className={cn(filters.unlabeledOnly && 'selected', collapsedItem)}
               aria-pressed={filters.unlabeledOnly}
               onClick={() => {
                 setFilters({ ...filters, unlabeledOnly: true, labelIds: [] });
@@ -172,7 +158,7 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
             >
               <Tag size={15} />
               <span className={cn('min-w-0 truncate', collapsedText)}>{t('label.unlabeled')}</span>
-            </button>
+            </NavItem>
           </>
         )}
         {labels.length ? (
@@ -200,13 +186,13 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
                     if (ctl.labelSelectionMode) ctl.toggleLabelSelection(label.id);
                   }}
                 >
-                  <button
-                    type="button"
+                  {/* The row carries the hover and selection color, so the button itself stays clear. */}
+                  <NavItem
+                    size="sm"
                     className={cn(
-                      navItemClass,
-                      'label-main h-7 min-w-0 gap-2 overflow-hidden pe-0 text-xs hover:bg-transparent active:bg-transparent',
-                      selected && `selected ${navItemCurrent}`,
-                      ctl.labelSelectionMode && 'bg-transparent font-normal',
+                      'label-main overflow-hidden pe-0 hover:bg-transparent active:bg-transparent',
+                      selected && 'selected',
+                      ctl.labelSelectionMode && 'aria-pressed:bg-transparent aria-pressed:font-normal',
                       collapsedItem,
                     )}
                     aria-label={`${label.name} ${counts[label.id] || 0}`}
@@ -239,7 +225,7 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
                     >
                       {label.name}
                     </span>
-                  </button>
+                  </NavItem>
                   <span
                     className={cn(
                       'nav-count label-count shrink-0 text-xs whitespace-nowrap text-muted tabular-nums',
@@ -337,11 +323,9 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
             },
           ]}
         >
-          <button
-            className={cn(
-              'repository-pill mt-5 flex w-full items-center gap-2.5 rounded-lg border border-line bg-canvas px-3 py-3 text-start hover:bg-hover',
-              collapsed && 'justify-center p-2.5',
-            )}
+          <NavItem
+            variant="tile"
+            className={cn('repository-pill mt-5', collapsed && 'justify-center p-2.5')}
             onClick={() => ctl.setConnectOpen(true)}
           >
             <span
@@ -354,7 +338,7 @@ export default function Sidebar({ collapsed = false }: { collapsed?: boolean }) 
               <strong className="truncate text-xs font-medium">{connection.repo}</strong>
               <small className="mt-0.5 text-xs text-muted">{connection.owner}</small>
             </span>
-          </button>
+          </NavItem>
         </ContextMenu>
       </div>
     </>

@@ -3,7 +3,7 @@ import { Pin, Archive, ArchiveRestore, Trash2, RotateCcw, CircleAlert, Check } f
 import { useTranslation } from 'react-i18next';
 import type { Label, LocalNote } from '../../domain/types';
 import { isSimpleChecklist, parseChecklist } from '../../domain/markdown';
-import { IconButton, cn } from '../../ui';
+import { IconButton, StretchedButton, cn } from '../../ui';
 import MarkdownPreview, { PreviewCheckbox } from '../editor/MarkdownPreview';
 import { LabelBadge } from '../labels';
 import { cardColor } from './cardColor';
@@ -124,13 +124,13 @@ export default function NoteCard({
         <div className="note-summary min-w-0">
           <div className="card-title mb-2 flex items-start justify-between gap-2">
             <h3 className="min-w-0">
-              <button
-                className="note-open line-clamp-2 w-full border-0 bg-transparent p-0 text-left text-base font-semibold wrap-anywhere after:absolute after:inset-0 after:z-1 after:content-['']"
+              <StretchedButton
+                className="note-open line-clamp-2 text-base font-semibold wrap-anywhere"
                 onClick={onOpen}
                 aria-label={`${t('action.edit')}: ${document.title}`}
               >
                 <Highlight query={query} text={document.title} />
-              </button>
+              </StretchedButton>
             </h3>
             {!trashed && document.meta.pinned && (
               <IconButton
@@ -162,12 +162,10 @@ export default function NoteCard({
                 </span>
               </div>
             ))}
-            <button
-              className="checklist-count mt-1 self-start border-0 bg-transparent p-0 text-muted"
-              onClick={onOpen}
-            >
+            {/* Plain text: the title's click area already opens the note from here. */}
+            <span className="checklist-count mt-1 self-start text-muted">
               {t('note.done', { done: checklist.filter((x) => x.checked).length, total: checklist.length })}
-            </button>
+            </span>
           </div>
         )}
         {document.labelIds.length > 0 && (

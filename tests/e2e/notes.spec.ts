@@ -244,6 +244,7 @@ test('explicit conversion preserves an existing Issue and label changes use incr
   await connect(page);
   await page.getByRole('link', { name: 'Settings', exact: true }).click();
   await page.locator('.settings-page').getByRole('link', { name: 'Existing Issues', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Search Issues', exact: true })).toBeVisible();
   await page.locator('.note-card').filter({ hasText: 'An ordinary Issue' }).getByRole('button').click();
   await page.getByRole('button', { name: 'Turn into a note', exact: true }).click();
   await expect(page.locator('.note-save-row').getByRole('status')).toContainText('Synced to GitHub');
