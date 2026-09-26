@@ -250,7 +250,7 @@ function EditorBody({
 
   useEffect(() => {
     if (loading) return;
-    session.editor = get();
+    session.attach(get());
     if (!session.editor) {
       setLoadFailed(true);
       setSource(session.value);

@@ -23,7 +23,7 @@ afterEach(async () => {
   await Promise.all(editors.splice(0).map((editor) => editor.destroy()));
 });
 
-async function realEditor(markdown: string) {
+async function realEditor(markdown: string, attach = true) {
   const onChange = vi.fn();
   const session = new MarkdownSession(markdown, onChange);
   const root = document.createElement('div');
@@ -35,7 +35,7 @@ async function realEditor(markdown: string) {
     readOnly: () => false,
     label: (key) => key,
   }).create();
-  session.editor = editor;
+  if (attach) session.attach(editor);
   editors.push(editor);
   return { editor, session, root, onChange };
 }
@@ -97,6 +97,20 @@ describe('real Milkdown Markdown engine', () => {
       redo(view.state, view.dispatch);
     });
     await session.flush();
+    expect(session.value).toContain('新original');
+  });
+
+  it('keeps input made before the started editor is attached', async () => {
+    // Milkdown's document is editable before create() resolves and the component attaches it.
+    const { editor, session, onChange } = await realEditor('original', false);
+    editor.action((ctx) => {
+      const view = ctx.get(editorViewCtx);
+      view.dispatch(view.state.tr.insertText('新', 1));
+    });
+    await session.flush();
+    expect(onChange).not.toHaveBeenCalled();
+    session.attach(editor);
+    expect(onChange).toHaveBeenCalledTimes(1);
     expect(session.value).toContain('新original');
   });
 
