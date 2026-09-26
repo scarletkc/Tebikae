@@ -9,6 +9,8 @@
 export { cn } from './cn';
 export { Button, type ButtonProps } from './Button';
 export { IconButton, type IconButtonProps } from './IconButton';
+export { NavItem, type NavItemProps } from './NavItem';
+export { StretchedButton } from './StretchedButton';
 export { Dialog, Sheet, ConfirmDialog, type DialogSize } from './Dialog';
 export { Field, Input, Textarea, FileInput, ColorInput, Checkbox, CheckboxLabel } from './Field';
 export { Select, type SelectOption } from './Select';

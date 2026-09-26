@@ -174,7 +174,8 @@
   .markdown-preview ::selection {
     background: var(--accent-soft);
   }
-  @media (max-width: 480px) {
+  /* Same as max-xs: in theme.css. */
+  @media (width < 430px) {
     .markdown-editor .ProseMirror {
       padding: 24px 0 32px;
     }

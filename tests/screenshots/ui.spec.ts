@@ -118,12 +118,12 @@ test('editor-tools', async ({ page, openEditor, text, capture }) => {
   await page
     .getByRole('button', { name: text('More formatting options', '更多格式选项'), exact: true })
     .click();
-  await page.locator('.editor-table-actions summary').click();
+  await page.locator('.editor-table-actions').click();
   await expect(
-    page.getByRole('button', { name: text('Delete table', '删除表格'), exact: true }),
+    page.getByRole('menuitem', { name: text('Delete table', '删除表格'), exact: true }),
   ).toBeVisible();
   await capture('editor-more-tools');
-  await page.locator('.editor-table-actions summary').click();
+  await page.keyboard.press('Escape');
   await page
     .getByRole('button', { name: text('Insert or edit link', '插入或修改链接'), exact: true })
     .click();
@@ -142,7 +142,10 @@ test('editor-tools', async ({ page, openEditor, text, capture }) => {
 test('filters-and-status', async ({ page, openApp, text, capture }) => {
   await openApp();
   await page.locator('.filter-open-button').click();
-  await page.getByRole('button', { name: text('Pinned', '置顶'), exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await capture('filters-dialog');
+  // A Select is named by its label and current value.
+  await page.getByRole('button', { name: text('Pinned, Any', '置顶, 全部'), exact: true }).click();
   await expect(page.getByRole('menuitemradio').first()).toBeVisible();
   await capture('filters-select-open');
   await page.keyboard.press('Escape');
@@ -167,6 +170,28 @@ test('label-menu', async ({ page, openApp, text, capture }) => {
   const navigation = page.locator(mobile ? '.mobile-drawer' : '.sidebar');
   await navigation.locator('.label-nav-row').first().getByRole('button').first().click({ button: 'right' });
   await expect(page.getByRole('menuitem', { name: text('Rename', '重命名'), exact: true })).toBeVisible();
+  await capture();
+});
+
+test('issues', async ({ page, openApp, text, capture }) => {
+  const plain = (number: number, title: string, body: string) => ({ ...mockIssue(number, title), body });
+  await openApp({
+    issues: [
+      mockIssue(1, 'Weekend ideas', 'Visit the bookshop.', { color: 'yellow' }),
+      plain(
+        4,
+        text('Login button does nothing on phones', '手机上登录按钮没有反应'),
+        text('Open the page on a phone and tap Log in.', '在手机上打开页面，点击登录。'),
+      ),
+      plain(
+        5,
+        text('Add a dark theme', '增加深色主题'),
+        text('Follow the system setting by default.', '默认跟随系统设置。'),
+      ),
+    ],
+  });
+  await page.goto('/#/issues');
+  await expect(page.locator('.note-card')).toHaveCount(2);
   await capture();
 });
 

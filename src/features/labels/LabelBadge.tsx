@@ -1,4 +1,3 @@
-import { X } from 'lucide-react';
 import type { Label } from '../../domain/types';
 import { cn } from '../../ui';
 import { labelStyle, safeLabelColor } from './color';
@@ -32,14 +31,10 @@ export function LabelDot({ color, muted = false }: { color?: string; muted?: boo
 export function LabelBadge({
   label,
   fallback,
-  onRemove,
-  removeLabel,
   className,
 }: {
   label?: { name: string; color: string };
   fallback?: string;
-  onRemove?(): void;
-  removeLabel?: string;
   className?: string;
 }) {
   const name = label?.name ?? fallback;
@@ -58,16 +53,6 @@ export function LabelBadge({
         className="label-dot size-2 shrink-0 rounded-full bg-[var(--label-color,var(--muted))]"
       />
       <span className="label-badge-name truncate">{name}</span>
-      {onRemove && (
-        <button
-          type="button"
-          className="label-badge-remove -mr-1 inline-flex size-3.5 shrink-0 items-center justify-center rounded-full hover:bg-[color-mix(in_srgb,var(--text)_14%,transparent)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-          aria-label={removeLabel}
-          onClick={onRemove}
-        >
-          <X size={10} aria-hidden="true" />
-        </button>
-      )}
     </span>
   );
 }

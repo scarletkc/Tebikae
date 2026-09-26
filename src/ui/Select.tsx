@@ -13,6 +13,8 @@ export type SelectOption<T extends string> = { value: T; label: string; icon?: L
  * (settings, toolbars, dialog forms); native <select> elements are not used.
  *
  *   <Select id="theme-setting" label={t('settings.theme')} value={theme} onChange={setTheme} options={…} />
+ *
+ * Screen readers hear the label and the current choice ("Theme, Light"), like a native select.
  */
 export function Select<T extends string>({
   value,
@@ -26,14 +28,12 @@ export function Select<T extends string>({
   className,
   contentClassName,
   itemClassName,
-  nativeMirror = false,
-  containerClassName,
 }: {
   value: T;
   onChange(value: T): void;
   options: readonly SelectOption<T>[];
-  /** Accessible name, also the tooltip. Omit only when a <label htmlFor={id}> names it. */
-  label?: string;
+  /** What is being chosen, e.g. "Theme". Also the tooltip. Required even inside a <Field>. */
+  label: string;
   id?: string;
   /** Icon-only trigger for compact toolbars; the menu still lists the option labels. */
   icon?: ReactNode;
@@ -43,13 +43,11 @@ export function Select<T extends string>({
   className?: string;
   contentClassName?: string;
   itemClassName?: string;
-  /** Also render a visually hidden native <select> with the same value (kept for form automation). */
-  nativeMirror?: boolean;
-  containerClassName?: string;
 }) {
   const current = options.find((choice) => choice.value === value) ?? options[0];
+  const name = current ? `${label}, ${current.label}` : label;
   const trigger = icon ? (
-    <IconButton id={id} size={size} label={label ?? current?.label ?? ''} className={className}>
+    <IconButton id={id} size={size} label={label} aria-label={name} className={className}>
       {icon}
     </IconButton>
   ) : (
@@ -57,9 +55,10 @@ export function Select<T extends string>({
       id={id}
       size={size}
       title={label}
-      aria-label={label}
+      aria-label={name}
       className={cn(
-        'min-w-0 justify-between gap-1.5 font-normal data-[state=open]:border-accent data-[state=open]:bg-surface',
+        // Same border as Input: a Select is a form control, not an action.
+        'min-w-0 justify-between gap-1.5 border-line-strong font-normal data-[state=open]:border-accent data-[state=open]:bg-surface',
         className,
       )}
     >
@@ -70,7 +69,7 @@ export function Select<T extends string>({
       <ChevronDown aria-hidden="true" className="text-muted" />
     </Button>
   );
-  const menu = (
+  return (
     <Menu>
       <MenuTrigger>{trigger}</MenuTrigger>
       <MenuContent
@@ -88,25 +87,5 @@ export function Select<T extends string>({
         </MenuRadioGroup>
       </MenuContent>
     </Menu>
-  );
-  if (!nativeMirror) return menu;
-  return (
-    <div className={cn('relative inline-flex min-w-0 items-center', containerClassName)}>
-      <select
-        aria-label={label}
-        value={value}
-        onChange={(event) => onChange(event.target.value as T)}
-        tabIndex={-1}
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-1 size-full opacity-0"
-      >
-        {options.map((choice) => (
-          <option key={choice.value} value={choice.value}>
-            {choice.label}
-          </option>
-        ))}
-      </select>
-      {menu}
-    </div>
   );
 }

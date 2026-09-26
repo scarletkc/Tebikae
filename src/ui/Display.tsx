@@ -153,7 +153,8 @@ export function SegmentedControl<T extends string>({
   className?: string;
 }) {
   return (
-    <div className={cn(buttonGroupClass, className)}>
+    // Same border as Input and Select: it holds a value, unlike the Toolbar's actions.
+    <div className={cn(buttonGroupClass, 'border-line-strong', className)}>
       {options.map((option) => (
         <IconButton
           key={option.value}

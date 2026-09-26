@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { closeDialog, connect, mockGitHub, mockIssue } from './fixtures';
+import { closeDialog, connect, mockGitHub, mockIssue, sortBy } from './fixtures';
 
 for (const mode of ['title', 'markdown'] as const) {
   test(`navigation does not wait for a delayed ${mode} save`, async ({ page, context }) => {
@@ -22,7 +22,7 @@ for (const mode of ['title', 'markdown'] as const) {
     });
     try {
       await connect(page);
-      await page.locator('select[aria-label]').first().selectOption('title');
+      await sortBy(page, 'Title');
       await page.getByRole('button', { name: 'Edit note: A first', exact: true }).click();
       const dialog = page.getByRole('dialog');
       if (mode === 'markdown') await dialog.locator('.ProseMirror').fill('Latest buffered Markdown');
@@ -58,7 +58,7 @@ for (const mode of ['title', 'markdown'] as const) {
 test('an invalid title keeps the editor open until it is fixed', async ({ page, context }) => {
   const remote = await mockGitHub(context, [mockIssue(1, 'A first'), mockIssue(2, 'B second')]);
   await connect(page);
-  await page.locator('select[aria-label]').first().selectOption('title');
+  await sortBy(page, 'Title');
   await page.getByRole('button', { name: 'Edit note: A first', exact: true }).click();
   const dialog = page.getByRole('dialog');
   const next = dialog.getByRole('button', { name: 'Next note', exact: true });
@@ -90,7 +90,7 @@ test('a delayed navigation cannot replace a new editor opened by Ctrl/Cmd+N', as
   });
   try {
     await connect(page);
-    await page.locator('select[aria-label]').first().selectOption('title');
+    await sortBy(page, 'Title');
     await page.getByRole('button', { name: 'Edit note: A first', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByLabel('Title', { exact: true }).fill('A edited');

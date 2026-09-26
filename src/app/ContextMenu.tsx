@@ -20,7 +20,7 @@ export interface MenuAction {
 
 /** Touch and narrow screens get a wider floating menu (docs/context-menus.md). */
 const coarseMenuWidth =
-  'pointer-coarse:min-w-[min(220px,calc(100vw-16px))] max-[600px]:min-w-[min(220px,calc(100vw-16px))]';
+  'pointer-coarse:min-w-[min(220px,calc(100vw-16px))] max-sm:min-w-[min(220px,calc(100vw-16px))]';
 
 function Icon({ icon: IconComponent, swatch }: Pick<MenuAction, 'icon' | 'swatch'>) {
   if (swatch !== undefined)

@@ -61,18 +61,21 @@ function literalAttribute(opening, name) {
   return null;
 }
 
+const BUTTONS = 'Button, IconButton, NavItem (sidebar rows) or StretchedButton (card titles)';
 const nativeControls = {
   input: 'Input, Checkbox, FileInput or ColorInput',
   select: 'Select',
   textarea: 'Textarea',
+  button: BUTTONS,
 };
 
 const noNativeControls = {
   meta: {
     type: 'problem',
-    docs: { description: 'Form controls come from the UI kit so they share one look.' },
+    docs: { description: 'Buttons and form controls come from the UI kit so they share one look.' },
     messages: {
       native: '<{{name}}> outside src/ui: use {{replacement}} from src/ui instead.',
+      role: `role="button" outside src/ui: use ${BUTTONS} from src/ui instead.`,
     },
     schema: [],
   },
@@ -83,6 +86,7 @@ const noNativeControls = {
         const name = jsxName(node.name);
         if (name in nativeControls)
           context.report({ node, messageId: 'native', data: { name, replacement: nativeControls[name] } });
+        else if (literalAttribute(node, 'role') === 'button') context.report({ node, messageId: 'role' });
       },
     };
   },
@@ -161,6 +165,13 @@ const TOKEN_ONLY =
 const COLOR_CAPABLE =
   /^-?(text|bg|border(?:-[xytrblse])?|outline|ring|inset-ring|ring-offset|fill|stroke|decoration|accent|caret|placeholder|divide)-\[(.+)\]$/;
 const LENGTH = /^(?:length:)?\d*\.?\d+(?:px|rem|em)?$/;
+// Spacing and sizes take a plain length ([42px], [26rem]) only as a scale step (px-10, max-w-104).
+// Values that compute something (calc, min, max, env, var) or use %, vw, dvh … stay allowed.
+const SPACING =
+  /^-?(?:[pm][xytrblse]?|gap(?:-[xy])?|space-[xy]|inset(?:-[xy])?|top|right|bottom|left|start|end|(?:min-|max-)?[wh]|size|basis|indent|scroll-[pm][xytrblse]?|translate-[xy])-\[(.+)\]$/;
+const PLAIN_LENGTH = /^-?\d*\.?\d+(?:px|rem|em)$/;
+// Viewport breakpoints come from theme.css (xs … xl); container queries are not affected.
+const ARBITRARY_BREAKPOINT = /^(?:min|max)-\[|^\[@media[^\]]*width/;
 const RAW_COLOR = /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?|oklch|oklab|lab|lch|hwb)\(/i;
 const TOKEN_PROPERTIES = new Set([
   'color',
@@ -191,22 +202,31 @@ const STYLE_PROPERTIES = new Set([
   'zIndex',
 ]);
 
-/** The utility part of a class token: strips variants such as `md:` or `[&_svg]:`. */
-function utilityOf(token) {
+/** Splits a class token into its variants (`md:`, `[&_svg]:`) and the utility itself. */
+function parseToken(token) {
+  const variants = [];
   let depth = 0;
   let start = 0;
   for (let i = 0; i < token.length; i++) {
     const char = token[i];
     if (char === '[' || char === '(') depth++;
     else if (char === ']' || char === ')') depth--;
-    else if (char === ':' && depth === 0) start = i + 1;
+    else if (char === ':' && depth === 0) {
+      variants.push(token.slice(start, i));
+      start = i + 1;
+    }
   }
-  return token.slice(start).replace(/^!|!$/g, '');
+  return { variants, utility: token.slice(start).replace(/^!|!$/g, '') };
 }
 
 function tokenProblem(token) {
-  const utility = utilityOf(token);
+  const { variants, utility } = parseToken(token);
+  if (variants.some((variant) => ARBITRARY_BREAKPOINT.test(variant)))
+    return `"${token}" uses an arbitrary breakpoint; use xs:, sm:, md:, lg:, xl: or their max- forms`;
   if (TOKEN_ONLY.test(utility)) return `"${token}" uses an arbitrary value; use the theme scale`;
+  const spacing = SPACING.exec(utility);
+  if (spacing && PLAIN_LENGTH.test(spacing[1]))
+    return `"${token}" uses an arbitrary length; use the spacing scale (4px steps, e.g. px-10 = 40px)`;
   const color = COLOR_CAPABLE.exec(utility);
   if (color) {
     const [, family, value] = color;
@@ -225,7 +245,10 @@ function tokenProblem(token) {
 const themeTokens = {
   meta: {
     type: 'problem',
-    docs: { description: 'Colors, type, radius, shadow and layers come from theme tokens only.' },
+    docs: {
+      description:
+        'Colors, type, radius, shadow, layers, spacing and breakpoints come from theme tokens only.',
+    },
     messages: {
       token: '{{problem}} (src/styles/theme.css).',
       important:

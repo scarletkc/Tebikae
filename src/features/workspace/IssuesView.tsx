@@ -1,5 +1,5 @@
 import { GitBranch } from 'lucide-react';
-import { EmptyState, cn } from '../../ui';
+import { EmptyState, StretchedButton, cn } from '../../ui';
 import { notesGridClasses } from '../notes/NotesGrid';
 import { useWorkspace } from './useWorkspaceController';
 
@@ -12,26 +12,25 @@ export default function IssuesView() {
       {visibleIssues.slice(0, limit).map((row) => (
         <article
           key={row.issueId}
-          className="note-card min-w-0 rounded-xl border border-line bg-card-default transition-shadow hover:shadow-card-hover focus-within:shadow-card-hover"
+          className="note-card relative min-w-0 rounded-xl border border-line bg-card-default p-4 transition-shadow hover:shadow-card-hover focus-within:shadow-card-hover"
         >
-          <button
-            className="note-open block w-full border-0 bg-transparent p-4 text-left"
-            onClick={() => setIssue(row)}
-          >
-            <span className="issue-number mb-2 block text-xs text-muted">#{row.snapshot.number}</span>
-            <h3 className="mb-1 text-base font-semibold wrap-anywhere">{row.snapshot.title}</h3>
-            <p
-              className={cn(
-                'card-preview mt-1 text-sm wrap-anywhere whitespace-pre-wrap',
-                list ? 'line-clamp-3' : 'line-clamp-9',
-              )}
-            >
-              {row.snapshot.body.slice(0, 220)}
-            </p>
-            {row.status !== 'unmanaged' && (
-              <p className="mt-1 text-xs text-danger">{t(`home.${row.status}`)}</p>
+          <span className="issue-number mb-2 block text-xs text-muted">#{row.snapshot.number}</span>
+          <h3 className="mb-1 text-base font-semibold wrap-anywhere">
+            <StretchedButton className="note-open" onClick={() => setIssue(row)}>
+              {row.snapshot.title}
+            </StretchedButton>
+          </h3>
+          <p
+            className={cn(
+              'card-preview mt-1 text-sm wrap-anywhere whitespace-pre-wrap',
+              list ? 'line-clamp-3' : 'line-clamp-9',
             )}
-          </button>
+          >
+            {row.snapshot.body.slice(0, 220)}
+          </p>
+          {row.status !== 'unmanaged' && (
+            <p className="mt-1 text-xs text-danger">{t(`home.${row.status}`)}</p>
+          )}
         </article>
       ))}
       {!issues.length && (

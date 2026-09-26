@@ -315,6 +315,15 @@ export async function noteAction(page: Page, name: string): Promise<void> {
   await page.getByRole('dialog').getByRole('button', { name: 'More actions', exact: true }).click();
   await page.getByRole('menuitem', { name, exact: true }).click();
 }
+/** The topbar sort control: a labelled menu button, or an icon button in the compact topbar. */
+export const sortTrigger = (page: Page) =>
+  page.locator('.app-topbar').locator('.sort-menu-trigger, .sort-icon-button');
+/** Chooses a sort order from the topbar sort menu, e.g. sortBy(page, 'Title'). */
+export async function sortBy(page: Page, name: string): Promise<void> {
+  await sortTrigger(page).click();
+  await page.getByRole('menuitemradio', { name, exact: true }).click();
+  await expect(page.getByRole('menu')).toHaveCount(0);
+}
 export async function noteColor(page: Page, name: string): Promise<void> {
   await page.getByRole('dialog').getByRole('button', { name: 'More actions', exact: true }).click();
   await page.getByRole('menuitemradio', { name, exact: true }).click();

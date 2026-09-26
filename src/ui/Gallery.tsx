@@ -17,6 +17,8 @@ import {
   Plus,
   Redo2,
   Sun,
+  Tag,
+  Tags,
   Trash2,
   TriangleAlert,
   Undo2,
@@ -44,10 +46,12 @@ import {
   MenuRadioItem,
   MenuSeparator,
   MenuTrigger,
+  NavItem,
   SegmentedControl,
   Select,
   SettingRow,
   Spinner,
+  StretchedButton,
   Textarea,
   Toolbar,
   ToolbarDivider,
@@ -217,6 +221,43 @@ export default function Gallery() {
           </Toolbar>
         </Section>
 
+        <Section title="Navigation rows and cards">
+          <nav
+            aria-label="Sidebar sample"
+            className="w-60 space-y-0.5 rounded-xl border border-line bg-sidebar p-2"
+          >
+            <NavItem aria-current="page">
+              <NotebookPen size={19} /> Notes
+              <span className="ms-auto text-xs text-muted tabular-nums">12</span>
+            </NavItem>
+            <NavItem>
+              <Archive size={19} /> Archive
+            </NavItem>
+            <NavItem size="sm" aria-pressed>
+              <Tags size={16} /> All labels
+            </NavItem>
+            <NavItem size="sm" aria-pressed={false}>
+              <Tag size={15} /> Unlabeled
+            </NavItem>
+            <NavItem variant="tile" className="mt-3">
+              <span className="size-2 shrink-0 rounded-full bg-accent ring-3 ring-accent-soft" />
+              <span className="flex min-w-0 flex-col">
+                <strong className="truncate text-xs font-medium">notes</strong>
+                <small className="mt-0.5 text-xs text-muted">owner</small>
+              </span>
+            </NavItem>
+          </nav>
+          <article className="relative w-60 self-start rounded-xl border border-line bg-card-yellow p-4 transition-shadow hover:shadow-card-hover">
+            <h3 className="mb-2 text-base font-semibold">
+              <StretchedButton>Whole card opens</StretchedButton>
+            </h3>
+            <p className="text-sm text-muted">The title covers the card; controls with z-2 stay on top.</p>
+            <IconButton size="xs" label="Pin" className="relative z-2 mt-2">
+              <Pin size={14} />
+            </IconButton>
+          </article>
+        </Section>
+
         <Section title="Form controls">
           <div className="grid w-full max-w-md gap-4">
             <Field label="Repository" help="owner/repository or a GitHub URL">
@@ -229,6 +270,7 @@ export default function Gallery() {
               {(id) => (
                 <Select<'all' | 'any'>
                   id={id}
+                  label="Labels"
                   className="w-full"
                   value={match}
                   onChange={setMatch}

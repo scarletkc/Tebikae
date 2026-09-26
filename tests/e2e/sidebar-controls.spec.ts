@@ -4,7 +4,7 @@ import { connect, mockGitHub } from './fixtures';
 test('welcome language menu supports keyboard selection, dismissal and persistence', async ({ page }) => {
   await mockGitHub(page.context());
   await page.goto('/');
-  const trigger = page.getByRole('button', { name: 'Language', exact: true });
+  const trigger = page.getByRole('button', { name: 'Language, English', exact: true });
   await expect(trigger).toHaveText('English');
   await expect(page.getByRole('combobox', { name: 'Language', exact: true })).toHaveCount(0);
   await trigger.focus();
@@ -16,7 +16,7 @@ test('welcome language menu supports keyboard selection, dismissal and persisten
   await page.keyboard.press('ArrowDown');
   await expect(chinese).toBeFocused();
   await page.keyboard.press('Enter');
-  const translatedTrigger = page.getByRole('button', { name: '界面语言', exact: true });
+  const translatedTrigger = page.getByRole('button', { name: '界面语言, 简体中文', exact: true });
   await expect(translatedTrigger).toHaveText('简体中文');
   await expect(translatedTrigger).toBeFocused();
   await page.reload();
@@ -50,7 +50,7 @@ for (const mobile of [false, true]) {
     await row.getByRole('button', { name: 'Language' }).click();
     await page.getByRole('menuitemradio', { name: '简体中文' }).click();
     await expect(row.getByRole('link', { name: '设置', exact: true })).toHaveText('');
-    const language = row.getByRole('button', { name: '界面语言', exact: true });
+    const language = row.getByRole('button', { name: '界面语言, 简体中文', exact: true });
     await expect(language).toHaveText('');
     await language.press('ArrowDown');
     await expect(page.getByRole('menuitemradio', { name: '简体中文' })).toBeChecked();

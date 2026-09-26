@@ -117,7 +117,7 @@ test('workspace controls expose their issue menus and suppress undefined native 
   await page.getByRole('menuitemcheckbox', { name: 'List view', exact: true }).click();
   await expect(page.locator('.notes-list')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Language', exact: true }).click({ button: 'right' });
+  await page.getByRole('button', { name: 'Language, English', exact: true }).click({ button: 'right' });
   await expect(page.getByRole('menuitemcheckbox', { name: 'English', exact: true })).toBeVisible();
   await expect(page.getByRole('menuitemcheckbox', { name: '简体中文', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');

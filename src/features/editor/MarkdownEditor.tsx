@@ -67,6 +67,7 @@ import {
   Menu,
   MenuContent,
   MenuItem,
+  MenuSeparator,
   MenuTrigger,
   Textarea,
   Toolbar,
@@ -291,18 +292,19 @@ function EditorBody({
 
   useEffect(() => () => session.dispose(), [session]);
 
-  const run = (callback: (ctx: Ctx) => void) => {
+  /** Runs an editor change, then moves focus back into the document unless `focus` is false. */
+  const run = (callback: (ctx: Ctx) => void, focus = true) => {
     if (loading || readOnly) return;
     get()?.action((ctx) => {
       callback(ctx);
-      ctx.get(editorViewCtx).focus();
+      if (focus) ctx.get(editorViewCtx).focus();
     });
   };
-  const command = (factory: (ctx: Ctx) => Command) =>
+  const command = (factory: (ctx: Ctx) => Command, focus = true) =>
     run((ctx) => {
       const view = ctx.get(editorViewCtx);
       factory(ctx)(view.state, view.dispatch, view);
-    });
+    }, focus);
   const mark = (name: string) =>
     command((ctx) => toggleMark(ctx.get(editorViewCtx).state.schema.marks[name]!));
   const list = (ordered: boolean, convert = false) => command(() => convertList(ordered, convert));
@@ -350,26 +352,37 @@ function EditorBody({
         if (selection) view.dispatch(view.state.tr.setSelection(selection));
       }
     });
-  const removeTableRows = () =>
-    command(() => (state, dispatch) => {
-      if (!isInTable(state)) return false;
-      const { table, tableStart, top, bottom } = selectedRect(state);
-      const rows: ProseNode[] = [];
-      table.forEach((row, _offset, index) => {
-        if (index < top || index >= bottom) rows.push(row);
-      });
-      if (!rows.length) return deleteTable(state, dispatch);
-      if (rows[0]!.type.name !== 'table_header_row') {
-        const cells: ProseNode[] = [];
-        rows[0]!.forEach((cell) =>
-          cells.push(state.schema.nodes.table_header!.create(cell.attrs, cell.content)),
-        );
-        rows[0] = state.schema.nodes.table_header_row!.create(null, cells);
-      }
-      const replacement = table.type.create(table.attrs, rows);
-      dispatch?.(state.tr.replaceWith(tableStart - 1, tableStart - 1 + table.nodeSize, replacement));
-      return true;
+  /** Deletes the selected rows, keeps a header row, and deletes the table when no row is left. */
+  const deleteRows: Command = (state, dispatch) => {
+    if (!isInTable(state)) return false;
+    const { table, tableStart, top, bottom, left } = selectedRect(state);
+    const rows: ProseNode[] = [];
+    table.forEach((row, _offset, index) => {
+      if (index < top || index >= bottom) rows.push(row);
     });
+    if (!rows.length) return deleteTable(state, dispatch);
+    if (rows[0]!.type.name !== 'table_header_row') {
+      const cells: ProseNode[] = [];
+      rows[0]!.forEach((cell) =>
+        cells.push(state.schema.nodes.table_header!.create(cell.attrs, cell.content)),
+      );
+      rows[0] = state.schema.nodes.table_header_row!.create(null, cells);
+    }
+    const replacement = table.type.create(table.attrs, rows);
+    if (!dispatch) return true;
+    const tr = state.tr.replaceWith(tableStart - 1, tableStart - 1 + table.nodeSize, replacement);
+    // Keep the cursor in the same column of the row that moved up, so the next delete still
+    // applies to this table. Replacing the whole table maps the cursor to its end, which puts it
+    // in the next paragraph when one follows the table.
+    const rowIndex = Math.min(top, rows.length - 1);
+    let pos = tableStart + 1;
+    for (let index = 0; index < rowIndex; index++) pos += rows[index]!.nodeSize;
+    const row = rows[rowIndex]!;
+    for (let index = 0; index < Math.min(left, row.childCount - 1); index++) pos += row.child(index).nodeSize;
+    dispatch(tr.setSelection(Selection.near(tr.doc.resolve(pos + 1))));
+    return true;
+  };
+  const removeTableRows = () => command(() => deleteRows);
   const switchMode = async () => {
     await session.flush();
     if (mode === 'visual') {
@@ -873,55 +886,67 @@ function EditorBody({
                       );
                     }),
                   )}
-                  <ToolbarDivider />
-                  {tool('table', <Table />, insertTable)}
-                  {tool('addRow', <Rows3 />, () =>
-                    run((ctx) => ctx.get(commandsCtx).call(addRowAfterCommand.key)),
-                  )}
-                  {tool('addColumn', <Columns3 />, () => command(() => addColumnAfter))}
-                  <details className="editor-table-actions relative">
-                    <Button
-                      asChild
-                      variant="ghost"
-                      size="sm"
-                      className="list-none px-2 font-normal text-muted hover:text-fg [&::-webkit-details-marker]:hidden"
-                    >
-                      <summary aria-label={t('editor.tableActions')} title={t('editor.tableActions')}>
-                        {t('editor.tableMenu')}
-                        <ChevronDown aria-hidden="true" />
-                      </summary>
-                    </Button>
-                    <div className="absolute end-0 top-full z-10 mt-1 grid min-w-40 gap-0.5 rounded-xl border border-line bg-surface p-1 shadow-popover">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="justify-start font-normal"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={removeTableRows}
+                  {/* On phones the table group starts its own row, so no divider is left at a row start. */}
+                  <ToolbarDivider className="max-md:hidden" />
+                  <div className="editor-table-tools flex items-center gap-0.5 max-md:basis-full">
+                    {tool('table', <Table />, insertTable)}
+                    {tool('addRow', <Rows3 />, () =>
+                      run((ctx) => ctx.get(commandsCtx).call(addRowAfterCommand.key)),
+                    )}
+                    {tool('addColumn', <Columns3 />, () => command(() => addColumnAfter))}
+                    <Menu modal={false}>
+                      <MenuTrigger disabled={readOnly || loading}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="editor-table-actions gap-1 px-2 font-normal text-muted hover:text-fg data-[state=open]:text-fg max-md:h-11"
+                          aria-label={t('editor.tableActions')}
+                          title={t('editor.tableActions')}
+                          onMouseDown={(event) => event.preventDefault()}
+                        >
+                          {t('editor.tableMenu')}
+                          <ChevronDown aria-hidden="true" />
+                        </Button>
+                      </MenuTrigger>
+                      <MenuContent
+                        align="end"
+                        loop
+                        className="editor-table-menu"
+                        onCloseAutoFocus={(event) => {
+                          // Back to the document rather than the trigger; the editor may be gone by now.
+                          event.preventDefault();
+                          container.current
+                            ?.querySelector<HTMLElement>('.ProseMirror')
+                            ?.focus({ preventScroll: true });
+                        }}
                       >
-                        {t('editor.deleteRow')}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="justify-start font-normal"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => command(() => deleteColumn)}
-                      >
-                        {t('editor.deleteColumn')}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="justify-start font-normal text-danger hover:bg-danger-soft"
-                        onMouseDown={(event) => event.preventDefault()}
-                        onClick={() => command(() => deleteTable)}
-                      >
-                        <Trash2 />
-                        {t('editor.deleteTable')}
-                      </Button>
-                    </div>
-                  </details>
+                        {/* Row and column deletes keep the menu open and focused, so several can be removed in a row. */}
+                        <MenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            command(() => deleteRows, false);
+                          }}
+                        >
+                          <Rows3 aria-hidden="true" />
+                          {t('editor.deleteRow')}
+                        </MenuItem>
+                        <MenuItem
+                          onSelect={(event) => {
+                            event.preventDefault();
+                            command(() => deleteColumn, false);
+                          }}
+                        >
+                          <Columns3 aria-hidden="true" />
+                          {t('editor.deleteColumn')}
+                        </MenuItem>
+                        <MenuSeparator />
+                        <MenuItem danger onSelect={() => command(() => deleteTable)}>
+                          <Trash2 aria-hidden="true" />
+                          {t('editor.deleteTable')}
+                        </MenuItem>
+                      </MenuContent>
+                    </Menu>
+                  </div>
                 </Toolbar>
                 <div className="editor-codebar flex flex-wrap items-center gap-2 px-1 py-1">
                   {tool('codeBlock', <CodeXml />, () =>

@@ -320,8 +320,12 @@ describe('editor lifecycle and safe preview', () => {
     expect(container.querySelectorAll('.ProseMirror tr')).toHaveLength(4);
     fireEvent.click(screen.getByRole('button', { name: english.addColumn }));
     expect(container.querySelector('.ProseMirror tr')?.children).toHaveLength(4);
-    fireEvent.click(screen.getByRole('button', { name: english.deleteRow }));
+    fireEvent.keyDown(screen.getByRole('button', { name: english.tableActions }), { key: 'Enter' });
+    fireEvent.click(await screen.findByRole('menuitem', { name: english.deleteRow }));
     expect(container.querySelectorAll('.ProseMirror tr')).toHaveLength(3);
+    // The menu stays open for further row or column deletes.
+    fireEvent.click(screen.getByRole('menuitem', { name: english.deleteColumn }));
+    expect(container.querySelector('.ProseMirror tr')?.children).toHaveLength(3);
     await waitFor(() => expect(onChange).toHaveBeenCalled());
     expect(onChange.mock.calls.at(-1)?.[0]).not.toContain('<br');
   });

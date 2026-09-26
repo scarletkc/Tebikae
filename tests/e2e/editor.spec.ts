@@ -78,13 +78,15 @@ test('task, code, link and table tools modify real Milkdown documents', async ({
   await expect(page.locator('.ProseMirror tr')).toHaveCount(4);
   await page.getByRole('button', { name: 'Add column after', exact: true }).click();
   await expect(page.locator('.ProseMirror tr').first().locator('th,td')).toHaveCount(4);
-  await page.getByLabel('More table actions', { exact: true }).click();
-  await page.getByRole('button', { name: 'Delete current column', exact: true }).click();
+  await page.getByRole('button', { name: 'More table actions', exact: true }).click();
+  // Row and column deletes keep the table menu open; deleting the table closes it.
+  await page.getByRole('menuitem', { name: 'Delete current column', exact: true }).click();
   await expect(page.locator('.ProseMirror tr').first().locator('th,td')).toHaveCount(3);
-  await page.getByRole('button', { name: 'Delete current row', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Delete current row', exact: true }).click();
   await expect(page.locator('.ProseMirror tr')).toHaveCount(3);
-  await page.getByRole('button', { name: 'Delete table', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Delete table', exact: true }).click();
   await expect(page.locator('.ProseMirror table')).toHaveCount(0);
+  await expect(page.getByRole('menu')).toHaveCount(0);
   await page.getByRole('button', { name: 'Insert or edit link', exact: true }).click();
   await page.getByLabel('Link address', { exact: true }).fill('javascript:alert(1)');
   await page.getByRole('button', { name: 'Apply link', exact: true }).click();
@@ -93,6 +95,25 @@ test('task, code, link and table tools modify real Milkdown documents', async ({
   await page.getByLabel('Link text (for new links)', { exact: true }).fill('Safe link');
   await page.getByRole('button', { name: 'Apply link', exact: true }).click();
   await expect(page.locator('.ProseMirror a')).toHaveAttribute('href', 'https://example.com/kept');
+});
+
+test('on phones the table tools start their own row in the more formatting panel', async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockGitHub(context, [mockIssue(34, 'Phone tools', 'Body')]);
+  await connect(page);
+  await page.getByRole('button', { name: 'Edit note: Phone tools', exact: true }).click();
+  await page.getByRole('button', { name: 'More formatting options', exact: true }).click();
+  const panel = page.locator('.editor-expanded-tools .editor-toolbar');
+  const first = (await panel.getByRole('button', { name: 'Strikethrough', exact: true }).boundingBox())!;
+  const table = (await panel.locator('.editor-table-tools').boundingBox())!;
+  // A new row that starts at the left edge, so no divider is left at the start of a row.
+  expect(table.y).toBeGreaterThanOrEqual(first.y + first.height);
+  expect(Math.abs(table.x - first.x)).toBeLessThanOrEqual(1);
+  const panelBox = (await panel.boundingBox())!;
+  expect(table.x + table.width).toBeLessThanOrEqual(panelBox.x + panelBox.width);
 });
 
 test('HTML stays in source and images never fetch external URLs', async ({ page, context }) => {

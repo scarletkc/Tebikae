@@ -68,6 +68,16 @@
   - 其他：同步状态面板、笔记“更多”菜单、侧栏的设置入口和标签多选按钮、筛选对话框的两个下拉、导入备份的文件选择、新建标签的颜色选择、Issue 标题字号、卡片 Markdown 预览里的勾选框（原来是 `✓` 字符）都改用组件库或令牌；提示条里“链接 + 普通按钮”的组合改为 `ghost` 按钮。
   - 修改了测试的操作方式（断言不变）：主题和“文字样式”从 `selectOption` 改为点开菜单再选；PWA 强制更新后停在设置页，“工作区已恢复”的判断从“能看到搜索框”改为“能看到设置页”。
 
+### 门禁后续（2026-09-26，#38）
+
+门禁 PR 有意留下的几项在这一轮收尾：
+
+- **间距、尺寸和断点**：`theme.css` 删掉 Tailwind 默认的 `sm`（640px）和 `2xl`，只保留 `xs` 430px、`sm` 600px、`md` 761px、`lg` 1100px、`xl` 1500px。`max-[430px]:`、`max-[600px]:`、`max-[760px]:`、`max-[1100px]:`、`min-[1500px]:` 全部换成命名断点。其中 `max-[760px]:` 换成 `max-md:` 后，视口正好 760px 时网格也切到手机布局，与 `useIsMobile()` 一致。笔记区内边距改到 4px 档位（42 → 40、26 → 24、22 → 20、70 → 72、55 → 56、29 → 28、25 → 24px）；`useWorkspaceLayout.ts` 按实际内边距测量，`GRID_GAP`（18）和 `MIN_GRID_CARD_WIDTH`（232）与网格类名仍一致，没有改动。其余写死的宽高换成等值的刻度类。门禁开始拒绝纯长度的间距、尺寸任意值和任意断点，见 3.7。
+- **按钮**：新增 `NavItem`（侧栏行、仓库入口）和 `StretchedButton`（卡片标题，点击区域覆盖整张卡片），侧栏、笔记卡片和 Issue 卡片改用它们。Issue 卡片原来整张是一个按钮，无障碍名称包含正文；现在名称只有标题。卡片上的“x/y 已完成”原来是一个按钮，但鼠标一直点不到它（被标题的点击区域盖住），键盘上又多一个意义不明的 Tab 停留点，现改为普通文字。标签徽章的删除按钮没有任何调用方，已删除。门禁开始拒绝组件库以外的 `<button>` 和 `role="button"`。
+- **`Select`**：`label` 改为必填，无障碍名称是“标签, 当前值”（例如“Theme, Light”），读屏软件能读出当前选项，也满足 WCAG 2.5.3（可见文字包含在名称中）。触发按钮的边框改为与 `Input` 相同的 `border-line-strong`。排序控件里只为测试保留的隐藏原生 `<select>`（`nativeMirror`）已删除，相关测试改为点开菜单再选（`fixtures.ts` 的 `sortBy()`）。
+- **编辑器**：“表格”操作从 `<details>` 改为 `Menu`，支持 Esc 和点击外部关闭；删除行、删除列后菜单不关闭，可以连续删除，删除表格后关闭。删除行后光标留在表格里（原来整张表被替换后光标会跑到表格后面，接着删列不起作用）。手机上“更多格式”面板里表格一组单独占一行，行首不再出现分隔线。
+- **其他**：“已有 Issues”页的搜索框提示改为“搜索 Issue”（新增 `home.searchIssues`）。
+
 基线时已存在、与本改造无关的问题（不要当成自己引入的回归）：
 
 - 截图场景 `label-menu` 在两个手机项目中失败。
@@ -230,7 +240,7 @@
 
 **圆角**：`rounded-md`（6px，菜单项、徽标）、`rounded-lg`（8px，按钮、输入框、侧栏项、提示条）、`rounded-xl`（12px，卡片、弹出菜单、分组）、`rounded-2xl`（16px，对话框）、`rounded-full`（FAB、圆点）。
 
-**间距**：只使用 Tailwind 的 4px 档位（`1`、`2`、`3`、`4`、`5`、`6`、`8`），安全区计算除外。
+**间距和尺寸**：只使用 Tailwind 刻度，不写 `px-[42px]`、`max-w-[26rem]` 这类纯长度的任意值（门禁 `ui/theme-tokens`）。页面级间距用 4px 的整数倍（`4`、`5`、`6`、`8`、`10`…）；控件内部可以用半档（`px-2.5`、`gap-1.5`）。写死的宽高同样换成刻度（`max-w-104` = 26rem，`max-h-45` = 180px）。安全区和视口计算（`pb-[calc(56px+env(safe-area-inset-bottom))]`、`max-h-[85dvh]`）除外。
 
 **控件尺寸**（已写进组件）：
 
@@ -238,7 +248,7 @@
 | ------------------------------- | ------------------------------------------------------------------- |
 | `Button` `sm` / `md` / `lg`     | 高 32 / 36 / 44px                                                   |
 | `IconButton` `xs` / `sm` / `md` | 28 / 32 / 36px。卡片操作按钮用 `xs`，搜索栏内用 `sm`，其他默认 `md` |
-| 菜单项                          | 32px；触屏（`pointer-coarse`）或屏宽 ≤600px 时为 44px               |
+| 菜单项                          | 32px；触屏（`pointer-coarse`）或屏宽 <600px（`max-sm:`）时为 44px   |
 | 输入框                          | 36px                                                                |
 | 顶栏 / 底部导航（阶段 4f）      | 56px                                                                |
 | FAB                             | 56px                                                                |
@@ -251,7 +261,17 @@
 
 **动效**：`animate-fade-in`（遮罩）、`animate-pop-in`（菜单、居中对话框）、`animate-sheet-in`（底部面板）、`animate-drawer-in`（左侧抽屉），都已带 `motion-reduce:animate-none`。
 
-**断点**：`md:` = 761px（与 `useIsMobile()` 的 `max-width: 760px` 正好互补，**不要改这个阈值**）；`lg:` = 1100px；`xl:` = 1500px。需要“小于某宽度”时用 `max-md:` 等写法。
+**断点**：只有 `theme.css` 定义的五档，Tailwind 默认的 `sm`（640px）和 `2xl` 已删除。
+
+| 类名  | 宽度   | 用途                                                                            |
+| ----- | ------ | ------------------------------------------------------------------------------- |
+| `xs:` | 430px  | 小屏手机：`max-xs:` 时网格单列、编辑器顶栏换行                                  |
+| `sm:` | 600px  | 窄屏：`max-sm:` 时菜单项加高到 44px、多选工具条移到底部                         |
+| `md:` | 761px  | 手机与桌面的分界，与 `useIsMobile()` 的 `max-width: 760px` 正好互补，**不要改** |
+| `lg:` | 1100px | 桌面                                                                            |
+| `xl:` | 1500px | 宽屏                                                                            |
+
+需要“小于某宽度”时用 `max-md:` 等写法。门禁拒绝 `max-[430px]:`、`[@media(max-width:600px)]:` 这类任意断点。`editor.css` 的媒体查询写相同的数值（`width < 430px`、`max-width: 760px`）。
 
 ### 3.5 组件用法速查
 
@@ -288,6 +308,15 @@ if (await confirmDialog({ title, confirmLabel, danger: true })) …
 <Select id="theme-setting" label={t('settings.theme')} value={theme} onChange={setTheme}
   options={[{ value: 'light', label: t('settings.light'), icon: Sun }, …]} />
 <Select icon={<ArrowUpDown />} size="sm" … />                // 紧凑工具栏：只显示图标
+// label 必填（在 <Field> 里也要写）；读屏读到的名称是“标签, 当前值”，例如 “Theme, Light”
+
+// 侧栏行：页面链接、标签筛选、仓库入口。当前页由 NavLink 的 aria-current 标出，筛选用 aria-pressed
+<NavItem asChild><NavLink to="/archive"><Archive /> {t('nav.archive')}</NavLink></NavItem>
+<NavItem size="sm" aria-pressed={active} onClick={…}><Tags /> {t('label.all')}</NavItem>
+<NavItem variant="tile" onClick={…}>…</NavItem>              // 带边框的两行入口（侧栏底部的仓库）
+
+// 卡片标题：点击区域覆盖整张卡片。卡片要加 relative，卡片里的其他按钮加 relative z-2
+<article className="relative …"><h3><StretchedButton onClick={open}>{title}</StretchedButton></h3>…</article>
 
 // 工具条（编辑器格式按钮）
 <Toolbar aria-label={t('editor.toolbar')}><IconButton size="sm" …/><ToolbarDivider /></Toolbar>
@@ -329,6 +358,7 @@ if (await confirmDialog({ title, confirmLabel, danger: true })) …
 
 - **可多选项**（CheckboxItem，例如右键菜单里的标签和颜色）：选中时加粗并加下划线，部分选中时用虚线下划线，**不显示勾号**。这是 [右键菜单设计](context-menus.md) 的约定，E2E 测试会断言。
 - **单选项**（RadioItem）：选中时显示右侧勾号。
+- 点完一项后菜单要保持打开时（例如编辑器的“表格”菜单连续删除行或列），在 `MenuItem` 的 `onSelect` 里调用 `event.preventDefault()`。
 - 像菜单一样的信息面板（例如同步状态面板）使用 `menuSurface`，再自行设置宽度和内边距。
 - 右键菜单统一通过 `src/app/ContextMenu.tsx`，传入 `MenuAction[]` 即可，不要自己拼菜单。
 
@@ -345,18 +375,19 @@ if (await confirmDialog({ title, confirmLabel, danger: true })) …
 
 `scripts/eslint-plugin-ui.mjs` 对 `src/` 下的 TS/TSX 生效，报错会阻止 CI 通过，编辑器里也会直接标红。规则针对的是已经出现过的问题：
 
-| 规则                        | 禁止                                                                                                                                                                                                                     | 改为                                                                                  |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| `ui/no-native-controls`     | `src/ui` 以外出现 `<input>`、`<select>`、`<textarea>`                                                                                                                                                                    | `Input`、`Textarea`、`Select`、`Checkbox`、`FileInput`、`ColorInput`                  |
-| `ui/kit-imports`            | 从 `src/ui/Button` 等内部文件导入；在别的模块转出或另起名字导出组件（例如原来 `app/ui.tsx` 转出的 `IconButton`）；功能代码使用 `menuClasses.ts` 的类名；`src/ui` 和 `src/app/ContextMenu.tsx` 以外导入 `@radix-ui/*`     | 从 `src/ui` 导入组件；菜单用 `Menu` 系列，对话框用 `Dialog`、`Sheet`、`ConfirmDialog` |
-| `ui/theme-tokens`           | 颜色、字号、字重、行高、字距、圆角、阴影、z-index、透明度、模糊使用任意值（`text-[25px]`、`rounded-[10px]`、`leading-[1.8]`、`shadow-[…]`、`bg-[#fff]`）；在组件库以外用 `!` 强制覆盖组件样式；行内 `style` 设置这些属性 | 令牌类；组件需要新外观时给组件加变体（例如 `IconButton variant="accent"`）            |
-| `ui/consistent-actions`     | 同一行里把 `variant="link"` 的按钮和普通按钮放在一起                                                                                                                                                                     | 次要操作用 `variant="ghost"`，或整行都用链接样式                                      |
-| `ui/require-disable-reason` | 不写原因地关闭 `ui/*` 规则                                                                                                                                                                                               | `// eslint-disable-next-line ui/… -- 原因`                                            |
+| 规则                        | 禁止                                                                                                                                                                                                                                                                                                                                             | 改为                                                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `ui/no-native-controls`     | `src/ui` 以外出现 `<input>`、`<select>`、`<textarea>`、`<button>`，或 `role="button"`                                                                                                                                                                                                                                                            | `Input`、`Textarea`、`Select`、`Checkbox`、`FileInput`、`ColorInput`；按钮用 `Button`、`IconButton`、`NavItem`、`StretchedButton`         |
+| `ui/kit-imports`            | 从 `src/ui/Button` 等内部文件导入；在别的模块转出或另起名字导出组件（例如原来 `app/ui.tsx` 转出的 `IconButton`）；功能代码使用 `menuClasses.ts` 的类名；`src/ui` 和 `src/app/ContextMenu.tsx` 以外导入 `@radix-ui/*`                                                                                                                             | 从 `src/ui` 导入组件；菜单用 `Menu` 系列，对话框用 `Dialog`、`Sheet`、`ConfirmDialog`                                                     |
+| `ui/theme-tokens`           | 颜色、字号、字重、行高、字距、圆角、阴影、z-index、透明度、模糊使用任意值（`text-[25px]`、`rounded-[10px]`、`leading-[1.8]`、`shadow-[…]`、`bg-[#fff]`）；间距和尺寸使用纯长度的任意值（`px-[42px]`、`max-w-[26rem]`）；任意断点（`max-[430px]:`、`[@media(max-width:600px)]:`）；在组件库以外用 `!` 强制覆盖组件样式；行内 `style` 设置这些属性 | 令牌类、刻度类（`px-10`、`max-w-104`）、命名断点（`max-xs:` … `xl:`）；组件需要新外观时给组件加变体（例如 `IconButton variant="accent"`） |
+| `ui/consistent-actions`     | 同一行里把 `variant="link"` 的按钮和普通按钮放在一起                                                                                                                                                                                                                                                                                             | 次要操作用 `variant="ghost"`，或整行都用链接样式                                                                                          |
+| `ui/require-disable-reason` | 不写原因地关闭 `ui/*` 规则                                                                                                                                                                                                                                                                                                                       | `// eslint-disable-next-line ui/… -- 原因`                                                                                                |
 
 说明：
 
 - 用户数据决定的颜色（标签颜色）通过 CSS 自定义属性传递，例如 `style={{ '--swatch': color }}` 加 `bg-(--swatch)`；由令牌推导的任意值（`bg-[color-mix(…var(--surface))]`）允许。
-- 间距、尺寸和断点的任意值暂不检查：网格和顶栏的 JS 布局测量依赖现有像素值（`useWorkspaceLayout.ts`），要改须单独立项并跑 `topbar-layout.spec.ts`。
+- 间距和尺寸的任意值只在是纯长度时报错。`calc()`、`min()`、`max()`、`env()`、`var()`、百分比和视口单位（`85dvh`、`8vw`）允许，它们表达的是刻度写不出来的关系（安全区、视口）。`grid-cols-[…]` 这类网格模板不检查：笔记网格的列宽要与 `useWorkspaceLayout.ts` 的 `MIN_GRID_CARD_WIDTH`、`GRID_GAP` 保持一致，改动时跑 `topbar-layout.spec.ts` 和 `note-layout.spec.ts`。容器查询（`@max-[20rem]:`）不算断点，不受限制。
+- 代码块的语言输入框和按钮是 ProseMirror 节点视图用 DOM API 生成的，不经过 JSX，门禁管不到，样式留在 `editor.css`。
 - 真正需要例外时用带原因的 `eslint-disable`，评审时逐条确认。不要把新例外加进插件的白名单。
 
 ---
@@ -618,7 +649,7 @@ pnpm exec playwright show-report .artifacts/screenshots/phase-4j/report
 | 右键菜单测试断言失败：`font-weight` 或下划线不对 | 可多选项的选中样式（加粗加下划线）是测试锁定的产品约定，不要改成勾号                                                                     |
 | `ContextMenu` 包裹的元素布局塌了                 | 外层是 `display: contents`，通过 `className` 传入 `block` 或 `flex`                                                                      |
 | 手机上点输入框时页面放大                         | 字号小于 16px，应使用 `text-base md:text-sm`                                                                                             |
-| E2E 在 760px 附近失败                            | 用了写死的像素断点。项目的 `md:` 已设为 761px，直接用 `md:` / `max-md:`                                                                  |
+| E2E 在 760px 附近失败                            | 用了写死的像素断点（门禁会拒绝）。项目的 `md:` 已设为 761px，直接用 `md:` / `max-md:`                                                    |
 | 深色模式下某处颜色不对                           | 写了原始颜色或 `dark:` 覆盖。改用令牌                                                                                                    |
 | PWA 离线测试失败                                 | 改动了 chunk 拆分方式（`MarkdownEditor` 的 `lazy` 导入），或者 `/Tebikae/` 的构建产物是在 Git Bash 下生成的                              |
 | `git status` 里出现了没改过的业务文件            | 对整个目录运行了 `prettier --write`，见规则 11                                                                                           |
