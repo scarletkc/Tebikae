@@ -47,12 +47,13 @@ for (const language of ['en', 'zh-CN'] as const) {
     await expect.poll(() => page.evaluate(() => Boolean(navigator.serviceWorker.controller))).toBe(true);
     await disconnectNetwork(context, page, outageServer, info);
     await page.reload({ waitUntil: 'domcontentloaded' });
-    await expect(page.getByLabel(copy.home.search, { exact: true })).toBeVisible();
+    // Playwright's WebKit can stall or terminate Service Worker intercepted fetches when the
+    // outage server closes the origin sockets at the same moment. On Linux CI this also kept
+    // the saved notebook opening for more than 5 s while a precached chunk stayed pending, so
+    // allow the shell and the lazy-loaded editor chunk time to resolve before failing.
+    await expect(page.getByLabel(copy.home.search, { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
     await page.locator('.note-card').filter({ hasText: 'Weekend ideas' }).locator('.note-open').click();
-    // The editor chunk is lazy-loaded. Playwright's Windows WebKit can terminate a
-    // Service Worker intercepted fetch when the origin sockets close at the same
-    // moment, so allow the chunk time to resolve from the precache before failing.
     await expect(page.locator('.ProseMirror[contenteditable="true"]')).toBeVisible({ timeout: 30_000 });
     await page
       .locator('.ProseMirror[contenteditable="true"]')
