@@ -113,3 +113,42 @@ test('a delayed navigation cannot replace a new editor opened by Ctrl/Cmd+N', as
     release();
   }
 });
+
+test('queued close must not publish a reopened editor draft', async ({ page, context }) => {
+  const remote = await mockGitHub(context, [mockIssue(1, 'A first'), mockIssue(2, 'B second')]);
+  let release!: () => void;
+  let started = false;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await context.route('https://api.github.com/repos/scarletkc/Tebikae-dev/issues/1', async (route) => {
+    if (route.request().method() === 'PATCH' && !started) {
+      started = true;
+      await gate;
+    }
+    await route.fallback();
+  });
+  try {
+    await connect(page);
+    await page.getByRole('button', { name: 'Edit note: A first', exact: true }).click();
+    await page.getByLabel('Title', { exact: true }).fill('A changed');
+    await closeDialog(page);
+    await expect.poll(() => started).toBe(true);
+    await page.getByRole('button', { name: 'Edit note: B second', exact: true }).click();
+    await page.getByLabel('Title', { exact: true }).fill('B closed version');
+    await closeDialog(page);
+    await page.getByRole('button', { name: 'Edit note: B closed version', exact: true }).click();
+    await page.getByLabel('Title', { exact: true }).fill('B still editing draft');
+    await page.waitForTimeout(500);
+    release();
+    await expect.poll(() => remote.issues[0]!.title).toBe('A changed');
+    await page.waitForTimeout(500);
+    expect(remote.writes.filter((w) => w.method === 'PATCH' && w.path.endsWith('/2'))).toHaveLength(0);
+    await expect(page.getByRole('dialog')).toBeVisible();
+    expect(remote.issues[1]!.title).not.toBe('B still editing draft');
+    await closeDialog(page);
+    await expect.poll(() => remote.issues[1]!.title).toBe('B still editing draft');
+  } finally {
+    release();
+  }
+});

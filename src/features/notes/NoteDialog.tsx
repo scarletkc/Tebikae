@@ -306,7 +306,7 @@ export default function NoteDialog({
       if (idRef.current) {
         engine?.setEditing(idRef.current, false);
         /* A failed write keeps the local draft and Outbox entry for a later retry. */
-        void engine?.flushNote(idRef.current).catch(() => {});
+        void engine?.flushNote(idRef.current, { allowEditing: false }).catch(() => {});
       }
       if (direction) onNavigate(direction);
       else onClose();

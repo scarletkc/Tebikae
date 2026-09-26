@@ -712,14 +712,19 @@ export class SyncEngine {
    * this method when the current editor is closed or when the user explicitly saves;
    * it only considers the requested note and leaves every other Outbox entry queued.
    */
-  flushNote(localId: string): Promise<void> {
+  flushNote(localId: string, options?: { allowEditing?: boolean }): Promise<void> {
     return this.enqueue(async (generation) => {
-      await this.flushOne(localId, generation, true);
+      await this.flushOne(localId, generation, true, options?.allowEditing ?? true);
       this.emit();
     }, 10);
   }
 
-  private async flushOne(localId: string, generation: number, manual: boolean): Promise<boolean> {
+  private async flushOne(
+    localId: string,
+    generation: number,
+    manual: boolean,
+    allowEditing = manual,
+  ): Promise<boolean> {
     if (this.connection.readOnly || Date.now() < this.pausedUntil) return true;
     const key: [string, string] = [this.connection.scopeId, localId];
     // A close/navigation of an unchanged note must not cause a remote read or
@@ -749,9 +754,9 @@ export class SyncEngine {
     const note = await this.db.notes.get(key);
     if (!note || note.duplicate || note.remoteUnavailable || note.purgeStartedAt) return true;
     if (entry.status === 'uncertain' && note.error && !isTransient(note.error)) return true;
-    // Background polling/retry must not publish an editor that is still open. The
-    // editor's close, Ctrl/Cmd+S, or explicit save button calls flushNote manually.
-    if (!manual && this.editingIds.has(localId)) return true;
+    // A queued close may run after the note has been reopened. Only explicit saves
+    // may publish the draft of an active editor.
+    if (!allowEditing && this.editingIds.has(localId)) return true;
     if (entry.kind === 'create' && entry.status === 'uncertain') return true;
 
     // An edit can be undone before its debounce runs. Drop that now-empty update
@@ -793,7 +798,7 @@ export class SyncEngine {
       return false;
     }
     try {
-      if (note.issueNumber) await this.update(note, entry as Attempt, generation);
+      if (note.issueNumber) await this.update(note, entry as Attempt, generation, allowEditing);
       else await this.create(note, generation);
     } catch (error) {
       if (!this.active(generation)) return false;
@@ -889,7 +894,7 @@ export class SyncEngine {
     await this.acknowledge(note, attempt, remote, true);
   }
 
-  private async update(note: LocalNote, prior: Attempt, generation: number) {
+  private async update(note: LocalNote, prior: Attempt, generation: number, allowEditing: boolean) {
     const remote = await this.client.getIssue(this.connection, note.issueNumber!);
     this.assertActive(generation);
     note = (await this.db.notes.get([note.scopeId, note.localId])) || note;
@@ -911,6 +916,8 @@ export class SyncEngine {
         note = (await this.db.notes.get([note.scopeId, note.localId]))!;
       }
     }
+    // The preflight request can also outlive the closed editor session.
+    if (!allowEditing && this.editingIds.has(note.localId)) return;
     if (prior.forceExpectedRemote && !this.sameRemoteContent(remote, prior.forceExpectedRemote)) {
       await this.conflict(note, remote, ['remote-changed']);
       return;
