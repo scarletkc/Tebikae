@@ -78,7 +78,11 @@ Tebikae 使用 GitHub Pages 托管，自定义域名为 `tebikae.fog.moe`，DNS 
 gh workflow run pages.yml --repo scarletkc/Tebikae --ref main
 ```
 
-[Pages 工作流](../.github/workflows/pages.yml)先调用 `Check`，完成静态检查、单测及三浏览器全量 E2E／PWA 验证。全部通过后，部署任务进入 `github-pages` 环境审批；批准后发布同一次运行中已验证的 `dist/`，不重新构建。任何必需检查失败都会阻止部署。部署完成后，核对线上 `build-info.json` 的 commit 是否与本次发布提交一致。
+[Pages 工作流](../.github/workflows/pages.yml)先查找目标提交的已验证产物。只有同一仓库、同一 SHA 的成功手动 `Check` 或 `Deploy Pages` 运行，且保留了 `verified-browser-builds`，才会尝试复用。该产物由全量检查通过后的 `check` 任务生成，包含根路径和子路径构建及验证记录。
+
+[ci-verified-build.mjs](../scripts/ci-verified-build.mjs) 的 `validateBuild()` 核对提交、运行及重试编号、完整浏览器矩阵、构建路径和 `build-info.json`。查找失败、产物缺失或过期、下载失败、记录不匹配时，工作流调用 `Check` 重新完成静态检查、单测及三浏览器全量 E2E／PWA 验证。复用时，任务摘要链接到原验证运行。
+
+验证成功后，部署任务进入 `github-pages` 环境审批；批准后再次核对产物并发布已验证的 `dist/`，不重新构建。任何必需检查或发布产物校验失败都会阻止部署。部署完成后，核对线上 `build-info.json` 的 commit 是否与本次发布提交一致。产物保留时间由 [Check 工作流](../.github/workflows/check.yml) 的 `verified-browser-builds` 上传步骤定义。
 
 工作流使用 contents 读取、Pages 写入和 OIDC 权限，不使用用户笔记 Token。首次设置时，启用仓库 Pages 的 GitHub Actions 来源，在 Pages 设置中绑定 `tebikae.fog.moe`，再添加 Cloudflare DNS 记录：
 

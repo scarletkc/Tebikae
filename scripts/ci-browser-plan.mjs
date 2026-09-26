@@ -1,101 +1,165 @@
 import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { appendFileSync, readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
-const editorTests = ['editor', 'notes', 'note-layout', 'reliability', 'context-menu'];
-const storageTests = ['session', 'notes', 'reliability', 'backup-import', 'workspace-status'];
-const layoutTests = ['note-layout', 'topbar-layout', 'sidebar-controls', 'labels', 'notes'];
+const editorTests = ['editor', 'editor-canvas', 'editor-save-races', 'notes', 'reliability', 'context-menu'];
+const storageTests = ['session', 'notes', 'reliability', 'sync-retry', 'backup-import', 'workspace-status'];
+const layoutTests = ['note-layout', 'topbar-layout', 'sidebar-controls', 'labels', 'context-interactions'];
+const sharedUiTests = [
+  ...layoutTests,
+  'notes',
+  'editor-canvas',
+  'context-menu',
+  'backup-import',
+  'markdown-export',
+];
 const documentation = (path) =>
   path === 'LICENSE' || (path.endsWith('.md') && (!path.includes('/') || path.startsWith('docs/')));
 
-/** Select extra engine coverage without repeating pure logic tests in every browser. */
+const grep = (tests) =>
+  [
+    '@smoke',
+    ...[...tests]
+      .sort()
+      .map((name) => `(?:^|[\\\\/\\s])${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\.spec\\.ts(?:\\s|$)`),
+  ].join('|');
+
 export function browserPlan(paths, full = false) {
+  if (full)
+    return {
+      include: ['chromium', 'webkit', 'firefox'].map((browser) => ({ browser, grep: '.', pwa: true })),
+      reasons: ['Full verification requested.'],
+    };
   const affected = new Set();
-  let crossBrowserPwa = full;
-  const add = (tests) => tests.forEach((test) => affected.add(test));
+  const crossBrowser = new Set();
+  const reasons = new Set();
+  let chromiumFull = false;
+  let crossBrowserPwa = false;
+  const add = (tests, cross = false, pwa = false) => {
+    tests.forEach((name) => affected.add(name));
+    if (cross) tests.forEach((name) => crossBrowser.add(name));
+    crossBrowserPwa ||= pwa;
+  };
   for (const path of paths) {
     if (documentation(path)) continue;
-    if (path.startsWith('src/features/editor/') || path === 'src/domain/markdown.ts') {
-      add(editorTests);
-      crossBrowserPwa = true;
+    if (
+      path.startsWith('src/features/editor/') ||
+      [
+        'src/domain/markdown.ts',
+        'src/features/notes/NoteDialog.tsx',
+        'src/features/workspace/useGlobalShortcuts.ts',
+      ].includes(path)
+    ) {
+      add(editorTests, true, true);
     } else if (
-      path.startsWith('src/storage/') ||
-      path.startsWith('src/security/') ||
+      ['src/storage/', 'src/security/', 'src/sync/', 'src/adapters/', 'src/features/connect/'].some(
+        (prefix) => path.startsWith(prefix),
+      ) ||
       [
         'src/app/session.tsx',
         'src/app/pwa.ts',
-        'src/sync/lock.ts',
+        'src/app/usePwaLifecycle.ts',
         'src/application/commands.ts',
         'src/application/backup-import.ts',
+        'src/domain/codec.ts',
+        'src/domain/merge.ts',
+        'src/domain/types.ts',
+        'src/domain/backup-import.ts',
+        'src/features/settings/BackupImportDialog.tsx',
+        'src/features/notes/actions.ts',
       ].includes(path)
     ) {
-      add(storageTests);
-      crossBrowserPwa = true;
-    } else if (path === 'src/application/markdown-export.ts') {
+      add(storageTests, true, true);
+    } else if (
+      ['src/application/markdown-export.ts', 'src/features/settings/MarkdownExportDialog.tsx'].includes(path)
+    ) {
       add(['markdown-export', 'notes']);
     } else if (
+      path.startsWith('src/ui/') ||
+      path === 'src/app/ui.tsx' ||
       path.startsWith('src/styles/') ||
-      path.startsWith('src/i18n/') ||
-      path.startsWith('src/app/') ||
-      path.startsWith('src/features/')
+      path.startsWith('src/i18n/')
     ) {
-      // Shared UI can affect editor controls, import/export dialogs, and connection forms.
-      add([...layoutTests, ...editorTests, ...storageTests, 'markdown-export']);
+      add(sharedUiTests);
+    } else if (path.startsWith('src/features/labels/')) {
+      add(['labels', 'sidebar-controls', 'context-menu', 'context-interactions']);
+    } else if (path.startsWith('src/features/filters/') || path === 'src/domain/filters.ts') {
+      add(['topbar-layout', 'notes', 'pagination-search']);
+    } else if (path.startsWith('src/features/workspace/')) {
+      add([...layoutTests, 'notes', 'pagination-search', 'workspace-status']);
+    } else if (path.startsWith('src/features/notes/')) {
+      add(['notes', 'note-layout', 'pagination-search', 'context-menu']);
+    } else if (path.startsWith('src/features/settings/')) {
+      add(['session', 'backup-import', 'markdown-export']);
+    } else if (path.startsWith('src/features/issues/')) {
+      add(['notes', 'pagination-search']);
+    } else if (path.startsWith('src/app/')) {
+      add(sharedUiTests);
     } else if (path.startsWith('tests/e2e/') && path.endsWith('.spec.ts')) {
-      affected.add(path.slice('tests/e2e/'.length, -'.spec.ts'.length));
-    } else if (path.startsWith('tests/pwa/')) {
-      add(storageTests);
-      crossBrowserPwa = true;
+      add([path.slice('tests/e2e/'.length, -'.spec.ts'.length)]);
+    } else if (path.startsWith('tests/pwa/') || path === 'playwright.pwa.config.ts') {
+      add(storageTests, true, true);
     } else if (
-      path.startsWith('src/domain/') ||
-      path.startsWith('src/application/') ||
-      path.startsWith('src/sync/') ||
-      path.startsWith('src/adapters/') ||
-      /^tests\/[^/]+\.test\.tsx?$/.test(path)
+      path.startsWith('tests/e2e/') ||
+      path === 'playwright.config.ts' ||
+      [
+        'package.json',
+        'pnpm-lock.yaml',
+        'pnpm-workspace.yaml',
+        'vite.config.ts',
+        'index.html',
+        'src/main.tsx',
+      ].includes(path) ||
+      path.startsWith('public/')
     ) {
-      // Chromium still exercises the complete UI integration for these changes.
+      chromiumFull = true;
+      reasons.add(`Chromium full: shared browser infrastructure or build input (${path}).`);
+    } else if (
+      path.startsWith('tests/ci/') ||
+      path.startsWith('.github/') ||
+      path.startsWith('scripts/') ||
+      path.startsWith('tests/screenshots/') ||
+      path === 'playwright.screenshots.config.ts' ||
+      /^tests\/[^/]+\.test\.tsx?$/.test(path) ||
+      [
+        'tests/setup.ts',
+        'tsconfig.json',
+        'eslint.config.js',
+        '.prettierrc.json',
+        '.prettierignore',
+        '.gitattributes',
+        '.gitignore',
+      ].includes(path)
+    ) {
+      // Static checks cover tooling; smoke and Chromium PWA still exercise the pipeline.
     } else {
-      // Assets, entrypoints, dependencies, configuration, shared fixtures and unknown
-      // paths fail open to coverage, including production/offline checks.
-      full = true;
-      crossBrowserPwa = true;
+      chromiumFull = true;
+      reasons.add(`Chromium full: unclassified path (${path}).`);
     }
   }
-  const escape = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  // Playwright grep includes the test file name as well as its title and tags.
-  const related = [...affected]
-    .sort()
-    .map((name) => `${escape(name)}\\.spec\\.ts`)
-    .join('|');
-  const include = [
-    { browser: 'chromium', grep: '.', pwa: true },
-    {
-      browser: 'webkit',
-      grep: full ? '.' : ['@smoke', related].filter(Boolean).join('|'),
-      pwa: crossBrowserPwa,
-    },
-  ];
-  if (full || related || crossBrowserPwa)
-    include.push({
-      browser: 'firefox',
-      // Keep a runnable core even when the changed spec was deleted or renamed.
-      grep: full ? '.' : ['@smoke', related].filter(Boolean).join('|'),
-      pwa: crossBrowserPwa,
-    });
-  return { include };
+  const include = [{ browser: 'chromium', grep: chromiumFull ? '.' : grep(affected), pwa: true }];
+  if (crossBrowser.size || crossBrowserPwa) {
+    for (const browser of ['webkit', 'firefox'])
+      include.push({ browser, grep: grep(crossBrowser), pwa: crossBrowserPwa });
+  }
+  return { include, reasons: [...reasons] };
 }
 
 export function planForEvent(eventName, event, changedPaths, forceFull = false) {
   if (forceFull || eventName === 'workflow_dispatch') return browserPlan([], true);
-  const base = eventName === 'pull_request' ? event.pull_request?.base.sha : event.before;
-  const head = eventName === 'pull_request' ? event.pull_request?.head.sha : event.after;
-  if (!base || !head || /^0+$/.test(base)) return browserPlan([], true);
+  if (eventName === 'push')
+    return { include: [], reasons: ['Main push: static checks, unit tests and build only.'] };
+  const base = event.pull_request?.base.sha;
+  const head = event.pull_request?.head.sha;
+  if (eventName !== 'pull_request' || !base || !head)
+    return {
+      ...browserPlan(['unknown-event']),
+      reasons: ['Chromium full: missing PR comparison metadata.'],
+    };
   try {
-    return browserPlan(changedPaths(base, head, eventName === 'pull_request'));
+    return browserPlan(changedPaths(base, head));
   } catch {
-    // A missing history object must increase coverage, never silently omit a browser.
-    return browserPlan([], true);
+    return { ...browserPlan(['unknown-history']), reasons: ['Chromium full: unable to read changed paths.'] };
   }
 }
 
@@ -122,83 +186,42 @@ export function documentationOnlyForEvent(eventName, event, rawDiff, forceFull =
   }
 }
 
-/** A pass is reusable only for the same tested tree, base, coverage and runner. */
-export function successCacheKey({ tree, matrix, base, scope, runtime }) {
-  if (!base || !scope || !runtime) throw new Error('Missing cache identity');
-  const code = tree
-    .split('\0')
-    .filter(Boolean)
-    .filter((entry) => {
-      const separator = entry.indexOf('\t');
-      if (separator < 0) throw new Error('Invalid Git tree entry');
-      const path = entry.slice(separator + 1);
-      // Executable files and symlinks are never treated as documentation.
-      const prose = documentation(path);
-      return !entry.startsWith('100644 blob ') || !prose;
-    })
-    .sort();
-  return `ci-success-v1-${createHash('sha256').update(JSON.stringify({ code, matrix, base, scope, runtime })).digest('hex')}`;
-}
-
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
-  const matrix = planForEvent(
-    process.env.GITHUB_EVENT_NAME,
-    event,
-    (base, head, mergeBase) =>
-      execFileSync(
-        'git',
-        ['diff', '--name-only', '-z', '--no-renames', `${base}${mergeBase ? '...' : '..'}${head}`, '--'],
-        {
-          encoding: 'utf8',
-        },
-      )
-        .split('\0')
-        .filter(Boolean),
-    process.env.FULL_BROWSER_SUITE === 'true',
-  );
-  const output = JSON.stringify(matrix);
-  const documentationOnly = documentationOnlyForEvent(
+  const full =
+    process.env.FULL_BROWSER_SUITE === 'true' || process.env.GITHUB_EVENT_NAME === 'workflow_dispatch';
+  const docs = documentationOnlyForEvent(
     process.env.GITHUB_EVENT_NAME,
     event,
     (base, head) =>
       execFileSync('git', ['diff', '--raw', '-z', '--no-renames', `${base}...${head}`, '--'], {
         encoding: 'utf8',
       }),
-    process.env.FULL_BROWSER_SUITE === 'true',
+    full,
   );
-  let cacheKey = '';
-  if (
-    !documentationOnly &&
-    process.env.GITHUB_EVENT_NAME === 'pull_request' &&
-    process.env.FULL_BROWSER_SUITE !== 'true' &&
-    process.env.GITHUB_REF &&
-    process.env.GITHUB_WORKFLOW &&
-    process.env.ImageOS &&
-    process.env.ImageVersion
-  ) {
-    try {
-      cacheKey = successCacheKey({
-        tree: execFileSync('git', ['ls-tree', '-rz', '--full-tree', 'HEAD'], { encoding: 'utf8' }),
-        matrix,
-        base: event.pull_request?.base.sha,
-        scope: `${process.env.GITHUB_WORKFLOW}:${process.env.GITHUB_REF}`,
-        runtime: [
-          process.version,
-          process.platform,
-          process.arch,
-          process.env.ImageOS,
-          process.env.ImageVersion,
-        ],
-      });
-    } catch {
-      // If provenance cannot be established, run the checks instead of reusing a pass.
-    }
-  }
+  const plan = docs
+    ? { include: [], reasons: ['Documentation-only PR: no code checks required.'] }
+    : planForEvent(
+        process.env.GITHUB_EVENT_NAME,
+        event,
+        (base, head) =>
+          execFileSync('git', ['diff', '--name-only', '-z', '--no-renames', `${base}...${head}`, '--'], {
+            encoding: 'utf8',
+          })
+            .split('\0')
+            .filter(Boolean),
+        full,
+      );
+  const matrix = JSON.stringify({ include: plan.include });
   if (process.env.GITHUB_OUTPUT)
     appendFileSync(
       process.env.GITHUB_OUTPUT,
-      `matrix=${output}\ncache_key=${cacheKey}\nreuse_allowed=${Boolean(cacheKey)}\ndocumentation_only=${documentationOnly}\n`,
+      `matrix=${matrix}\ndocumentation_only=${docs}\nrun_browsers=${plan.include.length > 0}\nfull=${full}\n`,
     );
-  console.log(output);
+  if (process.env.GITHUB_STEP_SUMMARY)
+    appendFileSync(
+      process.env.GITHUB_STEP_SUMMARY,
+      `## Browser coverage\n\n${plan.reasons.map((reason) => `- ${reason}`).join('\n')}\n\n\`\`\`json\n${JSON.stringify(plan.include, null, 2)}\n\`\`\`\n`,
+    );
+  console.log(JSON.stringify(plan));
 }

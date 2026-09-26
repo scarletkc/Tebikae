@@ -3,28 +3,79 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 concurrency:
   group: pages
   cancel-in-progress: false
 jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      reused: ${{ steps.probe.outputs.reused == 'true' }}
+      run_id: ${{ steps.find.outputs.run_id }}
+      run_attempt: ${{ steps.find.outputs.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: find
+        run: node scripts/ci-verified-build.mjs find
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        id: download
+        if: steps.find.outputs.artifact_id != ''
+        continue-on-error: true
+        with:
+          name: verified-browser-builds
+          run-id: ${{ steps.find.outputs.run_id }}
+          github-token: ${{ github.token }}
+          path: .artifacts/reuse
+      - id: probe
+        if: steps.download.outcome == 'success'
+        run: node scripts/ci-verified-build.mjs probe .artifacts/reuse
+        env:
+          VERIFIED_RUN_ID: ${{ steps.find.outputs.run_id }}
+          VERIFIED_RUN_ATTEMPT: ${{ steps.find.outputs.run_attempt }}
   verify:
+    needs: resolve
+    if: needs.resolve.outputs.reused != 'true'
     uses: ./.github/workflows/check.yml
     permissions:
       contents: read
     with:
       full: true
   deploy:
-    needs: verify
+    needs: [resolve, verify]
+    if: >-
+      always() && !cancelled() && needs.resolve.result == 'success' &&
+      ((needs.resolve.outputs.reused == 'true' && needs.verify.result == 'skipped') ||
+      (needs.resolve.outputs.reused != 'true' && needs.verify.result == 'success'))
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - uses: actions/download-artifact@v4
         with:
-          name: browser-builds
+          name: verified-browser-builds
+          run-id: ${{ needs.resolve.outputs.reused == 'true' && needs.resolve.outputs.run_id || github.run_id }}
+          github-token: ${{ github.token }}
+      - name: Verify deployment build
+        run: node scripts/ci-verified-build.mjs validate
+        env:
+          VERIFIED_RUN_ID: ${{ needs.resolve.outputs.reused == 'true' && needs.resolve.outputs.run_id || github.run_id }}
+          VERIFIED_RUN_ATTEMPT: ${{ needs.resolve.outputs.reused == 'true' && needs.resolve.outputs.run_attempt || github.run_attempt }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
