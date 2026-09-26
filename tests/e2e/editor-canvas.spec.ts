@@ -67,6 +67,7 @@ test('note menu, labels and color remain keyboard accessible on a small dark can
   await noteAction(page, 'Archive note');
   await closeDialog(page);
   await expect.poll(() => state.issues[0]!.state).toBe('closed');
-  expect(state.issues[0]!.labels.map((label) => label.name)).toContain('Personal');
-  expect(state.issues[0]!.body).toContain('"color":"blue"');
+  // Closing waits only for the local write; the remote update may land a moment later.
+  await expect.poll(() => state.issues[0]!.labels.map((label) => label.name)).toContain('Personal');
+  await expect.poll(() => state.issues[0]!.body).toContain('"color":"blue"');
 });

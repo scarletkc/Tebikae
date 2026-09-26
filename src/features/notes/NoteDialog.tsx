@@ -296,23 +296,18 @@ export default function NoteDialog({
     if (purging.current || purged.current || closing.current) return;
     closing.current = true;
     try {
-      let flushedVersion: number;
+      // Close only waits for the local write; the remote write stays queued so a slow
+      // or busy connection never blocks the close button.
       do {
         await editorFlush.current();
         await persist({ finalizeEmptyTitle: true });
-        flushedVersion = savedVersion.current;
-        if (idRef.current) {
-          try {
-            await engine?.flushNote(idRef.current);
-          } catch {
-            /* Keep the local draft and Outbox entry when the network is unavailable. */
-          }
-        }
-        // Input can arrive during the network request, including buffered Markdown.
-        await editorFlush.current();
         if (!rootRef.current) return;
-      } while (flushedVersion !== version.current);
-      if (idRef.current) engine?.setEditing(idRef.current, false);
+      } while (savedVersion.current !== version.current);
+      if (idRef.current) {
+        engine?.setEditing(idRef.current, false);
+        /* A failed write keeps the local draft and Outbox entry for a later retry. */
+        void engine?.flushNote(idRef.current).catch(() => {});
+      }
       if (direction) onNavigate(direction);
       else onClose();
     } catch {
@@ -695,7 +690,7 @@ export default function NoteDialog({
               </LabelContextMenu>
             ))}
           <details
-            className="note-label-picker relative text-xs open:basis-full"
+            className="note-label-picker relative text-xs open:basis-full first:-ms-2"
             onKeyDown={(event) => {
               if (event.key === 'Escape' && event.currentTarget.open && !event.defaultPrevented) {
                 event.preventDefault();
