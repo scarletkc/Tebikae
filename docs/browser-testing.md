@@ -66,4 +66,10 @@ pnpm test:e2e
 
 `pnpm test:e2e` 和 `pnpm test:pwa` 默认选择全部引擎。生产构建和 PWA 的运行方法见 [PWA 验收说明](testing-pwa.md)，定向测试与静态检查命令见[开发指南](development.md#检查)。
 
+E2E 的默认并发数和重试策略由 [playwright.config.ts](../playwright.config.ts) 中的 `workers` 和 `retries` 控制，本地并发数不随 CPU 核心数增长。需要调整并发或重复排查偶发失败时，可以覆盖运行参数：
+
+```sh
+pnpm test:e2e --project=chromium --workers=4 --repeat-each=3 --retries=0
+```
+
 浏览器自动化不能替代真机软键盘、中文输入法、iOS 独立 PWA 和系统存储回收验证。PWA 验收记录中的结果对应其注明的日期，不代表当前分支已通过检查。

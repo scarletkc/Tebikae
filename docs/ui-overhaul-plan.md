@@ -537,7 +537,7 @@ pnpm test
 pnpm check:hooks
 pnpm check:ui
 pnpm build                                   # CSS + JS 体积不应比上一版增加超过 10%
-pnpm test:e2e --project=chromium --workers=4  # 本机并发过高时会出现偶发超时，见“进度”中的已知问题
+pnpm test:e2e --project=chromium
 ```
 
 阶段 4e、4f 和 5 还需要运行 PWA 测试。**`/Tebikae/` 子路径的构建必须在 PowerShell 中执行**：Git Bash 会把 `/Tebikae/` 自动转换成 Windows 路径，导致构建产物错误。
