@@ -300,6 +300,18 @@ test('cleared title stays empty through body autosave and sync until close uses 
   const dialog = page.getByRole('dialog');
   const title = dialog.getByLabel('Title', { exact: true });
   const status = dialog.locator('.note-save-row').getByRole('status');
+  let releaseWrite!: () => void;
+  const writeGate = new Promise<void>((resolve) => {
+    releaseWrite = resolve;
+  });
+  let writeStarted = false;
+  await context.route('https://api.github.com/repos/scarletkc/Tebikae-dev/issues/1', async (route) => {
+    if (route.request().method() === 'PATCH') {
+      writeStarted = true;
+      await writeGate;
+    }
+    await route.fallback();
+  });
   await title.fill('');
   await page.locator('.ProseMirror[contenteditable="true"]').fill('Updated body with an empty title.');
   await expect(status).toHaveText(/Saved to this device|Waiting to sync|Synced to GitHub/);
@@ -307,12 +319,19 @@ test('cleared title stays empty through body autosave and sync until close uses 
   await expect(page.locator('.note-card').filter({ hasText: 'Weekend ideas' })).toHaveCount(1);
   await expect(page.locator('.note-card').filter({ hasText: 'Untitled note' })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Sync now', exact: true }).click();
+  try {
+    await expect.poll(() => writeStarted).toBe(true);
+    expect(remote.issues[0]!.body).not.toContain('Updated body with an empty title.');
+    await expect(status).not.toContainText('Synced to GitHub');
+  } finally {
+    releaseWrite();
+  }
+  // A previous revision can still say "Synced" when a new save starts.
+  // Wait for this edit at the remote before checking the final UI state.
+  await expect.poll(() => remote.issues[0]!.body).toContain('Updated body with an empty title.');
   await expect(status).toContainText('Synced to GitHub');
   await expect(title).toHaveValue('');
   expect(remote.issues[0]!.title).toBe('Weekend ideas');
-  // The status line flips to "Synced" when the write completes locally; the mocked
-  // remote state can lag one write behind under load, so poll instead of asserting once (#23).
-  await expect.poll(() => remote.issues[0]!.body).toContain('Updated body with an empty title.');
   await closeDialog(page);
   await expect(page.getByRole('button', { name: 'Edit note: Untitled note', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Refresh', exact: true }).click();
