@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Upload } from 'lucide-react';
-import { Banner, Button, Checkbox, CheckboxLabel, Dialog } from '../../ui';
+import { Banner, Button, Checkbox, CheckboxLabel, Dialog, FileInput } from '../../ui';
 import { useSession, flushAllDrafts } from '../../app/session';
 import { BackupImportError, IMPORT_MAX_BYTES, parseBackup } from '../../domain/backup-import';
 import { classify } from '../../domain/codec';
@@ -111,7 +111,7 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
     >
       <div className="backup-import-body" aria-busy={busy}>
         <p>{t('backupImport.help')}</p>
-        <p className="field-help mt-2.5 mb-5 text-xs leading-[1.8] text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-[3px]">
+        <p className="field-help mt-2.5 mb-5 text-xs leading-relaxed text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-1">
           {t('backupImport.coverage')}
         </p>
         {!session.writable && (
@@ -122,10 +122,8 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
         {!result && (
           <label className="backup-import-file my-5 grid gap-2 text-sm font-medium">
             <span>{t('backupImport.file')}</span>
-            <input
-              type="file"
+            <FileInput
               accept=".json,application/json"
-              className="w-full max-w-full cursor-pointer rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm text-fg file:me-3 file:rounded-md file:border-0 file:bg-hover file:px-3 file:py-1 file:text-xs file:font-medium file:text-fg"
               disabled={busy}
               onChange={(event) => {
                 const file = event.target.files?.[0];
@@ -136,7 +134,7 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
           </label>
         )}
         {filename && (
-          <p className="field-help mt-2.5 mb-5 text-xs leading-[1.8] text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-[3px] backup-import-filename [overflow-wrap:anywhere]">
+          <p className="field-help mt-2.5 mb-5 text-xs leading-relaxed text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-1 backup-import-filename [overflow-wrap:anywhere]">
             {filename}
           </p>
         )}
@@ -213,11 +211,11 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                         {row.document.title || t('home.untitled')}
                       </span>
                     </CheckboxLabel>
-                    <p className="field-help my-1 ms-[23px] text-xs leading-[1.8] text-muted">
+                    <p className="field-help my-1 ms-6 text-xs leading-relaxed text-muted">
                       {t(`nav.${classify(row.document)}`)}
                       {row.duplicate ? ` · ${t('backupImport.duplicate')}` : ''}
                     </p>
-                    <p className="backup-import-excerpt ms-[23px] mt-1 text-xs whitespace-pre-wrap text-muted [overflow-wrap:anywhere]">
+                    <p className="backup-import-excerpt ms-6 mt-1 text-xs whitespace-pre-wrap text-muted [overflow-wrap:anywhere]">
                       {row.document.markdown.slice(0, 180)}
                     </p>
                   </li>
@@ -252,7 +250,7 @@ export default function BackupImportDialog({ onClose }: { onClose(): void }) {
                   </CheckboxLabel>
                 </Banner>
               )}
-              <p className="field-help mt-2.5 mb-5 text-xs leading-[1.8] text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-[3px]">
+              <p className="field-help mt-2.5 mb-5 text-xs leading-relaxed text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-1">
                 {t('backupImport.trashHelp')}
               </p>
               <Button

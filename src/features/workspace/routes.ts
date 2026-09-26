@@ -12,6 +12,9 @@ export function parseRoute(pathname: string) {
 /** Routes that show the note list together with its sort, view, filter and new-note controls. */
 export const isNoteListRoute = (route: string) => route !== 'settings' && route !== 'issues';
 
+/** Routes whose topbar shows the search field: the note lists and the existing-Issues list. */
+export const hasSearch = (route: string) => route !== 'settings';
+
 /** Unmanaged issues whose title, body or label names contain the query (case-insensitive). */
 export function filterIssues(issues: UnmanagedIssue[], query: string) {
   const needle = query.toLowerCase();

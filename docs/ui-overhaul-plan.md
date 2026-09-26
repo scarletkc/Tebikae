@@ -56,6 +56,18 @@
 - 欢迎页：宽屏下表单放进卡片，页面底色改为 `sidebar`。
 - 关闭编辑器只等待本地写入，远端写入在后台排队（与[产品架构](github-issues-notes-product-architecture.md)第 172 行一致）。之前要等 GitHub 请求返回，期间再点关闭会被忽略。
 
+### 组件使用门禁（2026-09-26）
+
+阶段完成后，界面上仍有“同一种控件两种长相”：设置页的语言是下拉菜单、主题却是原生 `<select>`；“断开 GitHub 连接”按钮旁边是一个绿色链接样式的“关闭”；编辑器工具栏的“文字样式”也是原生 `<select>`，整个工具栏另有一套 `editor.css` 按钮样式。原因是组件库只提供了零件，没有东西阻止功能代码绕开它。这一轮做了两件事：
+
+- **门禁**：新增 ESLint 插件 `scripts/eslint-plugin-ui.mjs`，随 `pnpm lint` 在本地和 CI 运行，规则见 3.7。
+- **修复**：清掉门禁报出的全部问题。
+  - 组件库新增 `Select`（唯一的单选控件，基于菜单，取代原生 `<select>`）、`Menu` 系列、`ConfirmDialog`、`Toolbar`、`FileInput`、`ColorInput`，`Input`/`Textarea` 增加 `variant="bare"`，`IconButton` 支持 `asChild` 和 `accent` 变体。`buttonVariants`、`iconButtonVariants`、`controlClass`、`dialogContentClass` 等内部类名不再导出。`menu.ts` 改名为 `menuClasses.ts`（Windows 下与 `Menu.tsx` 只差大小写，会冲突）。
+  - 设置页：主题与语言使用同一个 `Select`；“你的仓库”全部改为 `SettingRow`，“关闭”改为独立的“关闭笔记本”一行并附说明；“查看源代码”也改为一行。设置页的顶栏不再显示“搜索笔记”，改为显示页面标题，页面内不再重复标题；设置页按 Ctrl+K 不再拦截。
+  - 编辑器：工具栏、模式切换、表格操作、链接表单、代码语言输入框和源码输入框全部改用组件库；“文字样式”改为菜单。`editor.css` 删去这些外框样式（764 → 423 行），只保留正文排版和代码块节点视图。
+  - 其他：同步状态面板、笔记“更多”菜单、侧栏的设置入口和标签多选按钮、筛选对话框的两个下拉、导入备份的文件选择、新建标签的颜色选择、Issue 标题字号、卡片 Markdown 预览里的勾选框（原来是 `✓` 字符）都改用组件库或令牌；提示条里“链接 + 普通按钮”的组合改为 `ghost` 按钮。
+  - 修改了测试的操作方式（断言不变）：主题和“文字样式”从 `selectOption` 改为点开菜单再选；PWA 强制更新后停在设置页，“工作区已恢复”的判断从“能看到搜索框”改为“能看到设置页”。
+
 基线时已存在、与本改造无关的问题（不要当成自己引入的回归）：
 
 - 截图场景 `label-menu` 在两个手机项目中失败。
@@ -72,7 +84,7 @@
 3. **不许删除或改名 JSX 中已有的 `className`**，除非这个元素本身被删除（第 4 节的装饰元素）。E2E 测试通过约 70 个类名定位元素，这些类名要作为“钩子”保留，写法是 `className={cn('note-card', '…新的 Tailwind 类…')}`。每个 PR 都要运行 `pnpm check:hooks`。
 4. **不许为了让测试通过而修改测试的预期行为。** 只有阶段说明中明确写了“允许修改测试”时才可以改，并且只能按说明的方式改。
 5. **用户可见文案**必须同时修改 `src/i18n/locales/en.json` 和 `src/i18n/locales/zh-CN.json`（编辑器文案在 `src/i18n/editor-*.json`）。删除 key 前，先在 `src/` 中搜索，确认没有其他引用。
-6. **颜色只能用令牌**（第 3.3 节）。TSX 和 CSS 中不许出现 `#xxxxxx`、`rgb()`，`pnpm check:ui` 会拦截。
+6. **颜色只能用令牌**（第 3.3 节）。TSX 和 CSS 中不许出现 `#xxxxxx`、`rgb()`，`pnpm check:ui` 会拦截。**控件只能用组件库**，`pnpm lint` 的 `ui/*` 规则会拦截（第 3.7 节）。
 7. **不要拼接 Tailwind 类名**，例如 `` `bg-${color}` ``。需要按值切换时，写一个映射对象，列出完整类名。
 8. **CSP 不能放宽**：不加内联 `<script>`，不从外部加载字体、脚本或样式。
 9. **不许新增 CSS 文件，也不许往 `legacy.css` 里加规则**，`pnpm check:ui` 会拦截。新样式一律用 Tailwind 类或 `src/ui` 组件。每删掉一批旧规则，就把 `scripts/check-ui-rules.mjs` 中的 `LEGACY_MAX_LINES` 调低到新的行数；删掉一个 CSS 文件，就把它从 `ALLOWED_CSS` 中移除。
@@ -163,13 +175,14 @@
 | `src/styles/theme.css`                       | **全部令牌**：颜色（浅色和深色）、字体、断点、阴影、动画关键帧，以及 `html`、`mark` 的基础样式。唯一允许出现原始颜色的样式文件                                                  |
 | `src/styles/app.css`                         | 入口：`@import 'tailwindcss'`、`theme.css`，再以 `layer(legacy)` 导入 `legacy.css`                                                                                              |
 | `src/styles/legacy.css`                      | 待迁移的旧样式，只许删减。它位于 `legacy` 层，**任何 Tailwind utility 都能覆盖它**                                                                                              |
-| `src/features/editor/editor.css`             | ProseMirror 正文排版（允许长期保留，但只能使用令牌）                                                                                                                            |
+| `src/features/editor/editor.css`             | ProseMirror 正文排版、代码块节点视图和卡片 Markdown 预览（允许长期保留，但只能使用令牌）。工具栏、按钮、输入框等外框一律用组件库，不写在这里                                    |
 | `src/features/notes/notes.css`、`labels.css` | 待迁移的旧样式，已包在 `@layer legacy { … }` 中                                                                                                                                 |
-| `src/ui/`                                    | 组件库，见 3.5。统一从 `src/ui/index.ts` 导入                                                                                                                                   |
+| `src/ui/`                                    | 组件库，见 3.5。**只能**从 `src/ui/index.ts` 导入（门禁 `ui/kit-imports`）                                                                                                      |
 | `src/ui/Gallery.tsx`                         | 仅开发环境可见的组件预览页，地址 `/#/__ui`。新增组件或变体时要同步加进去                                                                                                        |
 | `src/features/workspace/`                    | 工作区。**状态和操作都放在 `useWorkspaceController.ts`**，组件通过 `useWorkspace()` 读取；路由判断用 `routes.ts` 的 `isNoteListRoute()`；布局测量逻辑在 `useWorkspaceLayout.ts` |
 | `scripts/check-test-hooks.mjs`               | 检查测试依赖的类名是否仍存在于 `src/`（`pnpm check:hooks`）                                                                                                                     |
 | `scripts/check-ui-rules.mjs`                 | 检查本节规范（`pnpm check:ui`）：原始颜色、旧按钮类名、小于 12px 的字号、新增 CSS 文件、`legacy.css` 行数上限、行内 z-index                                                     |
+| `scripts/eslint-plugin-ui.mjs`               | 组件使用门禁（`pnpm lint`），规则见 3.7                                                                                                                                         |
 
 ### 3.3 颜色令牌
 
@@ -268,6 +281,16 @@ if (await confirmDialog({ title, confirmLabel, danger: true })) …
   {(id, describedBy) => <Input id={id} aria-describedby={describedBy} />}
 </Field>
 <CheckboxLabel><Checkbox checked={v} onChange={…} /> {t('…')}</CheckboxLabel>
+<Input variant="bare" className="text-2xl …" />            // 无边框的就地输入：搜索框、笔记标题、源码
+<FileInput accept=".json" />  <ColorInput value={hex} />
+
+// 单选（主题、语言、排序、筛选条件……）：唯一的写法，没有原生 <select>
+<Select id="theme-setting" label={t('settings.theme')} value={theme} onChange={setTheme}
+  options={[{ value: 'light', label: t('settings.light'), icon: Sun }, …]} />
+<Select icon={<ArrowUpDown />} size="sm" … />                // 紧凑工具栏：只显示图标
+
+// 工具条（编辑器格式按钮）
+<Toolbar aria-label={t('editor.toolbar')}><IconButton size="sm" …/><ToolbarDivider /></Toolbar>
 
 // 提示条：tone = info | warning | danger | success
 <Banner tone="warning" className="banner warning"><TriangleAlert /> …</Banner>
@@ -280,27 +303,29 @@ if (await confirmDialog({ title, confirmLabel, danger: true })) …
 <Spinner />
 ```
 
-**菜单**：菜单不做成组件，直接在 Radix 各部件上使用 `src/ui/menu.ts` 中的类名常量：
+**菜单**：用组件库的 `Menu` 系列，触发器永远是 `Button` 或 `IconButton`：
 
 ```tsx
-<DropdownMenu.Content className={cn('my-hook', menuContent)}>
-  <DropdownMenu.Item className={menuItem}>
-    <Pin /> …
-  </DropdownMenu.Item>
-  <DropdownMenu.Item className={cn(menuItem, menuItemDanger)}>
-    <Trash2 /> …
-  </DropdownMenu.Item>
-  <DropdownMenu.Separator className={menuSeparator} />
-  <DropdownMenu.Label className={menuLabel}>…</DropdownMenu.Label>
-  {/* 单选列表（排序、语言）：右侧勾号 */}
-  <DropdownMenu.RadioItem className={menuRadioItem}>
-    …{' '}
-    <DropdownMenu.ItemIndicator className={menuIndicator}>
-      <Check />
-    </DropdownMenu.ItemIndicator>
-  </DropdownMenu.RadioItem>
-</DropdownMenu.Content>
+<Menu>
+  <MenuTrigger>
+    <IconButton label={t('context.more')}><MoreHorizontal /></IconButton>
+  </MenuTrigger>
+  <MenuContent className="my-hook" align="end">
+    <MenuItem onSelect={pin}><Pin /> …</MenuItem>
+    <MenuItem danger onSelect={purge}><Trash2 /> …</MenuItem>
+    <MenuSeparator />
+    <MenuLabel>…</MenuLabel>
+    {/* 单选列表：右侧勾号。只是选一个值时直接用 <Select> */}
+    <MenuRadioGroup value={v} onValueChange={setV}>
+      <MenuRadioItem value="a">…</MenuRadioItem>
+    </MenuRadioGroup>
+  </MenuContent>
+</Menu>
+<MenuContent panel>…<MenuButtonItem onSelect={…}>…</MenuButtonItem></MenuContent>  // 信息面板（同步状态）
+<MenuSwatchItem value="yellow" className="bg-card-yellow" aria-label=… />          // 颜色圆点
 ```
+
+`menuClasses.ts` 中的类名常量只给组件库和 `src/app/ContextMenu.tsx`（右键菜单构建器）使用，功能代码不能直接用。
 
 - **可多选项**（CheckboxItem，例如右键菜单里的标签和颜色）：选中时加粗并加下划线，部分选中时用虚线下划线，**不显示勾号**。这是 [右键菜单设计](context-menus.md) 的约定，E2E 测试会断言。
 - **单选项**（RadioItem）：选中时显示右侧勾号。
@@ -315,6 +340,24 @@ if (await confirmDialog({ title, confirmLabel, danger: true })) …
 4. `ContextMenu` 的外层是 `display: contents`（`contents` 类）。调用方需要其他布局时，通过 `className` 传入，例如 `className="context-card relative block"`、`className="view-toggle flex"`。
 5. 新增自定义尺寸类名（例如新阴影 `shadow-xxx`）时，要在 `src/ui/cn.ts` 的 `extendTailwindMerge` 中登记，否则 `cn()` 可能把它误判为颜色并错误合并。
 6. 删除规则后，把 `scripts/check-ui-rules.mjs` 中的 `LEGACY_MAX_LINES` 改为 `wc -l src/styles/legacy.css` 的新结果。
+
+### 3.7 组件使用门禁（`pnpm lint`）
+
+`scripts/eslint-plugin-ui.mjs` 对 `src/` 下的 TS/TSX 生效，报错会阻止 CI 通过，编辑器里也会直接标红。规则针对的是已经出现过的问题：
+
+| 规则                        | 禁止                                                                                                                                                                                                                     | 改为                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `ui/no-native-controls`     | `src/ui` 以外出现 `<input>`、`<select>`、`<textarea>`                                                                                                                                                                    | `Input`、`Textarea`、`Select`、`Checkbox`、`FileInput`、`ColorInput`                  |
+| `ui/kit-imports`            | 从 `src/ui/Button` 等内部文件导入；在别的模块转出或另起名字导出组件（例如原来 `app/ui.tsx` 转出的 `IconButton`）；功能代码使用 `menuClasses.ts` 的类名；`src/ui` 和 `src/app/ContextMenu.tsx` 以外导入 `@radix-ui/*`     | 从 `src/ui` 导入组件；菜单用 `Menu` 系列，对话框用 `Dialog`、`Sheet`、`ConfirmDialog` |
+| `ui/theme-tokens`           | 颜色、字号、字重、行高、字距、圆角、阴影、z-index、透明度、模糊使用任意值（`text-[25px]`、`rounded-[10px]`、`leading-[1.8]`、`shadow-[…]`、`bg-[#fff]`）；在组件库以外用 `!` 强制覆盖组件样式；行内 `style` 设置这些属性 | 令牌类；组件需要新外观时给组件加变体（例如 `IconButton variant="accent"`）            |
+| `ui/consistent-actions`     | 同一行里把 `variant="link"` 的按钮和普通按钮放在一起                                                                                                                                                                     | 次要操作用 `variant="ghost"`，或整行都用链接样式                                      |
+| `ui/require-disable-reason` | 不写原因地关闭 `ui/*` 规则                                                                                                                                                                                               | `// eslint-disable-next-line ui/… -- 原因`                                            |
+
+说明：
+
+- 用户数据决定的颜色（标签颜色）通过 CSS 自定义属性传递，例如 `style={{ '--swatch': color }}` 加 `bg-(--swatch)`；由令牌推导的任意值（`bg-[color-mix(…var(--surface))]`）允许。
+- 间距、尺寸和断点的任意值暂不检查：网格和顶栏的 JS 布局测量依赖现有像素值（`useWorkspaceLayout.ts`），要改须单独立项并跑 `topbar-layout.spec.ts`。
+- 真正需要例外时用带原因的 `eslint-disable`，评审时逐条确认。不要把新例外加进插件的白名单。
 
 ---
 

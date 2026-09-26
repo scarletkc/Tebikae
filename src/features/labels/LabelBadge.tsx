@@ -17,7 +17,7 @@ export function LabelDot({ color, muted = false }: { color?: string; muted?: boo
     <span
       aria-hidden="true"
       className={cn(
-        'label-dot inline-block size-2.5 shrink-0 rounded-full bg-[var(--label-color,var(--muted))] shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--text)_18%,transparent)]',
+        'label-dot inline-block size-2.5 shrink-0 rounded-full bg-[var(--label-color,var(--muted))] inset-ring inset-ring-[color-mix(in_srgb,var(--text)_18%,transparent)]',
         (muted || !hex) && 'is-fallback bg-[color-mix(in_srgb,var(--muted)_70%,transparent)]',
       )}
       style={labelStyle(color)}

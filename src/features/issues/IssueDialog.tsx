@@ -26,7 +26,7 @@ export default function IssueDialog({
   return (
     <Dialog title={t('home.readIssue')} onClose={onClose} size="lg" className="issue-dialog">
       <div className="issue-content">
-        <h2 className="mb-5 text-[25px]">{issue.snapshot.title}</h2>
+        <h2 className="mb-5 text-2xl leading-tight font-semibold wrap-anywhere">{issue.snapshot.title}</h2>
         {issue.status !== 'unmanaged' && (
           <Banner tone="warning" className="banner warning mb-4">
             {t(`home.${issue.status}`)}

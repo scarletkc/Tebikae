@@ -106,6 +106,52 @@ test('editor-menu', async ({ page, openEditor, text, capture }) => {
   await capture();
 });
 
+test('editor-tools', async ({ page, openEditor, text, capture }) => {
+  const editor = await openEditor();
+  await editor.locator('p').first().click();
+  await page.getByRole('button', { name: text('Text style', '文字样式'), exact: true }).click();
+  await expect(
+    page.getByRole('menuitem', { name: text('Heading 2', '2 级标题'), exact: true }),
+  ).toBeVisible();
+  await capture('editor-text-style');
+  await page.keyboard.press('Escape');
+  await page
+    .getByRole('button', { name: text('More formatting options', '更多格式选项'), exact: true })
+    .click();
+  await page.locator('.editor-table-actions summary').click();
+  await expect(
+    page.getByRole('button', { name: text('Delete table', '删除表格'), exact: true }),
+  ).toBeVisible();
+  await capture('editor-more-tools');
+  await page.locator('.editor-table-actions summary').click();
+  await page
+    .getByRole('button', { name: text('Insert or edit link', '插入或修改链接'), exact: true })
+    .click();
+  await page.getByLabel(text('Link address', '链接地址'), { exact: true }).fill('javascript:alert(1)');
+  await page.getByRole('button', { name: text('Apply link', '应用链接'), exact: true }).click();
+  await expect(page.getByRole('alert')).toBeVisible();
+  await capture('editor-link-form');
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: text('More actions', '更多操作'), exact: true })
+    .click();
+  await expect(page.locator('.note-actions-menu')).toBeVisible();
+  await capture('note-actions-menu');
+});
+
+test('filters-and-status', async ({ page, openApp, text, capture }) => {
+  await openApp();
+  await page.locator('.filter-open-button').click();
+  await page.getByRole('button', { name: text('Pinned', '置顶'), exact: true }).click();
+  await expect(page.getByRole('menuitemradio').first()).toBeVisible();
+  await capture('filters-select-open');
+  await page.keyboard.press('Escape');
+  await page.getByRole('dialog').locator('.dialog-header button').click();
+  await page.locator('.workspace-status').click();
+  await expect(page.locator('.workspace-status-menu')).toBeVisible();
+  await capture('status-panel');
+});
+
 test('editor-table', async ({ page, openEditor, text, capture }) => {
   const editor = await openEditor();
   await editor.locator('td').first().click({ button: 'right' });
@@ -122,6 +168,25 @@ test('label-menu', async ({ page, openApp, text, capture }) => {
   await navigation.locator('.label-nav-row').first().getByRole('button').first().click({ button: 'right' });
   await expect(page.getByRole('menuitem', { name: text('Rename', '重命名'), exact: true })).toBeVisible();
   await capture();
+});
+
+test('settings', async ({ page, openApp, text, capture }) => {
+  await openApp();
+  await page.goto('/#/settings');
+  await expect(page.locator('.settings-page')).toBeVisible();
+  // Settings has no note search: the topbar shows the page title.
+  await expect(
+    page.locator('.app-topbar').getByRole('heading', { name: text('Settings', '设置') }),
+  ).toBeVisible();
+  await expect(page.locator('.search-box')).toHaveCount(0);
+  await capture('settings-top');
+  await page.locator('#language-setting').click();
+  await expect(page.getByRole('menuitemradio', { name: 'English', exact: true })).toBeVisible();
+  await capture('settings-language-open');
+  await page.keyboard.press('Escape');
+  await page.locator('#theme-setting').click();
+  await expect(page.getByRole('menuitemradio', { name: text('Follow system', '跟随系统') })).toBeVisible();
+  await capture('settings-theme-open');
 });
 
 test('settings-update', async ({ page, openApp, text, capture }) => {

@@ -1,5 +1,4 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
   Archive,
@@ -15,7 +14,6 @@ import {
   Trash2,
   RefreshCw,
   X,
-  Check,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -35,7 +33,7 @@ import {
   exportMarkdown,
 } from '../../application/commands';
 import { useSession, registerDraftFlusher } from '../../app/session';
-import { IconButton, download } from '../../app/ui';
+import { download } from '../../app/ui';
 import { noteColorBg, editorTint } from './cardColor';
 import {
   Banner,
@@ -44,11 +42,16 @@ import {
   Checkbox,
   CheckboxLabel,
   cn,
-  iconButtonVariants,
-  menuContent,
-  menuItem,
-  menuLabel,
-  menuSeparator,
+  IconButton,
+  Input,
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuLabel,
+  MenuRadioGroup,
+  MenuSeparator,
+  MenuSwatchItem,
+  MenuTrigger,
   Spinner,
 } from '../../ui';
 import { db } from '../../storage/db';
@@ -470,7 +473,8 @@ export default function NoteDialog({
         'max-md:h-dvh max-md:w-full max-md:rounded-none max-md:border-0',
         'max-md:pt-[env(safe-area-inset-top)] max-md:pb-[env(safe-area-inset-bottom)]',
         'md:h-[calc(100dvh-48px)] md:w-[min(1040px,calc(100vw-80px))] md:rounded-2xl md:border md:border-line md:shadow-dialog',
-        'max-md:[&_.icon-button]:min-h-11 max-md:[&_.icon-button]:min-w-11',
+        // Touch targets for the dialog's own buttons; editor tools size themselves (MarkdownEditor).
+        'max-md:[&_.icon-button:not(.editor-tool)]:min-h-11 max-md:[&_.icon-button:not(.editor-tool)]:min-w-11',
       )}
       role="dialog"
       aria-modal="true"
@@ -510,162 +514,139 @@ export default function NoteDialog({
             <RefreshCw size={17} />
           </IconButton>
         </div>
-        <DropdownMenu.Root modal={false}>
-          <DropdownMenu.Trigger
-            ref={noteMenuTrigger}
-            className={cn('icon-button', iconButtonVariants(), 'data-[state=open]:bg-active')}
-            aria-label={t('context.more')}
-            title={t('context.more')}
+        <Menu modal={false}>
+          <MenuTrigger>
+            <IconButton ref={noteMenuTrigger} label={t('context.more')}>
+              <MoreHorizontal size={20} />
+            </IconButton>
+          </MenuTrigger>
+          <MenuContent
+            className="note-actions-menu z-80 min-w-52 max-w-[calc(100vw-24px)]"
+            align="end"
+            sideOffset={8}
+            collisionPadding={12}
+            loop
+            onCloseAutoFocus={(event) => {
+              if (isConfirmDialogOpen()) event.preventDefault();
+            }}
           >
-            <MoreHorizontal size={20} />
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Portal>
-            <DropdownMenu.Content
-              className={cn('note-actions-menu', menuContent, 'z-80 min-w-52 max-w-[calc(100vw-24px)]')}
-              align="end"
-              sideOffset={8}
-              collisionPadding={12}
-              loop
-              onCloseAutoFocus={(event) => {
-                if (isConfirmDialogOpen()) event.preventDefault();
-              }}
+            {document.meta.trashedAt ? (
+              <>
+                <NoteAction
+                  label={t('action.restore')}
+                  disabled={!writable || deleting || !!latest?.purgeStartedAt}
+                  onClick={() => change((d) => ({ ...d, meta: { ...d.meta, trashedAt: null } }))}
+                >
+                  <RotateCcw size={18} />
+                </NoteAction>
+                <NoteAction
+                  label={t(deleting ? 'note.deleting' : 'action.deleteForever')}
+                  disabled={
+                    !engine ||
+                    !writable ||
+                    !online ||
+                    deleting ||
+                    !localId ||
+                    !!latest?.duplicate ||
+                    !!latest?.remoteUnavailable
+                  }
+                  onClick={() => {
+                    noteMenuTrigger.current?.focus();
+                    void purge();
+                  }}
+                >
+                  <Trash2 size={18} />
+                </NoteAction>
+              </>
+            ) : (
+              <>
+                <NoteAction
+                  label={t(document.meta.pinned ? 'action.unpin' : 'action.pin')}
+                  className={document.meta.pinned ? 'is-pinned' : undefined}
+                  disabled={readOnly}
+                  onClick={() => change((d) => ({ ...d, meta: { ...d.meta, pinned: !d.meta.pinned } }))}
+                >
+                  <Pin size={18} />
+                </NoteAction>
+                <NoteAction
+                  label={t(document.archived ? 'action.unarchive' : 'action.archive')}
+                  disabled={readOnly}
+                  onClick={() => change((d) => ({ ...d, archived: !d.archived }))}
+                >
+                  {document.archived ? <ArchiveRestore size={18} /> : <Archive size={18} />}
+                </NoteAction>
+                <NoteAction
+                  label={t('action.trash')}
+                  disabled={readOnly}
+                  onClick={() =>
+                    change((d) => ({ ...d, meta: { ...d.meta, trashedAt: new Date().toISOString() } }))
+                  }
+                >
+                  <Trash2 size={18} />
+                </NoteAction>
+              </>
+            )}
+            <NoteAction label={t('action.exportNote')} onClick={exportCurrent}>
+              <Download size={18} />
+            </NoteAction>
+            {issueUrl && safeHref(issueUrl) && (
+              <MenuItem asChild className="note-action">
+                <a
+                  href={safeHref(issueUrl)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={t('action.openGithub')}
+                  title={t('action.openGithub')}
+                >
+                  <ExternalLink size={18} />
+                  <span>{t('action.openGithub')}</span>
+                </a>
+              </MenuItem>
+            )}
+            {latest && !latest.issueId && latest.syncStatus !== 'uncertain' && (
+              <NoteAction
+                label={t('action.discard')}
+                disabled={!writable || saving}
+                onClick={() => {
+                  clearTimeout(localTimer.current);
+                  void persistence.current
+                    .then(() => discardDraft(scope, localId!))
+                    .then(onClose)
+                    .catch(() => setSaveError('generic'));
+                }}
+              />
+            )}
+            <MenuSeparator className="note-menu-separator" />
+            <MenuLabel className="note-menu-caption">{t('note.color')}</MenuLabel>
+            <MenuRadioGroup
+              className="note-color-options flex gap-1.5 px-2 pt-1 pb-2"
+              value={document.meta.color}
+              onValueChange={(color) =>
+                change((d) => ({
+                  ...d,
+                  meta: { ...d.meta, color: color as NoteDocument['meta']['color'] },
+                }))
+              }
             >
-              {document.meta.trashedAt ? (
-                <>
-                  <NoteAction
-                    label={t('action.restore')}
-                    disabled={!writable || deleting || !!latest?.purgeStartedAt}
-                    onClick={() => change((d) => ({ ...d, meta: { ...d.meta, trashedAt: null } }))}
-                  >
-                    <RotateCcw size={18} />
-                  </NoteAction>
-                  <NoteAction
-                    label={t(deleting ? 'note.deleting' : 'action.deleteForever')}
-                    disabled={
-                      !engine ||
-                      !writable ||
-                      !online ||
-                      deleting ||
-                      !localId ||
-                      !!latest?.duplicate ||
-                      !!latest?.remoteUnavailable
-                    }
-                    onClick={() => {
-                      noteMenuTrigger.current?.focus();
-                      void purge();
-                    }}
-                  >
-                    <Trash2 size={18} />
-                  </NoteAction>
-                </>
-              ) : (
-                <>
-                  <NoteAction
-                    label={t(document.meta.pinned ? 'action.unpin' : 'action.pin')}
-                    className={document.meta.pinned ? 'is-pinned' : undefined}
-                    disabled={readOnly}
-                    onClick={() => change((d) => ({ ...d, meta: { ...d.meta, pinned: !d.meta.pinned } }))}
-                  >
-                    <Pin size={18} />
-                  </NoteAction>
-                  <NoteAction
-                    label={t(document.archived ? 'action.unarchive' : 'action.archive')}
-                    disabled={readOnly}
-                    onClick={() => change((d) => ({ ...d, archived: !d.archived }))}
-                  >
-                    {document.archived ? <ArchiveRestore size={18} /> : <Archive size={18} />}
-                  </NoteAction>
-                  <NoteAction
-                    label={t('action.trash')}
-                    disabled={readOnly}
-                    onClick={() =>
-                      change((d) => ({ ...d, meta: { ...d.meta, trashedAt: new Date().toISOString() } }))
-                    }
-                  >
-                    <Trash2 size={18} />
-                  </NoteAction>
-                </>
-              )}
-              <NoteAction label={t('action.exportNote')} onClick={exportCurrent}>
-                <Download size={18} />
-              </NoteAction>
-              {issueUrl && safeHref(issueUrl) && (
-                <DropdownMenu.Item asChild>
-                  <a
-                    className={cn('note-action', menuItem)}
-                    href={safeHref(issueUrl)!}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={t('action.openGithub')}
-                    title={t('action.openGithub')}
-                  >
-                    <ExternalLink size={18} />
-                    <span>{t('action.openGithub')}</span>
-                  </a>
-                </DropdownMenu.Item>
-              )}
-              {latest && !latest.issueId && latest.syncStatus !== 'uncertain' && (
-                <DropdownMenu.Item asChild>
-                  <button
-                    className={cn('note-action', menuItem)}
-                    disabled={!writable || saving}
-                    onClick={() => {
-                      clearTimeout(localTimer.current);
-                      void persistence.current
-                        .then(() => discardDraft(scope, localId!))
-                        .then(onClose)
-                        .catch(() => setSaveError('generic'));
-                    }}
-                  >
-                    {t('action.discard')}
-                  </button>
-                </DropdownMenu.Item>
-              )}
-              <DropdownMenu.Separator className={cn('note-menu-separator', menuSeparator)} />
-              <DropdownMenu.Label className={cn('note-menu-caption', menuLabel)}>
-                {t('note.color')}
-              </DropdownMenu.Label>
-              <DropdownMenu.RadioGroup
-                className="note-color-options flex gap-1.5 px-2 pt-1 pb-2"
-                value={document.meta.color}
-                onValueChange={(color) =>
-                  change((d) => ({
-                    ...d,
-                    meta: { ...d.meta, color: color as NoteDocument['meta']['color'] },
-                  }))
-                }
-              >
-                {NOTE_COLORS.map((color) => (
-                  <DropdownMenu.RadioItem
-                    key={color}
-                    value={color}
-                    disabled={readOnly}
-                    className={cn(
-                      'note-color-option',
-                      `note-${color}`,
-                      noteColorBg[color],
-                      'grid size-7 cursor-pointer place-items-center rounded-full border border-line text-fg outline-none',
-                      'data-[highlighted]:outline-2 data-[highlighted]:outline-offset-2 data-[highlighted]:outline-accent',
-                      'data-[state=checked]:outline-2 data-[state=checked]:outline-offset-2 data-[state=checked]:outline-accent',
-                      'data-[disabled]:cursor-default data-[disabled]:opacity-40',
-                    )}
-                    aria-label={t(`color.${color}`)}
-                    title={t(`color.${color}`)}
-                  >
-                    <DropdownMenu.ItemIndicator>
-                      <Check size={14} aria-hidden="true" />
-                    </DropdownMenu.ItemIndicator>
-                  </DropdownMenu.RadioItem>
-                ))}
-              </DropdownMenu.RadioGroup>
-            </DropdownMenu.Content>
-          </DropdownMenu.Portal>
-        </DropdownMenu.Root>
+              {NOTE_COLORS.map((color) => (
+                <MenuSwatchItem
+                  key={color}
+                  value={color}
+                  disabled={readOnly}
+                  className={cn('note-color-option', `note-${color}`, noteColorBg[color])}
+                  aria-label={t(`color.${color}`)}
+                  title={t(`color.${color}`)}
+                />
+              ))}
+            </MenuRadioGroup>
+          </MenuContent>
+        </Menu>
       </header>
       <div className="note-dialog-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-[max(36px,calc((100%-720px)/2))] pt-7 pb-16 [scrollbar-gutter:stable] max-md:[scrollbar-gutter:auto] max-md:pt-5 max-md:pr-[max(22px,env(safe-area-inset-right))] max-md:pb-12 max-md:pl-[max(22px,env(safe-area-inset-left))]">
         <TextContextMenu readOnly={readOnly}>
-          <input
-            className="note-title-input w-full border-0 bg-transparent p-0 pb-3 text-2xl font-semibold leading-tight outline-none placeholder:text-muted focus:shadow-none md:text-3xl"
+          <Input
+            variant="bare"
+            className="note-title-input pb-3 text-2xl leading-tight font-semibold md:text-3xl"
             aria-label={t('note.title')}
             placeholder={t('note.titlePlaceholder')}
             value={document.title}
@@ -806,8 +787,7 @@ export default function NoteDialog({
               {!latest.issueId && (
                 <Button
                   disabled={!engine}
-                  variant="link"
-                  size="sm"
+                  variant="ghost"
                   onClick={() => {
                     void confirmDialog({
                       title: t('note.retryWarning'),
@@ -831,7 +811,7 @@ export default function NoteDialog({
               <div className="min-w-0 rounded-lg border border-line bg-canvas p-3">
                 <h4 className="mb-2 text-xs text-muted">{t('note.localVersion')}</h4>
                 <strong className="text-xs">{document.title}</strong>
-                <pre className="max-h-[180px] overflow-auto font-[inherit] text-xs wrap-anywhere whitespace-pre-wrap">
+                <pre className="max-h-[180px] overflow-auto font-sans text-xs wrap-anywhere whitespace-pre-wrap">
                   {document.markdown}
                 </pre>
                 <p className="text-xs text-muted">
@@ -844,7 +824,7 @@ export default function NoteDialog({
               <div className="min-w-0 rounded-lg border border-line bg-canvas p-3">
                 <h4 className="mb-2 text-xs text-muted">{t('note.remoteVersion')}</h4>
                 <strong className="text-xs">{remote.title}</strong>
-                <pre className="max-h-[180px] overflow-auto font-[inherit] text-xs wrap-anywhere whitespace-pre-wrap">
+                <pre className="max-h-[180px] overflow-auto font-sans text-xs wrap-anywhere whitespace-pre-wrap">
                   {remote.markdown}
                 </pre>
                 <p className="text-xs text-muted">
@@ -903,7 +883,7 @@ export default function NoteDialog({
               {saveError === 'storage' ? t('note.localError') : t(`error.${saveError}`)}
             </p>
             <Button onClick={exportCurrent}>{t('note.copyEmergency')}</Button>
-            <Button variant="link" size="sm" onClick={() => void persist().catch(() => {})}>
+            <Button variant="ghost" onClick={() => void persist().catch(() => {})}>
               {t('action.retry')}
             </Button>
           </Banner>
@@ -951,19 +931,18 @@ function NoteAction({
   children,
   onClick,
   disabled,
-  className = '',
-}: React.ComponentProps<typeof IconButton>) {
+  className,
+}: {
+  label: string;
+  children?: React.ReactNode;
+  onClick(): void;
+  disabled?: boolean;
+  className?: string;
+}) {
   return (
-    <DropdownMenu.Item asChild disabled={disabled}>
-      <button
-        type="button"
-        className={cn('note-action', menuItem, className)}
-        onClick={onClick}
-        disabled={disabled}
-      >
-        {children}
-        <span>{label}</span>
-      </button>
-    </DropdownMenu.Item>
+    <MenuItem className={cn('note-action', className)} disabled={disabled} onSelect={onClick}>
+      {children}
+      <span>{label}</span>
+    </MenuItem>
   );
 }

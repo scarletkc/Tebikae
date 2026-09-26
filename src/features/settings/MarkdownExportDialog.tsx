@@ -47,7 +47,7 @@ export default function MarkdownExportDialog({
     >
       <div className="markdown-export-body" aria-busy={busy}>
         <p>{t('markdownExport.help')}</p>
-        <p className="field-help mt-2.5 mb-5 text-xs leading-[1.8] text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-[3px]">
+        <p className="field-help mt-2.5 mb-5 text-xs leading-relaxed text-muted [&_a]:mt-1.5 [&_a]:inline-flex [&_a]:items-center [&_a]:gap-1">
           {t('markdownExport.coverage')}
         </p>
         <CheckboxLabel>

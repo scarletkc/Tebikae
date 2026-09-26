@@ -14,8 +14,10 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         primary: 'border border-transparent bg-accent text-accent-fg hover:bg-accent-hover',
-        secondary: 'border border-line bg-surface text-fg hover:bg-hover active:bg-active',
-        ghost: 'border border-transparent bg-transparent text-fg hover:bg-hover active:bg-active',
+        secondary:
+          'border border-line bg-surface text-fg hover:bg-hover active:bg-active data-[state=open]:bg-active',
+        ghost:
+          'border border-transparent bg-transparent text-fg hover:bg-hover active:bg-active data-[state=open]:bg-active',
         danger: 'border border-transparent bg-danger text-danger-fg hover:opacity-90',
         'danger-outline': 'border border-line bg-surface text-danger hover:bg-danger-soft',
         link: 'h-auto! border-0 bg-transparent px-0! text-accent underline-offset-4 hover:underline',

@@ -2,20 +2,24 @@
  * Development-only preview of the UI kit (open /#/__ui with `pnpm dev`). Not included in
  * production builds. English only on purpose: it is a tool for contributors, not a user screen.
  */
-import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import {
   Archive,
+  Bold,
   Check,
   Grid2X2,
   Info,
+  Italic,
   List,
+  Monitor,
   Moon,
   NotebookPen,
   Pin,
   Plus,
+  Redo2,
   Sun,
   Trash2,
   TriangleAlert,
+  Undo2,
 } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { usePreferences } from '../app/preferences';
@@ -32,18 +36,22 @@ import {
   Field,
   IconButton,
   Input,
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuLabel,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuSeparator,
+  MenuTrigger,
   SegmentedControl,
   Select,
   SettingRow,
   Spinner,
+  Textarea,
+  Toolbar,
+  ToolbarDivider,
   cn,
-  menuContent,
-  menuIndicator,
-  menuItem,
-  menuItemDanger,
-  menuLabel,
-  menuRadioItem,
-  menuSeparator,
 } from '.';
 
 const COLORS = [
@@ -105,6 +113,7 @@ export default function Gallery() {
   const [dialog, setDialog] = useState(false);
   const [layout, setLayout] = useState<'grid' | 'list'>('grid');
   const [sort, setSort] = useState('updated');
+  const [match, setMatch] = useState<'all' | 'any'>('all');
   const [checked, setChecked] = useState(true);
   return (
     <div className="h-dvh overflow-y-auto bg-canvas text-fg">
@@ -191,6 +200,21 @@ export default function Gallery() {
               { value: 'list', label: 'List', icon: <List size={16} /> },
             ]}
           />
+          <Toolbar aria-label="Formatting">
+            <IconButton label="Bold" size="sm">
+              <Bold size={16} />
+            </IconButton>
+            <IconButton label="Italic" size="sm">
+              <Italic size={16} />
+            </IconButton>
+            <ToolbarDivider />
+            <IconButton label="Undo" size="sm">
+              <Undo2 size={16} />
+            </IconButton>
+            <IconButton label="Redo" size="sm">
+              <Redo2 size={16} />
+            </IconButton>
+          </Toolbar>
         </Section>
 
         <Section title="Form controls">
@@ -203,12 +227,20 @@ export default function Gallery() {
             </Field>
             <Field label="Labels">
               {(id) => (
-                <Select id={id}>
-                  <option>All selected labels</option>
-                  <option>Any selected label</option>
-                </Select>
+                <Select<'all' | 'any'>
+                  id={id}
+                  className="w-full"
+                  value={match}
+                  onChange={setMatch}
+                  options={[
+                    { value: 'all', label: 'All selected labels' },
+                    { value: 'any', label: 'Any selected label' },
+                  ]}
+                />
               )}
             </Field>
+            <Field label="Comment">{(id) => <Textarea id={id} placeholder="Multi-line text" />}</Field>
+            <Input variant="bare" className="text-2xl font-semibold" placeholder="Bare input (note title)" />
             <CheckboxLabel>
               <Checkbox checked={checked} onChange={(event) => setChecked(event.target.checked)} />
               Remember this connection
@@ -242,47 +274,55 @@ export default function Gallery() {
         </Section>
 
         <Section title="Menus">
-          <DropdownMenu.Root>
-            <DropdownMenu.Trigger asChild>
+          {/* Right-click menus with multi-select (checkbox) items come from src/app/ContextMenu.tsx. */}
+          <Menu>
+            <MenuTrigger>
               <Button>Open menu</Button>
-            </DropdownMenu.Trigger>
-            <DropdownMenu.Portal>
-              <DropdownMenu.Content className={menuContent} align="start" sideOffset={6}>
-                <DropdownMenu.Item className={menuItem}>
-                  <Pin /> Pin
-                </DropdownMenu.Item>
-                <DropdownMenu.Item className={menuItem}>
-                  <Archive /> Archive
-                </DropdownMenu.Item>
-                <DropdownMenu.CheckboxItem className={menuItem} checked onSelect={(e) => e.preventDefault()}>
-                  Checked checkbox item
-                </DropdownMenu.CheckboxItem>
-                <DropdownMenu.CheckboxItem
-                  className={menuItem}
-                  checked="indeterminate"
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  Partly checked item
-                </DropdownMenu.CheckboxItem>
-                <DropdownMenu.Separator className={menuSeparator} />
-                <DropdownMenu.Label className={menuLabel}>Sort</DropdownMenu.Label>
-                <DropdownMenu.RadioGroup value={sort} onValueChange={setSort}>
-                  {['updated', 'created', 'title'].map((value) => (
-                    <DropdownMenu.RadioItem key={value} value={value} className={menuRadioItem}>
-                      {value}
-                      <DropdownMenu.ItemIndicator className={menuIndicator}>
-                        <Check />
-                      </DropdownMenu.ItemIndicator>
-                    </DropdownMenu.RadioItem>
-                  ))}
-                </DropdownMenu.RadioGroup>
-                <DropdownMenu.Separator className={menuSeparator} />
-                <DropdownMenu.Item className={cn(menuItem, menuItemDanger)}>
-                  <Trash2 /> Delete forever
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu.Portal>
-          </DropdownMenu.Root>
+            </MenuTrigger>
+            <MenuContent align="start">
+              <MenuItem>
+                <Pin /> Pin
+              </MenuItem>
+              <MenuItem>
+                <Archive /> Archive
+              </MenuItem>
+              <MenuSeparator />
+              <MenuLabel>Sort</MenuLabel>
+              <MenuRadioGroup value={sort} onValueChange={setSort}>
+                {['updated', 'created', 'title'].map((value) => (
+                  <MenuRadioItem key={value} value={value}>
+                    {value}
+                  </MenuRadioItem>
+                ))}
+              </MenuRadioGroup>
+              <MenuSeparator />
+              <MenuItem danger>
+                <Trash2 /> Delete forever
+              </MenuItem>
+            </MenuContent>
+          </Menu>
+          <Select
+            label="Sort"
+            value={sort}
+            onChange={setSort}
+            options={[
+              { value: 'updated', label: 'Last updated' },
+              { value: 'created', label: 'Date created' },
+              { value: 'title', label: 'Title' },
+            ]}
+          />
+          <Select
+            label="Sort"
+            size="sm"
+            icon={<List size={16} />}
+            value={sort}
+            onChange={setSort}
+            options={[
+              { value: 'updated', label: 'Last updated' },
+              { value: 'created', label: 'Date created' },
+              { value: 'title', label: 'Title' },
+            ]}
+          />
         </Section>
 
         <Section title="Dialogs">
@@ -321,10 +361,23 @@ export default function Gallery() {
         <Section title="Card and setting rows">
           <Card title="Appearance" className="w-full max-w-2xl">
             <SettingRow title="Theme" description="Follows the system unless you choose one.">
-              <Button size="sm">System</Button>
+              <Select
+                label="Theme"
+                className="min-w-32"
+                value={prefs.theme}
+                onChange={prefs.setTheme}
+                options={[
+                  { value: 'system', label: 'Follow system', icon: Monitor },
+                  { value: 'light', label: 'Light', icon: Sun },
+                  { value: 'dark', label: 'Dark', icon: Moon },
+                ]}
+              />
+            </SettingRow>
+            <SettingRow title="Export" description="Download every note as JSON.">
+              <Button>Export JSON</Button>
             </SettingRow>
             <SettingRow title="Clear this device" description="Removes local drafts and cache.">
-              <Button size="sm" variant="danger-outline">
+              <Button variant="danger-outline">
                 <Trash2 /> Clear
               </Button>
             </SettingRow>

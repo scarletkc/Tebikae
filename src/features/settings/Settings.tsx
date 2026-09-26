@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import {
+  BookX,
   Download,
   ExternalLink,
   GitBranch,
@@ -13,10 +14,10 @@ import {
   WifiOff,
 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { usePreferences, type Theme } from '../../app/preferences';
+import { usePreferences } from '../../app/preferences';
 import { usePwaUpdate } from '../../app/pwa';
 import { useSession, flushAllDrafts } from '../../app/session';
-import { download, LanguageControl } from '../../app/ui';
+import { download, LanguageControl, ThemeControl } from '../../app/ui';
 import { confirmDialog } from '../../app/confirm';
 import { exportScope, clearScope } from '../../application/commands';
 import { db } from '../../storage/db';
@@ -24,7 +25,7 @@ import packageJson from '../../../package.json';
 import { prepareMarkdownExport, type MarkdownExportSnapshot } from '../../application/markdown-export';
 import MarkdownExportDialog from './MarkdownExportDialog';
 import BackupImportDialog from './BackupImportDialog';
-import { Banner, Button, Card, Select, SettingRow } from '../../ui';
+import { Banner, Button, Card, SettingRow } from '../../ui';
 
 export default function Settings({ onConnect, offlineReady }: { onConnect(): void; offlineReady: boolean }) {
   const { t } = useTranslation();
@@ -102,8 +103,8 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
     }
   }
   return (
-    <section className="settings-page mx-auto w-full max-w-2xl space-y-6 px-4 py-6 md:px-6">
-      <h1 className="text-lg font-semibold">{t('nav.settings')}</h1>
+    // The page title lives in the topbar (Topbar.tsx), like the other workspace views.
+    <section className="settings-page mx-auto w-full max-w-2xl space-y-6">
       <Card title={t('settings.appearance')} className="settings-section">
         <SettingRow title={t('settings.language')}>
           <LanguageControl
@@ -114,33 +115,28 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
           />
         </SettingRow>
         <SettingRow title={t('settings.theme')}>
-          <Select
-            id="theme-setting"
-            className="w-auto min-w-32"
-            value={prefs.theme}
-            onChange={(e) => prefs.setTheme(e.target.value as Theme)}
-            aria-label={t('settings.theme')}
-          >
-            {(['light', 'dark', 'system'] as const).map((theme) => (
-              <option key={theme} value={theme}>
-                {t(`settings.${theme}`)}
-              </option>
-            ))}
-          </Select>
+          <ThemeControl id="theme-setting" label={t('settings.theme')} />
         </SettingRow>
       </Card>
       <Card title={t('settings.connection')} className="settings-section">
-        <p className="repository-name text-sm font-medium break-all text-fg">
-          {connection.owner}/{connection.repo}
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-muted">
-          {t(session.remembered ? 'settings.tokenStorage' : 'settings.tokenMemory')}
-        </p>
-        <p className="mt-1 text-xs leading-relaxed text-muted">{t('settings.syncLimit')}</p>
-        <div className="button-row mt-4 flex flex-wrap items-center gap-2.5">
+        <SettingRow
+          title={
+            <span className="repository-name break-all">
+              {connection.owner}/{connection.repo}
+            </span>
+          }
+          description={
+            <>
+              <span className="block">
+                {t(session.remembered ? 'settings.tokenStorage' : 'settings.tokenMemory')}
+              </span>
+              <span className="mt-1 block">{t('settings.syncLimit')}</span>
+            </>
+          }
+        >
           {session.connected || session.remembered ? (
             <Button onClick={() => void session.disconnect().catch(() => {})}>
-              <LogOut size={16} />
+              <LogOut />
               {t('action.disconnect')}
             </Button>
           ) : (
@@ -148,14 +144,17 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
               {t('action.connect')}
             </Button>
           )}
-          <Button variant="link" size="sm" onClick={() => void session.leave().catch(() => {})}>
-            {t('action.close')}
+        </SettingRow>
+        <SettingRow title={t('settings.closeNotebook')} description={t('settings.closeNotebookHelp')}>
+          <Button onClick={() => void session.leave().catch(() => {})}>
+            <BookX />
+            {t('settings.closeNotebook')}
           </Button>
-        </div>
+        </SettingRow>
         <SettingRow title={t('nav.issues')} description={t('home.issuesDescription')}>
           <Button asChild>
             <Link to="/issues">
-              <GitBranch size={16} />
+              <GitBranch />
               {t('nav.issues')}
             </Link>
           </Button>
@@ -169,13 +168,13 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
         )}
         <SettingRow title={t('action.export')} description={t('settings.exportHelp')}>
           <Button onClick={() => void exportData().catch(() => setNotice(t('error.generic')))}>
-            <Download size={16} />
+            <Download />
             {t('action.export')}
           </Button>
         </SettingRow>
         <SettingRow title={t('markdownExport.title')}>
           <Button disabled={preparingExport || busy} onClick={() => void previewMarkdownExport()}>
-            <Download size={16} />
+            <Download />
             {t(preparingExport ? 'markdownExport.preparing' : 'markdownExport.title')}
           </Button>
         </SettingRow>
@@ -190,13 +189,13 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
                 .catch(() => setNotice(t('settings.persistDenied')))
             }
           >
-            <HardDrive size={16} />
+            <HardDrive />
             {t('settings.persist')}
           </Button>
         </SettingRow>
         <SettingRow title={t('backupImport.title')} description={t('settings.recoveries')}>
           <Button disabled={busy || !session.writable} onClick={() => setImportOpen(true)}>
-            <Upload size={16} />
+            <Upload />
             {t('backupImport.title')}
           </Button>
         </SettingRow>
@@ -220,21 +219,19 @@ export default function Settings({ onConnect, offlineReady }: { onConnect(): voi
             {t('settings.forceUpdate')}
           </Button>
         </SettingRow>
-        <p className="mt-2 text-sm">
-          <a
-            href="https://github.com/scarletkc/Tebikae"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1"
-          >
-            {t('settings.githubLink')} <ExternalLink size={14} aria-hidden="true" />
-          </a>
-        </p>
+        <SettingRow title={t('settings.source')} description={t('settings.license')}>
+          <Button asChild>
+            <a href="https://github.com/scarletkc/Tebikae" target="_blank" rel="noopener noreferrer">
+              <ExternalLink />
+              {t('settings.githubLink')}
+            </a>
+          </Button>
+        </SettingRow>
       </Card>
       <Card title={t('settings.dangerZone')} className="settings-section">
         <SettingRow title={t('settings.clear')} description={t('settings.clearHelp')}>
           <Button variant="danger-outline" disabled={busy || !session.writable} onClick={() => void clear()}>
-            <Trash2 size={16} />
+            <Trash2 />
             {t('settings.clear')}
           </Button>
         </SettingRow>

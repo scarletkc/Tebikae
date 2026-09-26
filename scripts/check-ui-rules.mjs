@@ -1,5 +1,7 @@
 // Guards the UI conventions in docs/ui-overhaul-plan.md so finished migrations cannot regress.
 // Run from the repository root: node scripts/check-ui-rules.mjs
+// File-level checks live here; component usage in TSX is checked by the ESLint rules in
+// scripts/eslint-plugin-ui.mjs (`pnpm lint`).
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
