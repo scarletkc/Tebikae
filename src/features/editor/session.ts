@@ -22,11 +22,19 @@ export class MarkdownSession {
   }
 
   changed = () => {
-    if (this.suppress || !this.editor) return;
+    // Milkdown 在 create() 完成、attach() 之前就已可编辑；这段时间的输入同样要记下。
+    if (this.suppress) return;
     this.dirty = true;
     clearTimeout(this.timer);
     if (!this.composing) this.timer = setTimeout(() => this.serialize(), 100);
   };
+
+  /** 编辑器实例可用后调用；立即发布它启动期间收到的输入。 */
+  attach(editor: Editor | undefined) {
+    const first = !this.editor && editor;
+    this.editor = editor;
+    if (first) this.serialize();
+  }
 
   compositionStart = () => {
     this.composing = true;
