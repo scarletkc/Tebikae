@@ -142,6 +142,13 @@ const kitImports = {
             context.report({ node: specifier, messageId: 'reexport', data: { name } });
         }
       },
+      ExportAllDeclaration(node) {
+        const source = node.source.value;
+        if (typeof source !== 'string' || !source.startsWith('.')) return;
+        const target = resolve(here, source);
+        if (target === KIT_DIR || target.startsWith(KIT_DIR + sep))
+          context.report({ node, messageId: 'reexport', data: { name: `* from "${source}"` } });
+      },
     };
   },
 };
