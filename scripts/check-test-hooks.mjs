@@ -31,7 +31,6 @@ for (const file of walk('tests', ['.ts', '.tsx'])) {
 // Classes that tests assert are absent (toHaveCount(0)), plus file extensions that look like classes.
 const IGNORED = new Set([
   'context-more',
-  'context-check',
   'filter-button',
   'count-badge',
   'filter-clear-button',

@@ -2,10 +2,9 @@
  * Shared classes for every Radix dropdown/context menu. Use them on the Radix parts directly:
  *   <DropdownMenu.Content className={cn('my-hook-class', menuContent)}>
  *   <DropdownMenu.Item className={menuItem}>
- * Checkbox items show their checked state as bold + underline (docs/context-menus.md);
- * single-choice radio lists use `menuRadioItem` plus a trailing <Check className={menuIndicator} />.
+ * Checked state looks the same everywhere: semibold text plus a trailing indicator
+ * (<Check>, <Minus> for indeterminate) rendered through `menuIndicator` (docs/context-menus.md).
  */
-import { cn } from './cn';
 
 /** Popover surface shared by menus and menu-like panels (e.g. the workspace status panel). */
 export const menuSurface =
@@ -23,14 +22,10 @@ export const menuItem =
   'data-[disabled]:pointer-events-none data-[disabled]:opacity-50 ' +
   'pointer-coarse:min-h-11 max-sm:min-h-11 ' +
   '[&_svg]:size-4 [&_svg]:shrink-0 [&_svg]:text-muted data-[highlighted]:[&_svg]:text-current ' +
-  'data-[state=checked]:font-bold data-[state=checked]:underline data-[state=checked]:decoration-[1.5px] data-[state=checked]:underline-offset-3 ' +
-  'data-[state=indeterminate]:font-semibold data-[state=indeterminate]:underline data-[state=indeterminate]:decoration-dashed data-[state=indeterminate]:decoration-[1.5px] data-[state=indeterminate]:underline-offset-3';
+  'data-[state=checked]:font-semibold data-[state=indeterminate]:font-semibold';
 
-/** Single-choice item: checked shows a trailing check mark instead of the underline. */
-export const menuRadioItem = cn(
-  menuItem,
-  'data-[state=checked]:font-semibold data-[state=checked]:no-underline',
-);
+/** Single-choice item: same classes as `menuItem`; the check mark comes from menuIndicator. */
+export const menuRadioItem = menuItem;
 
 export const menuItemDanger = 'text-danger [&_svg]:text-danger data-[highlighted]:bg-danger-soft';
 
@@ -38,6 +33,6 @@ export const menuSeparator = 'mx-1 my-1 h-px bg-line';
 
 export const menuLabel = 'px-2 py-1.5 text-xs font-medium text-muted';
 
-/** Trailing check mark for `menuRadioItem`. */
+/** Trailing check/dash mark for checked items (`menuRadioItem` and context-menu checkboxes). */
 export const menuIndicator =
   'ms-auto flex size-4 items-center justify-center text-accent [&_svg]:text-accent!';

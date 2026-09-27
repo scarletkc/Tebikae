@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator } from '@playwright/test';
 import { connect, mockGitHub, mockIssue } from './fixtures';
 
 for (const width of [1280, 390, 320]) {
@@ -290,4 +290,51 @@ test('touch on editable root or text does not intercept native selection', async
     await expect(page.getByRole('menu')).toHaveCount(0);
     await target.dispatchEvent('pointerup', { pointerType: 'touch' });
   }
+});
+
+test.describe('coarse pointer', () => {
+  test.use({ hasTouch: true, viewport: { width: 390, height: 844 } });
+  const userSelect = (locator: Locator) =>
+    locator.evaluate((el) => {
+      const style = getComputedStyle(el);
+      return style.userSelect || style.webkitUserSelect;
+    });
+
+  test('bottom navigation long press opens the destination menu without navigating', async ({
+    page,
+    context,
+  }) => {
+    await mockGitHub(context, [
+      mockIssue(1, 'Kept note'),
+      mockIssue(2, 'Old draft', 'Let it go.', { trashedAt: '2026-09-15T08:00:00Z' }),
+    ]);
+    await connect(page);
+    const trash = page.locator('.bottom-nav').getByRole('link', { name: 'Trash', exact: true });
+    const box = (await trash.boundingBox())!;
+    const point = { pointerType: 'touch', clientX: box.x + box.width / 2, clientY: box.y + box.height / 2 };
+    await trash.dispatchEvent('pointerdown', point);
+    await page.waitForTimeout(550);
+    await expect(page.getByRole('menuitem', { name: 'Empty trash', exact: true })).toBeEnabled();
+    await trash.dispatchEvent('pointerup', point);
+    await trash.dispatchEvent('click');
+    await expect(page).not.toHaveURL(/#\/trash$/u);
+    await page.getByRole('menuitem', { name: 'Open', exact: true }).click();
+    await expect(page).toHaveURL(/#\/trash$/u);
+  });
+
+  test('chrome text is unselectable while editable text keeps native selection', async ({
+    page,
+    context,
+  }) => {
+    await mockGitHub(context, [mockIssue(1, 'Native selection', 'Select these words')]);
+    await connect(page);
+    expect(await userSelect(page.locator('.note-card').first())).toBe('none');
+    expect(await userSelect(page.locator('.search-box input'))).toBe('text');
+    await page.locator('.mobile-menu').click();
+    expect(await userSelect(page.locator('.mobile-drawer .main-nav a').first())).toBe('none');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'Edit note: Native selection' }).click();
+    expect(await userSelect(page.getByRole('textbox', { name: 'Title', exact: true }))).toBe('text');
+    expect(await userSelect(page.locator('.ProseMirror p'))).toBe('text');
+  });
 });

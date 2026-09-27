@@ -194,6 +194,23 @@
   p {
     line-height: 1.7;
   }
+  /*
+   * On touch devices a long press opens the app's own menus, so native text selection and
+   * callouts stay out of the workspace chrome, including the portaled mobile drawer.
+   * Editable text (as isNativeText() defines it) and the note overlay keep them.
+   */
+  @media (pointer: coarse) {
+    :is(.workspace, .mobile-drawer),
+    :is(.workspace, .mobile-drawer) * {
+      -webkit-touch-callout: none;
+      user-select: none;
+    }
+    :is(.workspace, .mobile-drawer)
+      :is(input, textarea, [contenteditable]:not([contenteditable='false']), .editor-layer, .editor-layer *) {
+      -webkit-touch-callout: default;
+      user-select: text;
+    }
+  }
   svg {
     flex-shrink: 0;
   }

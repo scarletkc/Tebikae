@@ -356,8 +356,7 @@ if (await confirmDialog({ title, confirmLabel, danger: true })) …
 
 `menuClasses.ts` 中的类名常量只给组件库和 `src/app/ContextMenu.tsx`（右键菜单构建器）使用，功能代码不能直接用。
 
-- **可多选项**（CheckboxItem，例如右键菜单里的标签和颜色）：选中时加粗并加下划线，部分选中时用虚线下划线，**不显示勾号**。这是 [右键菜单设计](context-menus.md) 的约定，E2E 测试会断言。
-- **单选项**（RadioItem）：选中时显示右侧勾号。
+- **可选项**（CheckboxItem 与 RadioItem）：选中时半粗体并显示右侧勾号，部分选中（indeterminate）显示减号。所有菜单统一使用 `menuIndicator` 标记，见 [右键菜单设计](context-menus.md)，E2E 测试会断言。
 - 点完一项后菜单要保持打开时（例如编辑器的“表格”菜单连续删除行或列），在 `MenuItem` 的 `onSelect` 里调用 `event.preventDefault()`。
 - 像菜单一样的信息面板（例如同步状态面板）使用 `menuSurface`，再自行设置宽度和内边距。
 - 右键菜单统一通过 `src/app/ContextMenu.tsx`，传入 `MenuAction[]` 即可，不要自己拼菜单。
